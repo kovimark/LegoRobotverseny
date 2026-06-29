@@ -30,7 +30,7 @@ export default function Navbar() {
                     </div>
                     <div className="navbar-nav">
                         <Link className="nav-link" to="/admin" onClick={() => setIsMenuOpen(false)}>
-                            Admoin felület
+                            Admin felület
                         </Link>
                     </div>
                 </div>
