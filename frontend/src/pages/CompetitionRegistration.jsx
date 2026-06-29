@@ -20,10 +20,10 @@ export default function CompetitionRegistration() {
     schoolName: 'Az iskola nevének kitöltése kötelező.',
     teamName: 'A csapatnév kitöltése kötelező.',
     emailAddress: 'Az emailcím kitöltése kötelező.',
-    teamMember1Name: 'Az 1. tag nevének kitöltése kötelező.',
-    teamMember1Age: 'Az 1. tag életkorának kitöltése kötelező.',
-    teamMember2Name: 'A 2. tag nevének kitöltése kötelező.',
-    teamMember2Age: 'A 2. tag életkorának kitöltése kötelező.',
+    teamMember1Name: 'Az 1. Versenyző nevének kitöltése kötelező.',
+    teamMember1Age: 'Az 1. Versenyző életkorának kitöltése kötelező.',
+    teamMember2Name: 'A 2. Versenyző nevének kitöltése kötelező.',
+    teamMember2Age: 'A 2. Versenyző életkorának kitöltése kötelező.',
     teamCoach1: 'Az 1. felkészítő tanár nevének kitöltése kötelező.',
   }
 
@@ -173,7 +173,7 @@ export default function CompetitionRegistration() {
 
             <div className="row">
               <div className="col-md-6 mb-3">
-                <label htmlFor="teamMember1Name" className="form-label">1. Tag Neve</label>
+                <label htmlFor="teamMember1Name" className="form-label">1. Versenyző Neve</label>
                 <div className="position-relative">
                   <input
                     type="text"
@@ -188,7 +188,7 @@ export default function CompetitionRegistration() {
                 {errors.teamMember1Name && <div className="text-danger small mt-1">{errors.teamMember1Name}</div>}
               </div>
               <div className="col-md-6 mb-3">
-                <label htmlFor="teamMember1Age" className="form-label">1. Tag Életkora</label>
+                <label htmlFor="teamMember1Age" className="form-label">1. Versenyző Életkora</label>
                 <div className="position-relative">
                   <input
                     type="number"
@@ -206,7 +206,7 @@ export default function CompetitionRegistration() {
 
             <div className="row">
               <div className="col-md-6 mb-3">
-                <label htmlFor="teamMember2Name" className="form-label">2. Tag Neve</label>
+                <label htmlFor="teamMember2Name" className="form-label">2. Versenyző Neve</label>
                 <div className="position-relative">
                   <input
                     type="text"
@@ -221,7 +221,7 @@ export default function CompetitionRegistration() {
                 {errors.teamMember2Name && <div className="text-danger small mt-1">{errors.teamMember2Name}</div>}
               </div>
               <div className="col-md-6 mb-3">
-                <label htmlFor="teamMember2Age" className="form-label">2. Tag Életkora</label>
+                <label htmlFor="teamMember2Age" className="form-label">2. Versenyző Életkora</label>
                 <div className="position-relative">
                   <input
                     type="number"
