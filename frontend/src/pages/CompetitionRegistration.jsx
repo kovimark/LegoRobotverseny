@@ -77,7 +77,7 @@ export default function CompetitionRegistration() {
     }
 
     try {
-      const response = await fetch('http://legocompetition.runasp.net/api/Teams', {
+      const response = await fetch('https://legocompetition.runasp.net/api/Teams', {
         method: 'POST',
         headers: {
           accept: '*/*',

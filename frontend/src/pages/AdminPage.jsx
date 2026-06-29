@@ -9,7 +9,7 @@ export default function AdminPage() {
   useEffect(() => {
     const fetchTeams = async () => {
       try {
-        const response = await fetch('http://legocompetition.runasp.net/api/Teams')
+        const response = await fetch('https://legocompetition.runasp.net/api/Teams')
         if (!response.ok) {
           throw new Error('Nem sikerült betölteni a csapatokat.')
         }
