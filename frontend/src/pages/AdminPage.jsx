@@ -65,8 +65,8 @@ export default function AdminPage() {
                     <li><strong>Csapatnév:</strong> {team.teamName || '-'}</li>
                     <li><strong>Email:</strong> {team.emailAddress || '-'}</li>
                     <li><strong>1. tag:</strong> {team.teamMember1Name || '-'}</li>
-                    <li><strong>2. tag:</strong> {team.teamMember2Name || '-'}</li>
                     <li><strong>1. tag életkora:</strong> {team.teamMember1Age ?? '-'}</li>
+                    <li><strong>2. tag:</strong> {team.teamMember2Name || '-'}</li>                    
                     <li><strong>2. tag életkora:</strong> {team.teamMember2Age ?? '-'}</li>
                     <li><strong>1. coach:</strong> {team.teamCoach1 || '-'}</li>
                     <li><strong>2. coach:</strong> {team.teamCoach2 || '-'}</li>
