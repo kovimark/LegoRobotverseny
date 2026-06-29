@@ -2,6 +2,113 @@
   text-align: center;
 }
 
+.custom-navbar {
+  position: relative;
+  z-index: 1000;
+}
+
+.navbar-toggler {
+  border: 0;
+  background: transparent;
+  padding: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.navbar-toggler:focus {
+  box-shadow: none;
+  outline: none;
+}
+
+.navbar-toggler-line {
+  display: block;
+  width: 24px;
+  height: 2px;
+  background-color: #212529;
+  border-radius: 999px;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.navbar-toggler.active .navbar-toggler-line:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.navbar-toggler.active .navbar-toggler-line:nth-child(2) {
+  opacity: 0;
+}
+
+.navbar-toggler.active .navbar-toggler-line:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+.navbar-menu {
+  display: flex;
+  align-items: center;
+}
+
+@media (max-width: 991.98px) {
+  .navbar-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    background-color: #f8f9fa;
+    padding: 0.75rem 1rem 1rem;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transform: translateY(-8px);
+    pointer-events: none;
+    transition: max-height 0.3s ease, opacity 0.25s ease, transform 0.25s ease;
+  }
+
+  .navbar-menu.open {
+    max-height: 220px;
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .navbar-menu .navbar-nav {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  .navbar-menu .nav-link {
+    width: 100%;
+    padding: 0.5rem 0;
+  }
+}
+
+@media (min-width: 992px) {
+  .navbar-toggler {
+    display: none;
+  }
+
+  .navbar-menu {
+    margin-left: auto;
+    position: static;
+    max-height: none;
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+    background-color: transparent;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .navbar-menu .navbar-nav {
+    flex-direction: row;
+    gap: 1rem;
+  }
+}
+
 .App-logo {
   height: 40vmin;
   pointer-events: none;
