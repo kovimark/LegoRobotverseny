@@ -7,6 +7,39 @@
   z-index: 1000;
 }
 
+.team-card {
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.team-toggle {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .team-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.12) !important;
+  }
+
+  .team-toggle:hover {
+    background-color: #6c757d;
+    color: #ffffff;
+  }
+}
+
+.team-details {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.3s ease, opacity 0.25s ease;
+}
+
+.team-details.open {
+  max-height: 500px;
+  opacity: 1;
+}
+
 .navbar-toggler {
   border: 0;
   background: transparent;

@@ -28,6 +28,11 @@ export default function Navbar() {
                             Versenyjelentkezés
                         </Link>
                     </div>
+                    <div className="navbar-nav">
+                        <Link className="nav-link" to="/admin" onClick={() => setIsMenuOpen(false)}>
+                            Admoin felület
+                        </Link>
+                    </div>
                 </div>
             </div>
         </nav>
