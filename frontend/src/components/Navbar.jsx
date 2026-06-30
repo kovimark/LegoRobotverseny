@@ -24,6 +24,20 @@ export default function Navbar() {
                 </button>
                 <div className={`navbar-menu ${isMenuOpen ? 'open' : ''}`} id="navbarNavAltMarkup">
                     <div className="navbar-nav">
+                        <Link className="nav-link" to="/szabalyzat" onClick={() => setIsMenuOpen(false)}>
+                            Szabályzat
+                        </Link>
+                    </div><div className="navbar-nav">
+                        <Link className="nav-link" to="/videok" onClick={() => setIsMenuOpen(false)}>
+                            Videók
+                        </Link>
+                    </div>
+                    <div className="navbar-nav">
+                        <Link className="nav-link" to="/hírek" onClick={() => setIsMenuOpen(false)}>
+                            Hírek
+                        </Link>
+                    </div>
+                    <div className="navbar-nav">
                         <Link className="nav-link" to="/versenyjelentkezes" onClick={() => setIsMenuOpen(false)}>
                             Versenyjelentkezés
                         </Link>
