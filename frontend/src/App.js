@@ -6,19 +6,38 @@ import HomePage from './pages/HomePage';
 import AdminPage from './pages/AdminPage';
 import CompetitionRegistration from './pages/CompetitionRegistration';
 import RulesPage from './pages/RulesPage';
+import StandingsPage from './pages/StandingsPage';
 import Navbar from './components/Navbar';
 import LoginPage from './pages/LoginPage';
 import { auth, googleProvider } from './firebase';
 
 function App() {
   const [user, setUser] = useState(null);
+  const [userRole, setUserRole] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState('');
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       setAuthLoading(false);
+
+      if (!currentUser?.email) {
+        setUserRole(null);
+        return;
+      }
+
+      try {
+        const response = await fetch(`https://legocompetition.runasp.net/api/Teams/privilege/${encodeURIComponent(currentUser.email)}`);
+        if (!response.ok) {
+          throw new Error('Privilege lookup failed');
+        }
+
+        const roleValue = await response.text();
+        setUserRole(roleValue === '1' ? 'admin' : 'competitor');
+      } catch (error) {
+        setUserRole('competitor');
+      }
     });
 
     return unsubscribe;
@@ -48,6 +67,7 @@ function App() {
     <div className="App">
       <Navbar
         user={user}
+        userRole={userRole}
         authLoading={authLoading}
         authError={authError}
         onGoogleSignIn={handleGoogleSignIn}
@@ -58,7 +78,8 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/versenyjelentkezes" element={<CompetitionRegistration user={user} />} />
         <Route path="/szabalyzat" element={<RulesPage />} />
-        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/allasok" element={<StandingsPage />} />
+        <Route path="/admin" element={userRole === 'admin' ? <AdminPage /> : <HomePage />} />
         <Route
           path="/bejelentkezes"
           element={

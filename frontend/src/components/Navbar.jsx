@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
+﻿import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 
-export default function Navbar({ user, authLoading, authError, onGoogleSignIn, onSignOut }) {
+export default function Navbar({ user, userRole, authLoading, authError, onGoogleSignIn, onSignOut }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [isProfileOpen, setIsProfileOpen] = useState(false)
 
@@ -62,11 +62,19 @@ export default function Navbar({ user, authLoading, authError, onGoogleSignIn, o
                                 Versenyjelentkezés
                             </Link>
                         </div>
-                        <div className="navbar-nav">
-                            <Link className="nav-link" to="/admin" onClick={closeMenu}>
-                                Admin felület
-                            </Link>
-                        </div>
+                        {userRole === 'admin' ? (
+                            <div className="navbar-nav">
+                                <Link className="nav-link" to="/admin" onClick={closeMenu}>
+                                    Admin felület
+                                </Link>
+                            </div>
+                        ) : (
+                            <div className="navbar-nav">
+                                <Link className="nav-link" to="/allasok" onClick={closeMenu}>
+                                    Állások
+                                </Link>
+                            </div>
+                        )}
                         <div className="navbar-nav navbar-auth">
                             {user ? (
                                 <button className="profile-button" type="button" onClick={handleProfileToggle} aria-expanded={isProfileOpen}>

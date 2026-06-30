@@ -7,6 +7,7 @@ export default function AdminPage() {
   const [openTeamId, setOpenTeamId] = useState(null)
   const [actionMessage, setActionMessage] = useState(null)
   const [teamToDelete, setTeamToDelete] = useState(null)
+  const [searchTerm, setSearchTerm] = useState('')
 
   const fetchTeams = async () => {
     try {
@@ -45,6 +46,32 @@ export default function AdminPage() {
   const toggleTeam = (teamId) => {
     setOpenTeamId((prevId) => (prevId === teamId ? null : teamId))
   }
+
+  const filteredTeams = teams.filter((team) => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+
+    if (!normalizedSearch) {
+      return true
+    }
+
+    const searchableValues = [
+      team.teamName,
+      team.teamMember1Name,
+      team.teamMember1Email,
+      team.teamMember2Name,
+      team.teamMember2Email,
+      team.teamCoach1,
+      team.teamCoach1Email,
+      team.teamCoach2,
+      team.teamCoach2Email,
+      team.schoolName,
+      team.id,
+      team.teamMember1Age,
+      team.teamMember2Age
+    ].filter(Boolean)
+
+    return searchableValues.some((value) => String(value).toLowerCase().includes(normalizedSearch))
+  })
 
   const handleDelete = async () => {
     if (!teamToDelete) {
@@ -85,8 +112,20 @@ export default function AdminPage() {
         <div className="alert alert-secondary">Nincsenek csapatok.</div>
       )}
 
-      <div className="d-flex flex-column gap-3">
-        {teams.map((team) => {
+      <div className="row g-3 align-items-start">
+        <div className="col-lg-4">
+          <label htmlFor="team-search" className="form-label fw-semibold">Keresés</label>
+          <input
+            id="team-search"
+            type="text"
+            className="form-control"
+            placeholder="Keresés név, email, iskola vagy egyéb adat alapján"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+          />
+        </div>
+        <div className="col-lg-12 d-flex flex-column gap-3">
+          {filteredTeams.map((team) => {
           const isOpen = openTeamId === team.id
 
           return (
@@ -130,7 +169,8 @@ export default function AdminPage() {
               </div>
             </div>
           )
-        })}
+          })}
+        </div>
       </div>
 
       {teamToDelete && (
