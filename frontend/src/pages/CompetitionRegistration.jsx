@@ -1,16 +1,19 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
-export default function CompetitionRegistration() {
+export default function CompetitionRegistration({ user }) {
   const [formData, setFormData] = useState({
     id: 0,
     teamName: '',
-    emailAddress: '',
+    teamMember1Email: user?.email || '',
+    teamMember2Email: '',
     teamMember1Name: '',
     teamMember2Name: '',
     teamMember1Age: '',
     teamMember2Age: '',
     teamCoach1: '',
+    teamCoach1Email: '',
     teamCoach2: '',
+    teamCoach2Email: '',
     schoolName: ''
   })
   const [errors, setErrors] = useState({})
@@ -19,13 +22,24 @@ export default function CompetitionRegistration() {
   const requiredFields = {
     schoolName: 'Az iskola nevének kitöltése kötelező.',
     teamName: 'A csapatnév kitöltése kötelező.',
-    emailAddress: 'Az emailcím kitöltése kötelező.',
+    teamMember1Email: 'Az 1. versenyző emailcímének kitöltése kötelező.',
+    teamMember2Email: 'A 2. versenyző emailcímének kitöltése kötelező.',
     teamMember1Name: 'Az 1. Versenyző nevének kitöltése kötelező.',
     teamMember1Age: 'Az 1. Versenyző életkorának kitöltése kötelező.',
     teamMember2Name: 'A 2. Versenyző nevének kitöltése kötelező.',
     teamMember2Age: 'A 2. Versenyző életkorának kitöltése kötelező.',
     teamCoach1: 'Az 1. felkészítő tanár nevének kitöltése kötelező.',
+    teamCoach1Email: 'Az 1. felkészítő tanár emailcímének kitöltése kötelező.'
   }
+
+  useEffect(() => {
+    if (user?.email) {
+      setFormData(prev => ({
+        ...prev,
+        teamMember1Email: prev.teamMember1Email || user.email
+      }))
+    }
+  }, [user?.email])
 
   const requiredMark = (
     <span className="position-absolute top-50 end-0 translate-middle-y me-3 text-danger fw-bold pe-none">
@@ -66,6 +80,36 @@ export default function CompetitionRegistration() {
       return acc
     }, {})
 
+    const emailFields = [
+      { key: 'teamMember1Email', label: 'Az 1. versenyző email címe' },
+      { key: 'teamMember2Email', label: 'A 2. versenyző email címe' },
+      { key: 'teamCoach1Email', label: 'Az 1. felkészítő tanár email címe' },
+      { key: 'teamCoach2Email', label: 'A 2. felkészítő tanár email címe' }
+    ]
+
+    const normalizedEmails = emailFields.reduce((acc, field) => {
+      const value = typeof formData[field.key] === 'string' ? formData[field.key].trim().toLowerCase() : ''
+      acc[field.key] = value
+      return acc
+    }, {})
+
+    const usedEmails = new Map()
+
+    emailFields.forEach((field) => {
+      const value = normalizedEmails[field.key]
+
+      if (!value) {
+        return
+      }
+
+      if (usedEmails.has(value)) {
+        validationErrors[field.key] = 'Az email cím nem lehet megegyező másik mezőben megadott címmel.'
+        validationErrors[usedEmails.get(value)] = 'Az email cím nem lehet megegyező másik mezőben megadott címmel.'
+      } else {
+        usedEmails.set(value, field.key)
+      }
+    })
+
     setErrors(validationErrors)
 
     if (Object.keys(validationErrors).length > 0) {
@@ -77,7 +121,7 @@ export default function CompetitionRegistration() {
     }
 
     try {
-      const response = await fetch('https://legocompetition.runasp.net/api/Teams', {
+      const response = await fetch('https://legocompetition.runasp.net/api/Teams/registerteam', {
         method: 'POST',
         headers: {
           accept: '*/*',
@@ -94,13 +138,16 @@ export default function CompetitionRegistration() {
       setFormData({
         id: 0,
         teamName: '',
-        emailAddress: '',
+        teamMember1Email: user?.email || '',
+        teamMember2Email: '',
         teamMember1Name: '',
         teamMember2Name: '',
         teamMember1Age: '',
         teamMember2Age: '',
         teamCoach1: '',
+        teamCoach1Email: '',
         teamCoach2: '',
+        teamCoach2Email: '',
         schoolName: ''
       })
       setErrors({})
@@ -155,22 +202,6 @@ export default function CompetitionRegistration() {
               {errors.schoolName && <div className="text-danger small mt-1">{errors.schoolName}</div>}
             </div>
 
-            <div className="mb-3">
-              <label htmlFor="emailAddress" className="form-label">Email</label>
-              <div className="position-relative">
-                <input
-                  type="email"
-                  className={`form-control pe-4 ${errors.emailAddress ? 'border-danger' : ''}`}
-                  id="emailAddress"
-                  name="emailAddress"
-                  value={formData.emailAddress}
-                  onChange={handleChange}
-                />
-                {requiredMark}
-              </div>
-              {errors.emailAddress && <div className="text-danger small mt-1">{errors.emailAddress}</div>}
-            </div>
-
             <div className="row">
               <div className="col-md-6 mb-3">
                 <label htmlFor="teamMember1Name" className="form-label">1. Versenyző Neve</label>
@@ -187,6 +218,25 @@ export default function CompetitionRegistration() {
                 </div>
                 {errors.teamMember1Name && <div className="text-danger small mt-1">{errors.teamMember1Name}</div>}
               </div>
+              <div className="col-md-6 mb-3">
+                <label htmlFor="teamMember1Email" className="form-label">1. Versenyző E-mail</label>
+                <div className="position-relative">
+                  <input
+                    type="email"
+                    className={`form-control pe-4 ${errors.teamMember1Email ? 'border-danger' : ''}`}
+                    id="teamMember1Email"
+                    name="teamMember1Email"
+                    value={formData.teamMember1Email}
+                    onChange={handleChange}
+                    disabled={Boolean(user?.email)}
+                  />
+                  {requiredMark}
+                </div>                
+                {errors.teamMember1Email && <div className="text-danger small mt-1">{errors.teamMember1Email}</div>}
+              </div>
+            </div>
+
+            <div className="row">
               <div className="col-md-6 mb-3">
                 <label htmlFor="teamMember1Age" className="form-label">1. Versenyző Életkora</label>
                 <div className="position-relative">
@@ -221,6 +271,24 @@ export default function CompetitionRegistration() {
                 {errors.teamMember2Name && <div className="text-danger small mt-1">{errors.teamMember2Name}</div>}
               </div>
               <div className="col-md-6 mb-3">
+                <label htmlFor="teamMember2Email" className="form-label">2. Versenyző E-mail</label>
+                <div className="position-relative">
+                  <input
+                    type="email"
+                    className={`form-control pe-4 ${errors.teamMember2Email ? 'border-danger' : ''}`}
+                    id="teamMember2Email"
+                    name="teamMember2Email"
+                    value={formData.teamMember2Email}
+                    onChange={handleChange}
+                  />
+                  {requiredMark}
+                </div>
+                {errors.teamMember2Email && <div className="text-danger small mt-1">{errors.teamMember2Email}</div>}
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-6 mb-3">
                 <label htmlFor="teamMember2Age" className="form-label">2. Versenyző Életkora</label>
                 <div className="position-relative">
                   <input
@@ -235,8 +303,8 @@ export default function CompetitionRegistration() {
                 </div>
                 {errors.teamMember2Age && <div className="text-danger small mt-1">{errors.teamMember2Age}</div>}
               </div>
-
             </div>
+
             <div className="row">
               <div className="col-md-6 mb-3">
                 <label htmlFor="teamCoach1" className="form-label">1. Felkészítő Tanár Neve</label>
@@ -254,6 +322,24 @@ export default function CompetitionRegistration() {
                 {errors.teamCoach1 && <div className="text-danger small mt-1">{errors.teamCoach1}</div>}
               </div>
               <div className="col-md-6 mb-3">
+                <label htmlFor="teamCoach1Email" className="form-label">1. Felkészítő Tanár E-mail</label>
+                <div className="position-relative">
+                  <input
+                    type="email"
+                    className={`form-control pe-4 ${errors.teamCoach1Email ? 'border-danger' : ''}`}
+                    id="teamCoach1Email"
+                    name="teamCoach1Email"
+                    value={formData.teamCoach1Email}
+                    onChange={handleChange}
+                  />
+                  {requiredMark}
+                </div>
+                {errors.teamCoach1Email && <div className="text-danger small mt-1">{errors.teamCoach1Email}</div>}
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-6 mb-3">
                 <label htmlFor="teamCoach2" className="form-label">2. Felkészítő Tanár Neve (Opcionális)</label>
                 <input
                   type="text"
@@ -261,6 +347,17 @@ export default function CompetitionRegistration() {
                   id="teamCoach2"
                   name="teamCoach2"
                   value={formData.teamCoach2}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="col-md-6 mb-3">
+                <label htmlFor="teamCoach2Email" className="form-label">2. Felkészítő Tanár E-mail (Opcionális)</label>
+                <input
+                  type="email"
+                  className="form-control"
+                  id="teamCoach2Email"
+                  name="teamCoach2Email"
+                  value={formData.teamCoach2Email}
                   onChange={handleChange}
                 />
               </div>

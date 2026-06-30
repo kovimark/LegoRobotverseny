@@ -168,7 +168,7 @@ export default function RulesPage() {
           <span className="home-kicker">Szabályzat</span>
           <h1 className="home-title">Versenyszabályzat és részletes feltételek</h1>
           <p className="home-copy">
-            Az alábbi részeket egymás után böngészheted, és mindegyikhez külön letöltési lehetőséget is biztosítunk. A tartalom A4-es, nyomtatható formátumra van tervezve.
+            Az alábbi részeket egymás után böngészheted, ésA belépett fiók e-mail címe kerül automatikusan beállításra. mindegyikhez külön letöltési lehetőséget is biztosítunk. A tartalom A4-es, nyomtatható formátumra van tervezve.
           </p>
 
           <div className="rules-actions">
@@ -183,23 +183,24 @@ export default function RulesPage() {
 
               return (
                 <article key={section.id} className="rules-card">
-                  <button
-                    className="rules-toggle"
-                    type="button"
-                    onClick={() => handleToggle(section.id)}
-                    aria-expanded={isOpen}
-                  >
-                    <span>{section.title}</span>
-                    <span className="rules-toggle-icon">{isOpen ? '▴' : '▾'}</span>
-                  </button>
+                  <div className="rules-toggle-row">
+                    <button
+                      className="rules-toggle"
+                      type="button"
+                      onClick={() => handleToggle(section.id)}
+                      aria-expanded={isOpen}
+                    >
+                      <span>{section.title}</span>
+                      <span className="rules-toggle-icon">{isOpen ? '▴' : '▾'}</span>
+                    </button>
+                    <button className="btn btn-theme-secondary rules-header-download" type="button" onClick={() => handleDownloadSection(section)}>
+                      Letöltés
+                    </button>
+                  </div>
 
                   <div className={`rules-body ${isOpen ? 'open' : ''}`}>
                     <div className="rules-body-inner">
-                      <div className="rules-download-row rules-download-row-top">
-                        <button className="btn btn-theme-secondary" type="button" onClick={() => handleDownloadSection(section)}>
-                          Szabályzat letöltése
-                        </button>
-                      </div>
+                      
                       <div className="rules-document-preview">
                         <div className="rules-document-meta">Lego Robotverseny • Szabályzat</div>
                         <h3>{section.title}</h3>
@@ -215,7 +216,7 @@ export default function RulesPage() {
                       </div>
                       <div className="rules-download-row rules-download-row-bottom">
                         <button className="btn btn-theme-secondary" type="button" onClick={() => handleDownloadSection(section)}>
-                          Szabályzat letöltése
+                          Letöltés
                         </button>
                       </div>
                     </div>

@@ -442,25 +442,36 @@ form {
 }
 
 .rules-card {
-  border: 2px solid var(--black);
   border-radius: 0.6rem;
   background: rgba(255, 255, 255, 0.92);
   overflow: hidden;
-  box-shadow: 0.4rem 0.4rem 0 var(--black);
+}
+
+.rules-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem;
+  background: linear-gradient(90deg, rgba(253, 231, 76, 0.45), rgba(91, 192, 235, 0.18));
 }
 
 .rules-toggle {
-  width: 100%;
+  flex: 1;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 1.1rem;
+  padding: 0.65rem 0.8rem;
   border: 0;
-  background: linear-gradient(90deg, rgba(253, 231, 76, 0.45), rgba(91, 192, 235, 0.18));
+  border-radius: 0.45rem;
+  background: transparent;
   color: var(--black);
   font-size: 1rem;
   font-weight: 800;
   text-align: left;
+}
+
+.rules-header-download {
+  white-space: nowrap;
 }
 
 .rules-toggle-icon {

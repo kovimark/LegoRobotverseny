@@ -56,7 +56,7 @@ function App() {
       <Routes>
         <Route path="*" element={<HomePage />} />
         <Route path="/" element={<HomePage />} />
-        <Route path="/versenyjelentkezes" element={<CompetitionRegistration />} />
+        <Route path="/versenyjelentkezes" element={<CompetitionRegistration user={user} />} />
         <Route path="/szabalyzat" element={<RulesPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route
