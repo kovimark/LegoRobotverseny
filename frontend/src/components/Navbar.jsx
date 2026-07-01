@@ -1,11 +1,16 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
+import './Navbar.css'
 
 export default function Navbar({ user, userRole, authLoading, authError, onGoogleSignIn, onSignOut }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [isProfileOpen, setIsProfileOpen] = useState(false)
+    const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false)
 
-    const closeMenu = () => setIsMenuOpen(false)
+    const closeMenu = () => {
+        setIsMenuOpen(false)
+        setIsAdminMenuOpen(false)
+    }
 
     const handleProfileToggle = () => {
         setIsProfileOpen(prev => !prev)
@@ -63,10 +68,25 @@ export default function Navbar({ user, userRole, authLoading, authError, onGoogl
                             </Link>
                         </div>
                         {userRole === 'admin' ? (
-                            <div className="navbar-nav">
-                                <Link className="nav-link" to="/admin" onClick={closeMenu}>
+                            <div className="navbar-nav admin-dropdown-wrapper">
+                                <button
+                                    className="nav-link admin-dropdown-toggle"
+                                    type="button"
+                                    onClick={() => setIsAdminMenuOpen(prev => !prev)}
+                                    aria-expanded={isAdminMenuOpen}
+                                >
                                     Admin felület
-                                </Link>
+                                </button>
+                                {isAdminMenuOpen && (
+                                    <div className="admin-dropdown-menu">
+                                        <Link className="admin-dropdown-link" to="/admin" onClick={closeMenu}>
+                                            Csapatok
+                                        </Link>
+                                        <Link className="admin-dropdown-link" to="/admin/pontozas" onClick={closeMenu}>
+                                            Pontozás kezelése
+                                        </Link>
+                                    </div>
+                                )}
                             </div>
                         ) : (
                             <div className="navbar-nav">

@@ -4,6 +4,7 @@ import { Routes, Route } from 'react-router-dom';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import HomePage from './pages/HomePage';
 import AdminPage from './pages/AdminPage';
+import AdminScoringPage from './pages/AdminScoringPage';
 import CompetitionRegistration from './pages/CompetitionRegistration';
 import RulesPage from './pages/RulesPage';
 import StandingsPage from './pages/StandingsPage';
@@ -80,6 +81,8 @@ function App() {
         <Route path="/szabalyzat" element={<RulesPage />} />
         <Route path="/allasok" element={<StandingsPage />} />
         <Route path="/admin" element={userRole === 'admin' ? <AdminPage /> : <HomePage />} />
+        <Route path="/admin/pontozas" element={userRole === 'admin' ? <AdminScoringPage /> : <HomePage />} />
+        <Route path="/admin/pontozas/:competitionType" element={userRole === 'admin' ? <AdminScoringPage /> : <HomePage />} />
         <Route
           path="/bejelentkezes"
           element={
