@@ -63,14 +63,6 @@ export default function HillClimbingScoring() {
   }
 
   const handleFieldChange = (teamName, field, value) => {
-    if (field === 'is_in_race') {
-      const currentTeam = teams.find((item) => item.team_name === teamName)
-      const currentRaceState = normalizeRaceState(currentTeam?.is_in_race)
-      if (currentRaceState === 1 && value === 0) {
-        return
-      }
-    }
-
     setPendingUpdates((prev) => ({
       ...prev,
       [teamName]: {
@@ -94,10 +86,10 @@ export default function HillClimbingScoring() {
 
     const currentLevel = Number(team.completed_level ?? 0)
     const currentTime = Number(team.time_spent_on_level ?? 0)
-    const currentRaceState = normalizeRaceState(team.is_in_race)
+    const currentRaceState = normalizeRaceState(team.eliminated)
     const pendingLevel = Number(pendingUpdates[teamName]?.completed_level ?? team.completed_level ?? 0)
     const pendingTime = Number(pendingUpdates[teamName]?.time_spent_on_level ?? team.time_spent_on_level ?? 0)
-    const pendingRaceState = normalizeRaceState(pendingUpdates[teamName]?.is_in_race ?? team.is_in_race)
+    const pendingRaceState = normalizeRaceState(pendingUpdates[teamName]?.eliminated ?? team.eliminated)
 
     return pendingLevel !== currentLevel || pendingTime !== currentTime || pendingRaceState !== currentRaceState
   }
@@ -108,17 +100,27 @@ export default function HillClimbingScoring() {
     if (!teamName || !hasPendingChange(team)) return
 
     try {
-      const level = update.completed_level ?? team.completed_level ?? 0
-      const timeSpent = update.time_spent_on_level ?? team.time_spent_on_level ?? 0
-      const raceStateValue = normalizeRaceState(update.is_in_race === undefined ? team.is_in_race : update.is_in_race)
+      const currentLevel = Number(team.completed_level ?? 0)
+      const currentTime = Number(team.time_spent_on_level ?? 0)
+      const currentRaceState = normalizeRaceState(team.eliminated)
+      const level = Number(update.completed_level ?? team.completed_level ?? 0)
+      const timeSpent = Number(update.time_spent_on_level ?? team.time_spent_on_level ?? 0)
+      const raceStateValue = normalizeRaceState(update.eliminated === undefined ? team.eliminated : update.eliminated)
 
-      await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(teamName)}/${level}/${timeSpent}`, {
-        method: 'PATCH'
-      })
+      const hasLevelTimeChange = level !== currentLevel || timeSpent !== currentTime
+      const hasRaceStateChange = raceStateValue !== currentRaceState
 
-      await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(teamName)}/${raceStateValue}`, {
-        method: 'PATCH'
-      })
+      if (hasLevelTimeChange) {
+        await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(teamName)}/${level}/${timeSpent}`, {
+          method: 'PATCH'
+        })
+      }
+
+      if (hasRaceStateChange) {
+        await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(teamName)}/${raceStateValue}`, {
+          method: 'PATCH'
+        })
+      }
 
       setActionMessage({ type: 'success', text: 'A frissítés sikeres volt.' })
       setPendingUpdates((prev) => {
@@ -163,7 +165,7 @@ export default function HillClimbingScoring() {
           const completedLevel = draft.completed_level ?? team.completed_level ?? 0
           const changed = hasPendingChange(team)
           const timeSpent = draft.time_spent_on_level ?? team.time_spent_on_level ?? 0
-          const raceState = normalizeRaceState(draft.is_in_race ?? team.is_in_race)
+          const raceState = normalizeRaceState(draft.eliminated ?? team.eliminated)
           const points = draft.points_scored ?? team.points_scored ?? 0
           const isEliminated = raceState === 1
 
@@ -208,9 +210,9 @@ export default function HillClimbingScoring() {
                       <select
                         className="form-select form-select-sm scoring-select-input"
                         value={raceState === null || raceState === undefined ? '' : raceState}
-                        onChange={(event) => handleFieldChange(team.team_name, 'is_in_race', Number(event.target.value))}
+                        onChange={(event) => handleFieldChange(team.team_name, 'eliminated', Number(event.target.value))}
                       >
-                        <option value="0" disabled={isEliminated}>Versenyben</option>
+                        <option value="0">Versenyben</option>
                         <option value="1">Kiesett</option>
                       </select>
                     </div>
