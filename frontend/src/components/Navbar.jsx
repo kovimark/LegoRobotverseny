@@ -1,6 +1,6 @@
-﻿import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import './Navbar.css'
+import React, { useState } from 'react'
 
 export default function Navbar({ user, userRole, authLoading, authError, onGoogleSignIn, onSignOut }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -108,8 +108,8 @@ export default function Navbar({ user, userRole, authLoading, authError, onGoogl
                                     Állások
                                 </Link>
                             )}
-<hr />
-                              </div>
+                            <hr />
+                        </div>
                         {authError && <div className="alert alert-danger mt-3">{authError}</div>}
                         <button className="btn btn-primary w-100 mt-3" type="button" onClick={handleSignOut}>
                             Kijelentkezés
