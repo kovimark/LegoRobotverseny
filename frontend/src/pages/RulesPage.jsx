@@ -6,10 +6,15 @@ const ruleSections = [
     title: 'Általános szabályok',
     fileName: 'altalanos-szabalyok.doc',
     content: [
-      'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
-      'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
-      'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.',
-      'Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.Lorem ipsum dolor sit amet consectetur adipisicing elit. Mollitia doloribus reprehenderit tempora! Saepe doloribus odit exercitationem, aspernatur nisi mollitia explicabo eligendi ratione ea deserunt, voluptatem perferendis! Dolores expedita a perferendis.'
+      'A verseny lebonyolítása',
+      'A robot versenyre 2 fős csapatokkal lehet, középiskolás diákoknak jelentkezni egy, maximum 2 felkészítő tanárral.',
+      'A versenyzőknek a saját robotjukkal kell a feladatokat az előre megírt szabályok alapján megoldaniuk. A szabályzat nem ismerete nem ment fel semmilyen szabálytalanság alól.',
+      'A helyszínen a csapatok kapnak saját asztalt, amin dolgozhatnak és a felszerelésüket tárolhatják. A nap elejétől minden csapat meg tudja tekinteni saját beosztását a weboldalunkon, a regisztrált fiókkal bejelentkezve. Ha a csapat nem tudja tartani az adott időbeosztást és nem jelenik meg időben az adott versenyszámnál, akkor automatikusan 0 pontot kapnak, és nem lesz lehetőségük javítani azon.',
+      'A robot',
+      'A robotok kizárólag hivatalos Lego által gyártott, Lego alkatrészekből épülhetnek. A robot mérete maximum 40x40x40 centiméter lehet. A méretek ellenőrzése minden versenyszám előtt le fog zajlani, és bele lesznek helyezve egy megfelelő méretű, felülről nyitott kockába. Ez azért szükséges, mert a versenyzők a versenyszámok között átépíthetik, módosíthatják robotjaikat. Amennyiben a robot meghaladja az előírt méreteket, módosítani kell ott a versenyszám helyszínén, amennyiben ez nem történik meg, a versenyző nem ér el pontot az adott versenyszámban, és automatikusan 0 pontot kap.',
+      'A versenyszámok',
+      'Minden évben egy Joker versenyszám van, ami véletlenszerűen van kiválasztva, és a jelentkezés megnyitásakor derül ki, hogy mik a végleges versenyszámok.',
+      'A versenyszámok alatt a versenyző az adott feladatszabályoknak megfelelően nyúlhat hozzá a robothoz. A versenyszámok alatt nincs videóbíró.'
     ]
   },
   {
@@ -58,8 +63,125 @@ const ruleSections = [
   }
 ];
 
+function isHeadingLike(value) {
+  const text = typeof value === 'string' ? value.trim() : '';
+
+  if (!text) {
+    return false;
+  }
+
+  if (/[.!?]$/.test(text)) {
+    return false;
+  }
+
+  if (text.length > 40) {
+    return false;
+  }
+
+  const words = text.split(/\s+/).filter(Boolean);
+  return words.length <= 6;
+}
+
+function buildContentHtml(content) {
+  const blocks = [];
+  let listItems = [];
+
+  const flushList = () => {
+    if (listItems.length === 0) {
+      return;
+    }
+
+    blocks.push(`<ul style="margin: 0 0 3mm; padding-left: 5mm;">${listItems.join('')}</ul>`);
+    listItems = [];
+  };
+
+  content.forEach((item) => {
+    if (typeof item === 'string') {
+      const text = item.trim();
+
+      if (isHeadingLike(text)) {
+        flushList();
+        blocks.push(`<p style="font-size: 13pt; font-weight: 700; margin: 6mm 0 2mm;">${text}</p>`);
+        return;
+      }
+
+      listItems.push(`<li style="font-size: 11pt; line-height: 1.5; margin: 0 0 2mm;">${text}</li>`);
+      return;
+    }
+
+    flushList();
+    const paragraphs = Array.isArray(item.text) ? item.text : [item.text];
+    const body = paragraphs.map((paragraph) => `<p>${paragraph}</p>`).join('');
+
+    blocks.push(`<h3 style="font-size: 13pt; font-weight: 700; margin: 6mm 0 2mm;">${item.title}</h3>${body}`);
+  });
+
+  flushList();
+  return blocks.join('');
+}
+
+function renderContentItems(content, sectionId) {
+  const elements = [];
+  let listItems = [];
+  let listCounter = 0;
+
+  const flushList = () => {
+    if (listItems.length === 0) {
+      return;
+    }
+
+    elements.push(
+      <ul key={`${sectionId}-list-${listCounter}`} className="ps-3 mb-3">
+        {listItems}
+      </ul>
+    );
+    listItems = [];
+    listCounter += 1;
+  };
+
+  content.forEach((item, index) => {
+    if (typeof item === 'string') {
+      const text = item.trim();
+
+      if (isHeadingLike(text)) {
+        flushList();
+        elements.push(
+          <p key={`${sectionId}-heading-${index}`} className="fw-bold fs-5 mt-3 mb-2">
+            {text}
+          </p>
+        );
+        return;
+      }
+
+      listItems.push(
+        <li key={`${sectionId}-item-${index}`} className="mb-2">
+          {text}
+        </li>
+      );
+      return;
+    }
+
+    flushList();
+    const paragraphs = Array.isArray(item.text) ? item.text : [item.text];
+
+    elements.push(
+      <div key={`${sectionId}-object-${index}`} className="mb-3">
+        <p className="fw-bold fs-5 mb-2">{item.title}</p>
+        {paragraphs.map((paragraph, paragraphIndex) => (
+          <p key={`${sectionId}-object-${index}-${paragraphIndex}`} className="mb-2">
+            {paragraph}
+          </p>
+        ))}
+      </div>
+    );
+  });
+
+  flushList();
+  return elements;
+}
+
 function buildDocumentdoc(section) {
-  const bodyContent = section.content.map((item) => `<p>${item}</p>`).join('');
+  const bodyContent = buildContentHtml(section.content);
 
   return `<!DOCTYPE doc>
 <doc lang="hu">
@@ -130,7 +252,7 @@ export default function RulesPage() {
 
   const handleDownloadAll = () => {
     const combined = allSections.map((section) => {
-      return `<section><h2>${section.title}</h2>${section.content.map((item) => `<p>${item}</p>`).join('')}</section>`;
+      return `<section><h2>${section.title}</h2>${buildContentHtml(section.content)}</section>`;
     }).join('');
 
     const fullDocument = `<!DOCTYPE doc>
@@ -168,7 +290,7 @@ export default function RulesPage() {
           <span className="home-kicker">Szabályzat</span>
           <h1 className="home-title">Versenyszabályzat és részletes feltételek</h1>
           <p className="home-copy">
-            Az alábbi részeket egymás után böngészheted, ésA belépett fiók e-mail címe kerül automatikusan beállításra. mindegyikhez külön letöltési lehetőséget is biztosítunk. A tartalom A4-es, nyomtatható formátumra van tervezve.
+            Az alábbi részeket egymás után böngészheted, és mindegyikhez külön letöltési lehetőséget is biztosítunk. A tartalom A4-es, nyomtatható formátumra van tervezve.
           </p>
 
           <div className="rules-actions">
@@ -200,18 +322,16 @@ export default function RulesPage() {
 
                   <div className={`rules-body ${isOpen ? 'open' : ''}`}>
                     <div className="rules-body-inner">
-                      
+
                       <div className="rules-document-preview">
                         <div className="rules-document-meta">Lego Robotverseny • Szabályzat</div>
                         <h3>{section.title}</h3>
                         <p>
                           Ez a tartalom A4-es formátumban jelenik meg a weboldalon is, és letöltéskor ugyanilyen elrendezésben kerül mentésre.
                         </p>
-                        <ul className="rules-list-items">
-                          {section.content.map((item) => (
-                            <li key={item}>{item}</li>
-                          ))}
-                        </ul>
+                        <div className="rules-list-items">
+                          {renderContentItems(section.content, section.id)}
+                        </div>
                         <div className="rules-document-footer">A4-es nyomtatási formátum • automatikusan generált dokumentum</div>
                       </div>
                       <div className="rules-download-row rules-download-row-bottom">
