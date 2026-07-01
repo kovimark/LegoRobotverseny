@@ -1,13 +1,29 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 export default function TeamDetailsPage() {
   const { teamName } = useParams()
   const decodedTeamName = decodeURIComponent(teamName || '')
-  const [summary, setSummary] = useState(null)
-  const [teamInfo, setTeamInfo] = useState(null)
+  const [teamData, setTeamData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  const resolveTeamIdentifier = useCallback(async () => {
+    const trimmedName = decodedTeamName.trim()
+    if (!trimmedName) return null
+
+    const teamListResponse = await fetch('https://legocompetition.runasp.net/api/Teams')
+    if (!teamListResponse.ok) {
+      return trimmedName
+    }
+
+    const teams = await teamListResponse.json()
+    const matchedTeam = Array.isArray(teams)
+      ? teams.find((item) => item.teamName?.toLowerCase() === trimmedName.toLowerCase())
+      : null
+
+    return matchedTeam?.id ?? trimmedName
+  }, [decodedTeamName])
 
   useEffect(() => {
     const loadTeamData = async () => {
@@ -15,24 +31,15 @@ export default function TeamDetailsPage() {
         setLoading(true)
         setError('')
 
-        const [summaryResponse, teamsResponse] = await Promise.all([
-          fetch(`https://legocompetition.runasp.net/api/Points/${encodeURIComponent(decodedTeamName)}`),
-          fetch('https://legocompetition.runasp.net/api/Teams')
-        ])
+        const teamIdentifier = await resolveTeamIdentifier()
+        const response = await fetch(`https://legocompetition.runasp.net/api/Teams/alldata/${encodeURIComponent(teamIdentifier ?? decodedTeamName)}`)
 
-        if (!summaryResponse.ok) {
-          throw new Error('A csapat pontjainak betöltése sikertelen volt.')
+        if (!response.ok) {
+          throw new Error('A csapat adatainak betöltése sikertelen volt.')
         }
 
-        const summaryData = await summaryResponse.json()
-        const teamsData = await teamsResponse.json()
-
-        setSummary(summaryData)
-        setTeamInfo(
-          Array.isArray(teamsData)
-            ? teamsData.find((item) => item.teamName?.toLowerCase() === decodedTeamName.toLowerCase()) || null
-            : null
-        )
+        const data = await response.json()
+        setTeamData(data)
       } catch (err) {
         setError(err.message)
       } finally {
@@ -43,7 +50,7 @@ export default function TeamDetailsPage() {
     if (decodedTeamName) {
       loadTeamData()
     }
-  }, [decodedTeamName])
+  }, [decodedTeamName, resolveTeamIdentifier])
 
   return (
     <div className="container py-4 py-md-5">
@@ -58,7 +65,7 @@ export default function TeamDetailsPage() {
                   <p className="text-muted mb-0">Részletes információk és pontstatisztikák a kiválasztott csapatról.</p>
                 </div>
                 <Link to="/admin/pontozas/osszesitett" className="btn btn-outline-primary">
-                  ← Vissza az adminhoz
+                  ← Vissza a pontokhoz
                 </Link>
               </div>
 
@@ -70,40 +77,40 @@ export default function TeamDetailsPage() {
                   <div className="col-12 col-lg-6">
                     <div className="team-detail-section">
                       <h4 className="mb-3">Pontok és helyezések</h4>
-                      {summary ? (
+                      {teamData ? (
                         <div className="row g-3">
                           <div className="col-12 col-sm-6">
                             <div className="border rounded p-3 detail-stat">
                               <div className="detail-label">Vonalkövetés</div>
-                              <div className="fw-bold detail-value">{summary.lineFollowPoint ?? 0} pont</div>
-                              <div className="text-muted">{summary.lineFollowPosition ?? '-'}. hely</div>
+                              <div className="fw-bold detail-value">{teamData.lineFollowPoint ?? 0} pont</div>
+                              <div className="text-muted">{teamData.lineFollowPosition ?? '-'} . hely</div>
                             </div>
                           </div>
                           <div className="col-12 col-sm-6">
                             <div className="border rounded p-3 detail-stat">
                               <div className="detail-label">Hegymászás</div>
-                              <div className="fw-bold detail-value">{summary.hillClimbPoint ?? 0} pont</div>
-                              <div className="text-muted">{summary.hillClimbPosition ?? '-'}. hely</div>
+                              <div className="fw-bold detail-value">{teamData.hillClimbPoint ?? 0} pont</div>
+                              <div className="text-muted">{teamData.hillClimbPosition ?? '-'} . hely</div>
                             </div>
                           </div>
                           <div className="col-12 col-sm-6">
                             <div className="border rounded p-3 detail-stat">
                               <div className="detail-label">Szumó</div>
-                              <div className="fw-bold detail-value">{summary.sumoPoint ?? 0} pont</div>
-                              <div className="text-muted">{summary.sumoPosition ?? '-'}. hely</div>
+                              <div className="fw-bold detail-value">{teamData.sumoPoint ?? 0} pont</div>
+                              <div className="text-muted">{teamData.sumoPosition ?? '-'} . hely</div>
                             </div>
                           </div>
                           <div className="col-12 col-sm-6">
                             <div className="border rounded p-3 detail-stat">
                               <div className="detail-label">Kosárlabda</div>
-                              <div className="fw-bold detail-value">{summary.basketballPoint ?? 0} pont</div>
-                              <div className="text-muted">{summary.basketballPosition ?? '-'}. hely</div>
+                              <div className="fw-bold detail-value">{teamData.basketballPoint ?? 0} pont</div>
+                              <div className="text-muted">{teamData.basketballPosition ?? '-'} . hely</div>
                             </div>
                           </div>
                           <div className="col-12">
                             <div className="border rounded p-3 bg-light detail-stat detail-stat--highlight">
                               <div className="detail-label">Összes pont</div>
-                              <div className="fw-bold fs-4 detail-value">{summary.allPoint ?? 0}</div>
+                              <div className="fw-bold fs-4 detail-value">{teamData.allPoint ?? 0}</div>
                             </div>
                           </div>
                         </div>
@@ -116,48 +123,48 @@ export default function TeamDetailsPage() {
                   <div className="col-12 col-lg-6">
                     <div className="team-detail-section">
                       <h4 className="mb-3">Csapat adatai</h4>
-                      {teamInfo ? (
+                      {teamData?.team ? (
                         <div className="row g-3">
                           <div className="col-12">
                             <div className="border rounded p-3 detail-stat">
                               <div className="detail-label">Csapat neve</div>
-                              <div className="fw-bold detail-value">{teamInfo.teamName}</div>
+                              <div className="fw-bold detail-value">{teamData.team.teamName}</div>
                             </div>
                           </div>
                           <div className="col-12">
                             <div className="border rounded p-3 detail-stat">
                               <div className="detail-label">Iskola</div>
-                              <div className="fw-semibold detail-value">{teamInfo.schoolName || '–'}</div>
+                              <div className="fw-semibold detail-value">{teamData.team.schoolName || '–'}</div>
                             </div>
                           </div>
                           <div className="col-12 col-sm-6">
                             <div className="border rounded p-3 detail-stat">
                               <div className="detail-label">1. versenyző</div>
-                              <div className="fw-semibold detail-value">{teamInfo.teamMember1Name || '–'}</div>
-                              <div className="small text-muted detail-break">{teamInfo.teamMember1Email || '–'}</div>
-                              <div className="small text-muted">{teamInfo.teamMember1Age ? `${teamInfo.teamMember1Age} év` : '–'}</div>
+                              <div className="fw-semibold detail-value">{teamData.team.teamMember1Name || '–'}</div>
+                              <div className="small text-muted detail-break">{teamData.team.teamMember1Email || '–'}</div>
+                              <div className="small text-muted">{teamData.team.teamMember1Age ? `${teamData.team.teamMember1Age} év` : '–'}</div>
                             </div>
                           </div>
                           <div className="col-12 col-sm-6">
                             <div className="border rounded p-3 detail-stat">
                               <div className="detail-label">2. versenyző</div>
-                              <div className="fw-semibold detail-value">{teamInfo.teamMember2Name || '–'}</div>
-                              <div className="small text-muted detail-break">{teamInfo.teamMember2Email || '–'}</div>
-                              <div className="small text-muted">{teamInfo.teamMember2Age ? `${teamInfo.teamMember2Age} év` : '–'}</div>
+                              <div className="fw-semibold detail-value">{teamData.team.teamMember2Name || '–'}</div>
+                              <div className="small text-muted detail-break">{teamData.team.teamMember2Email || '–'}</div>
+                              <div className="small text-muted">{teamData.team.teamMember2Age ? `${teamData.team.teamMember2Age} év` : '–'}</div>
                             </div>
                           </div>
                           <div className="col-12 col-sm-6">
                             <div className="border rounded p-3 detail-stat">
                               <div className="detail-label">Edző 1</div>
-                              <div className="fw-semibold detail-value">{teamInfo.teamCoach1 || '–'}</div>
-                              <div className="small text-muted detail-break">{teamInfo.teamCoach1Email || '–'}</div>
+                              <div className="fw-semibold detail-value">{teamData.team.teamCoach1 || '–'}</div>
+                              <div className="small text-muted detail-break">{teamData.team.teamCoach1Email || '–'}</div>
                             </div>
                           </div>
                           <div className="col-12 col-sm-6">
                             <div className="border rounded p-3 detail-stat">
                               <div className="detail-label">Edző 2</div>
-                              <div className="fw-semibold detail-value">{teamInfo.teamCoach2 || '–'}</div>
-                              <div className="small text-muted detail-break">{teamInfo.teamCoach2Email || '–'}</div>
+                              <div className="fw-semibold detail-value">{teamData.team.teamCoach2 || '–'}</div>
+                              <div className="small text-muted detail-break">{teamData.team.teamCoach2Email || '–'}</div>
                             </div>
                           </div>
                         </div>
