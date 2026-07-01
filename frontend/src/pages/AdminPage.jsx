@@ -98,7 +98,7 @@ export default function AdminPage() {
 
   return (
     <div className="container py-4">
-      <h2 className="mb-4">Admin felület</h2>
+      <h2 className="mb-4">Csapatok</h2>
 
       {loading && <div className="alert alert-info">Csapatok betöltése...</div>}
       {error && <div className="alert alert-danger">{error}</div>}

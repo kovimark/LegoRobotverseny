@@ -2,7 +2,8 @@ export const competitionTypes = [
   { slug: 'hegymaszas', label: 'Hegymászás', apiPath: 'HillClimbing' },
   { slug: 'vonalkovetes', label: 'Vonalkövetés', apiPath: 'LineFollowing' },
   { slug: 'kosarra-dobas', label: 'Kosárra dobás', apiPath: 'Basketball' },
-  { slug: 'szumo', label: 'Szumó', apiPath: 'Sumo' }
+  { slug: 'szumo', label: 'Szumó', apiPath: 'Sumo' },
+  { slug: 'osszesitett', label: 'Összesített ponttáblázat' }
 ]
 
 export const getCompetitionConfig = (slug) => competitionTypes.find((item) => item.slug === slug) || null

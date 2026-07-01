@@ -7,7 +7,7 @@ export default function LoginPage({ user, authLoading, authError, onGoogleSignIn
         <span className="home-kicker">Google fiók</span>
         <h1 className="home-title">Bejelentkezés</h1>
         <p className="home-copy">
-          Jelentkezz be Google-fiókkal, hogy később innen kezeld a profilodat, nevezéseidet és az admin felülethez tartozó műveleteket.
+          Jelentkezz be Google-fiókkal!
         </p>
 
         {authError && <div className="alert alert-danger">{authError}</div>}

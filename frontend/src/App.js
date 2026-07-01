@@ -1,13 +1,14 @@
 import './App.css';
 import { useEffect, useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { getRedirectResult, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
 import HomePage from './pages/HomePage';
 import AdminPage from './pages/AdminPage';
 import AdminScoringPage from './pages/AdminScoringPage';
 import CompetitionRegistration from './pages/CompetitionRegistration';
 import RulesPage from './pages/RulesPage';
 import StandingsPage from './pages/StandingsPage';
+import TeamDetailsPage from './pages/TeamDetailsPage';
 import Navbar from './components/Navbar';
 import LoginPage from './pages/LoginPage';
 import { auth, googleProvider } from './firebase';
@@ -19,6 +20,14 @@ function App() {
   const [authError, setAuthError] = useState('');
 
   useEffect(() => {
+    const handleRedirectResult = async () => {
+      try {
+        await getRedirectResult(auth);
+      } catch (error) {
+        setAuthError(`Sikertelen bejelentkezés: ${error.message}`);
+      }
+    };
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       setAuthLoading(false);
@@ -41,15 +50,35 @@ function App() {
       }
     });
 
+    handleRedirectResult();
+
     return unsubscribe;
   }, []);
 
   const handleGoogleSignIn = async () => {
     setAuthError('');
+    setAuthLoading(true);
 
     try {
-      await signInWithPopup(auth, googleProvider);
+      const isLikelyMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
+
+      if (isLikelyMobile) {
+        await signInWithRedirect(auth, googleProvider);
+        return;
+      }
+
+      try {
+        await signInWithPopup(auth, googleProvider);
+      } catch (popupError) {
+        if (popupError?.code === 'auth/popup-blocked' || popupError?.code === 'auth/popup-closed-by-user' || popupError?.message?.includes('popup')) {
+          await signInWithRedirect(auth, googleProvider);
+          return;
+        }
+
+        throw popupError;
+      }
     } catch (error) {
+      setAuthLoading(false);
       setAuthError(`Sikertelen bejelentkezés: ${error.message}`);
     }
   };
@@ -80,6 +109,7 @@ function App() {
         <Route path="/versenyjelentkezes" element={<CompetitionRegistration user={user} />} />
         <Route path="/szabalyzat" element={<RulesPage />} />
         <Route path="/allasok" element={<StandingsPage />} />
+        <Route path="/csapat/:teamName" element={<TeamDetailsPage />} />
         <Route path="/admin" element={userRole === 'admin' ? <AdminPage /> : <HomePage />} />
         <Route path="/admin/pontozas" element={userRole === 'admin' ? <AdminScoringPage /> : <HomePage />} />
         <Route path="/admin/pontozas/:competitionType" element={userRole === 'admin' ? <AdminScoringPage /> : <HomePage />} />

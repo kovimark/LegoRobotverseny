@@ -1,15 +1,13 @@
-import React, { useState } from 'react'
+﻿import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import './Navbar.css'
 
 export default function Navbar({ user, userRole, authLoading, authError, onGoogleSignIn, onSignOut }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [isProfileOpen, setIsProfileOpen] = useState(false)
-    const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false)
 
     const closeMenu = () => {
         setIsMenuOpen(false)
-        setIsAdminMenuOpen(false)
     }
 
     const handleProfileToggle = () => {
@@ -67,38 +65,10 @@ export default function Navbar({ user, userRole, authLoading, authError, onGoogl
                                 Versenyjelentkezés
                             </Link>
                         </div>
-                        {userRole === 'admin' ? (
-                            <div className="navbar-nav admin-dropdown-wrapper">
-                                <button
-                                    className="nav-link admin-dropdown-toggle"
-                                    type="button"
-                                    onClick={() => setIsAdminMenuOpen(prev => !prev)}
-                                    aria-expanded={isAdminMenuOpen}
-                                >
-                                    Admin felület
-                                </button>
-                                {isAdminMenuOpen && (
-                                    <div className="admin-dropdown-menu">
-                                        <Link className="admin-dropdown-link" to="/admin" onClick={closeMenu}>
-                                            Csapatok
-                                        </Link>
-                                        <Link className="admin-dropdown-link" to="/admin/pontozas" onClick={closeMenu}>
-                                            Pontozás kezelése
-                                        </Link>
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="navbar-nav">
-                                <Link className="nav-link" to="/allasok" onClick={closeMenu}>
-                                    Állások
-                                </Link>
-                            </div>
-                        )}
                         <div className="navbar-nav navbar-auth">
                             {user ? (
                                 <button className="profile-button" type="button" onClick={handleProfileToggle} aria-expanded={isProfileOpen}>
-                                    <img className="profile-avatar" src={user.photoURL} alt={user.displayName || 'Google profil'} />
+                                    <img className="profile-avatar" src={user.photoURL || user.picture || user.avatarUrl} alt={user.displayName || 'Google profil'} />
                                     <span className="profile-email">{user.email}</span>
                                 </button>
                             ) : (
@@ -116,17 +86,30 @@ export default function Navbar({ user, userRole, authLoading, authError, onGoogl
                 {user && (
                     <>
                         <div className="profile-drawer-header">
-                            <img className="profile-drawer-avatar" src={user.photoURL} alt={user.displayName || 'Google profil'} />
+                            <img className="profile-drawer-avatar" src={user.photoURL || user.picture || user.avatarUrl} alt={user.displayName || 'Google profil'} />
                             <div>
                                 <h2>{user.displayName || 'Bejelentkezett felhasználó'}</h2>
                                 <p>{user.email}</p>
                             </div>
                         </div>
                         <div className="profile-drawer-content">
-                            <p>Profil állapot: Google fiókkal bejelentkezve.</p>
-                            <p>Ide kerülhetnek majd a nevezések, jogosultságok vagy admin értesítések.</p>
-                            <p>Placeholder blokk: legutóbbi aktivitás, kedvenc csapatok, gyors linkek.</p>
-                        </div>
+                            <p>Google fiókkal bejelentkezve.</p>
+                            {userRole === 'admin' ? (
+                                <div className="d-grid gap-2">
+                                    <Link className="btn btn-outline-primary w-100" to="/admin" onClick={() => setIsProfileOpen(false)}>
+                                        Csapatok
+                                    </Link>
+                                    <Link className="btn btn-outline-primary w-100" to="/admin/pontozas" onClick={() => setIsProfileOpen(false)}>
+                                        Pontozás kezelése
+                                    </Link>
+                                </div>
+                            ) : (
+                                <Link className="btn btn-outline-primary w-100" to="/allasok" onClick={() => setIsProfileOpen(false)}>
+                                    Állások
+                                </Link>
+                            )}
+<hr />
+                              </div>
                         {authError && <div className="alert alert-danger mt-3">{authError}</div>}
                         <button className="btn btn-primary w-100 mt-3" type="button" onClick={handleSignOut}>
                             Kijelentkezés

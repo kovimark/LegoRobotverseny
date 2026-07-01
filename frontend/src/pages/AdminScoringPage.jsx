@@ -4,6 +4,7 @@ import BasketThrowScoring from '../components/BasketThrowScoring'
 import LineFollowingScoring from '../components/LineFollowingScoring'
 import SumoScoring from '../components/SumoScoring'
 import HillClimbingScoring from '../components/HillClimbingScoring'
+import OverallStandings from '../components/OverallStandings'
 import { competitionTypes } from '../config/adminScoringConfig'
 
 export default function AdminScoringPage() {
@@ -21,13 +22,18 @@ export default function AdminScoringPage() {
       </div>
 
       <div className="row g-3 mb-4">
-        {competitionTypes.map((item) => (
+        {competitionTypes.filter((item) => item.slug !== 'osszesitett').map((item) => (
           <div className="col-md-6 col-xl-3" key={item.slug}>
             <Link to={`/admin/pontozas/${item.slug}`} className={`btn w-100 py-3 admin-competition-btn ${competitionType === item.slug ? 'active' : ''}`}>
               {item.label}
             </Link>
           </div>
         ))}
+        <div className="col-12">
+          <Link to="/admin/pontozas/osszesitett" className={`btn w-100 py-3 admin-competition-btn ${competitionType === 'osszesitett' ? 'active' : ''}`}>
+            Összesített ponttáblázat
+          </Link>
+        </div>
       </div>
 
       {!activeCompetition ? (
@@ -40,6 +46,8 @@ export default function AdminScoringPage() {
         <SumoScoring />
       ) : activeCompetition.slug === 'hegymaszas' ? (
         <HillClimbingScoring />
+      ) : activeCompetition.slug === 'osszesitett' ? (
+        <OverallStandings />
       ) : (
         <div className="alert alert-info">
           A(z) <strong>{activeCompetition.label}</strong> versenyszámhoz még nincs megvalósított pontozási logika.

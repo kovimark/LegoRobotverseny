@@ -1,11 +1,12 @@
 .admin-dropdown-wrapper {
   position: relative;
+  width: 100%;
 }
 
 .admin-dropdown-toggle {
   background: none;
   border: 0;
-  padding: 0.5rem 1rem;
+  padding: 0.6rem 0.25rem;
   text-align: left;
   width: 100%;
   color: #1f3c88;
@@ -55,10 +56,15 @@
 }
 
 @media (max-width: 991px) {
+  .admin-dropdown-wrapper {
+    width: 100%;
+  }
+
   .admin-dropdown-menu {
     position: static;
-    margin-left: 0.5rem;
+    margin-left: 0;
     margin-top: 0.25rem;
     min-width: auto;
+    width: 100%;
   }
 }
