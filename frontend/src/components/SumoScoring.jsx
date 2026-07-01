@@ -155,6 +155,8 @@ export default function SumoScoring() {
                         type="number"
                         className="form-control form-control-sm scoring-number-input"
                         value={points}
+                        onFocus={(event) => event.target.select()}
+                        onClick={(event) => event.target.select()}
                         onChange={(event) => handleFieldChange(team.team_name, 'points_scored', Number(event.target.value))}
                       />
                     </div>

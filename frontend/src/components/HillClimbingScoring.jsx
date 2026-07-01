@@ -193,6 +193,8 @@ export default function HillClimbingScoring() {
                         type="number"
                         className="form-control form-control-sm scoring-number-input"
                         value={completedLevel}
+                        onFocus={(event) => event.target.select()}
+                        onClick={(event) => event.target.select()}
                         onChange={(event) => handleFieldChange(team.team_name, 'completed_level', Number(event.target.value))}
                       />
                     </div>
@@ -202,6 +204,8 @@ export default function HillClimbingScoring() {
                         type="number"
                         className="form-control form-control-sm scoring-number-input"
                         value={timeSpent}
+                        onFocus={(event) => event.target.select()}
+                        onClick={(event) => event.target.select()}
                         onChange={(event) => handleFieldChange(team.team_name, 'time_spent_on_level', Number(event.target.value))}
                       />
                     </div>

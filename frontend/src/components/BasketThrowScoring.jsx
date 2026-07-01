@@ -182,6 +182,8 @@ export default function BasketThrowScoring() {
                         type="number"
                         className="form-control form-control-sm scoring-number-input"
                         value={points}
+                        onFocus={(event) => event.target.select()}
+                        onClick={(event) => event.target.select()}
                         onChange={(event) => handleFieldChange(team.team_name, Number(event.target.value))}
                       />
                     </div>
