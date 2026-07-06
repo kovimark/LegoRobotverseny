@@ -601,11 +601,12 @@ form {
   max-height: 0;
   overflow: hidden;
   opacity: 0;
-  transition: max-height 0.25s ease, opacity 0.2s ease;
+  transition: opacity 0.2s ease;
 }
 
 .rules-body.open {
-  max-height: 3000px;
+  max-height: none;
+  overflow: visible;
   opacity: 1;
 }
 
