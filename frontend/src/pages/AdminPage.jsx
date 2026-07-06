@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import TournamentManager from './TournamentManager'
 
 export default function AdminPage() {
   const [teams, setTeams] = useState([])
@@ -99,6 +100,10 @@ export default function AdminPage() {
   return (
     <div className="container py-4">
       <h2 className="mb-4">Csapatok</h2>
+
+      <div className="mb-4">
+        <TournamentManager />
+      </div>
 
       {loading && <div className="alert alert-info">Csapatok betöltése...</div>}
       {error && <div className="alert alert-danger">{error}</div>}

@@ -191,7 +191,7 @@ function buildContentHtml(content) {
   return blocks.join('');
 }
 
-function renderContentItems(content, sectionId, sectionTitle, onImageClick) {
+function renderContentItems(content, sectionId) {
   const elements = [];
   let listItems = [];
   let listCounter = 0;
@@ -266,14 +266,7 @@ function renderContentItems(content, sectionId, sectionTitle, onImageClick) {
         <div key={`${sectionId}-image-${index}`} className="mb-4">
           <p className="fw-bold fs-5 mb-2">{item.title}</p>
           <div className="border rounded p-2 bg-light" style={{ maxHeight: '420px', overflow: 'auto' }}>
-            <button
-              type="button"
-              className="p-0 border-0 bg-transparent w-100"
-              onClick={() => onImageClick(item, sectionTitle)}
-              aria-label={`Nagyítás: ${item.title}`}
-            >
-              <img src={item.src} alt={item.alt || ''} className="img-fluid d-block mx-auto" />
-            </button>
+            <img src={item.src} alt={item.alt || ''} className="img-fluid d-block mx-auto" />
           </div>
         </div>
       );
@@ -356,34 +349,8 @@ function downloaddocFile(filename, content) {
   window.URL.revokeObjectURL(url);
 }
 
-function getImageDownloadName(image) {
-  const baseName = (image?.sectionTitle || image?.title || 'versenyszam')
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-
-  const guessedExtension = image?.src?.match(/data:image\/([a-zA-Z0-9.+-]+);/)?.[1] || 'png';
-  return `${baseName || 'versenyszam'}_palya_kepe.${guessedExtension}`;
-}
-
-async function downloadImageFile(image) {
-  const response = await fetch(image.src);
-  const blob = await response.blob();
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = getImageDownloadName(image);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  window.URL.revokeObjectURL(url);
-}
-
 export default function RulesPage() {
   const [openSectionId, setOpenSectionId] = useState(null);
-  const [previewImage, setPreviewImage] = useState(null);
 
   const allSections = useMemo(() => ruleSections, []);
 
@@ -430,65 +397,6 @@ export default function RulesPage() {
 
   return (
     <main className="rules-page">
-      {previewImage && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Kép előnézet"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 1050,
-            background: 'rgba(0, 0, 0, 0.82)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px'
-          }}
-          onClick={() => setPreviewImage(null)}
-        >
-          <div
-            style={{
-              width: 'min(960px, 100%)',
-              maxHeight: '92vh',
-              background: '#fff',
-              borderRadius: '16px',
-              overflow: 'hidden',
-              boxShadow: '0 16px 48px rgba(0, 0, 0, 0.3)'
-            }}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #eee' }}>
-              <div style={{ fontWeight: 700 }}>{previewImage.title}</div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  className="btn btn-theme-secondary"
-                  onClick={() => downloadImageFile(previewImage)}
-                >
-                  Letöltés
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary"
-                  onClick={() => setPreviewImage(null)}
-                  aria-label="Bezárás"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-            <div style={{ padding: '16px', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'auto', maxHeight: 'calc(92vh - 70px)' }}>
-              <img
-                src={previewImage.src}
-                alt={previewImage.alt || previewImage.title}
-                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
       <section className="container py-4 py-md-5">
         <div className="home-panel rules-panel">
           <span className="home-kicker">Szabályzat</span>
@@ -534,7 +442,7 @@ export default function RulesPage() {
                           Ez a tartalom A4-es formátumban jelenik meg a weboldalon is, és letöltéskor ugyanilyen elrendezésben kerül mentésre.
                         </p>
                         <div className="rules-list-items">
-                          {renderContentItems(section.content, section.id, section.title, (item, currentSectionTitle) => setPreviewImage({ ...item, sectionTitle: currentSectionTitle }))}
+                          {renderContentItems(section.content, section.id)}
                         </div>
                         <div className="rules-document-footer">A4-es nyomtatási formátum • automatikusan generált dokumentum</div>
                       </div>
