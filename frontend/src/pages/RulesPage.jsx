@@ -81,10 +81,41 @@ const ruleSections = [
     title: 'Vonalkövetés',
     fileName: 'vonalkovetes.doc',
     content: [
-      'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris ultricies orci a justo rhoncus, vitae fermentum ligula malesuada.',
-      'Cras euismod lacus vitae augue facilisis, nec ultrices nisi feugiat.',
-      'Proin volutpat augue quis mauris cursus, nec sed viverra nisl pharetra.',
-      'Suspendisse potenti. Donec vitae quam at dolor tincidunt convallis.'
+      {
+        title: 'Általános leírás',
+        text: [
+          'A vonalkövetés versenyszámban egy előre meghatározott körpályán kell a csapatoknak a vonal mentén végighaladni. A csapatok kétszer próbálkozhatnak, és csak a legjobb idő fog számítani.',
+          'A pályán a vonalak semmilyen esetben sem keresztezik egymást. A pálya egyenes szakaszai előtt és után a követendő vonal színétől egyértelműen megkülönböztethető jelzés lesz elhelyezve. Ez lehetőséget nyújt az egyenes szakaszok érzékelésében, de a használata nem kötelező.',
+          'Egy próbára 2 percet kap egy csapat, és összesen 2 próbálkozást kap.'
+        ]
+      },
+      {
+        title: 'Egy kör leírása',
+        text: [
+          'A versenyző lehelyezi a robotot a start területre. A visszaszámlálást követően a zöld jelzésre indíthatja a robotot. A robotnak ezután önállóan, külső beavatkozás nélkül kell a kijelölt pályán egyszer körbemennie.',
+          'A próbálkozások között a robot szabadon módosítható. A két próbálkozás közül csak a legjobbat értékeljük.',
+          'Ha a robot elhagyja a vonalat, és a versenyző úgy ítéli meg, hogy nem fog visszatalálni rá, a robot visszatehető a vonalra arra a pontra, ahol elvesztette. Ilyenkor 5 másodperces büntetés jár, amit az időhöz adunk hozzá.'
+        ]
+      },
+      {
+        title: 'A pálya',
+        text: [
+          'A pálya egy x*x méteres fehér alapú anyag. Ezen fekete színnel a követendő vonal található. Az egyenes szakaszok elején és végén a követendő vonaltól eltérő színű jelzés található.',
+          'Egy kanyar esetén a legnagyobb szög x fok. Két vonal közötti legkevesebb távolság x centiméter. Az időmérés fotocellás kapuval történik. A pálya az egész verseny alatt rögzítve lesz, és a pályára cipővel lépni tilos.'
+        ]
+      },
+      {
+        title: 'Részletes szabálykönyv',
+        text: [
+          'Lehetséges esetek: a robot nem indul el, rossz irányba indul, elhagyja a pályát, levág egy kanyart, az idő azonos, vagy megáll a pályán és nem megy tovább.',
+          'Egy próbálkozásnak tekintünk minden olyan esetet, amelyben a robot a fotocellás kapun áthaladva elindítja az időmérést.',
+          'Egy próbálkozás akkor ér véget, ha a robot a fotocellás kapun menetiránynak megfelelően áthalad, és ezzel leállítja az időmérést.',
+          'Ha egy kör közben, már futó idővel, a robot elhagyja a pályát, vagy rossz irányban kezdi el követni a vonalat, a versenyző kézzel hozzáérhet és visszahelyezheti a robotot a pályára. Ez esetben 5 másodperces büntetést kap. Ha a felügyelő bíró úgy ítéli meg, hogy a robot rossz helyre került vissza, kérheti a versenyzőt a robot helyes pozícióba történő visszaállítására. Ebben az esetben nem jár még egy 5 másodperces büntetés.',
+          'Ha a robot a pálya elhagyása miatt levág egy kanyart, a robotot kötelezően vissza kell helyezni a vonal azon pontjára, ahol még jól követte a vonalat. Ellenkező esetben a próbálkozás nem értékelhető.',
+          'Ha egy próbálkozás közben a robot megáll, vagy mozgásképtelen lesz, a próbálkozás nem értékelhető.',
+          'Ha egy próbálkozás közben bármilyen, a versenyző csapattól eltérő külső tényező befolyásolja a robot futását, a próbálkozás a versenyző kérésére szabadon megismételhető. Ebben az esetben a robot nem módosítható, és azonnal indítani kell.'
+        ]
+      }
     ]
   },
   {
@@ -92,10 +123,43 @@ const ruleSections = [
     title: 'Kosárra dobás',
     fileName: 'kosarra-dobas.doc',
     content: [
-      'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla facilisi. Aliquam erat volutpat.',
-      'Fusce rutrum est a augue placerat, vitae finibus augue molestie.',
-      'Morbi suscipit odio et justo ultricies, eu fermentum enim imperdiet.',
-      'Nam congue mi a magna volutpat, eget ultrices magna luctus.'
+      {
+        title: 'Általános leírás',
+        text: [
+          'A kosárra dobás versenyszámban a csapatoknak 5, változó távolságra lévő kosárra kell dobni egy hagyományos ping-pong labdával.',
+          'Minden csapatnak 2 perc áll rendelkezésére, és ezen belül maximum 5-ször dobhatnak. A csapat a kijelölt zónából dob, és ezen belül bárhova helyezheti a robotot.',
+          'A robotnak helyváltoztatásra alkalmasnak kell lennie, és minden dobás előtt és után valamilyen egyértelműen meghatározható mozgást kell végeznie. A csapatok kétszer próbálkozhatnak, a próbák között a robot szabadon módosítható.'
+        ]
+      },
+      {
+        title: 'Egy próbálkozás menete',
+        text: [
+          'A visszaszámlálás után zöld jelzésre indul a próbálkozás. Ezt követően a csapatnak kettő perc áll rendelkezésére a pontszerzésre.',
+          'Egy csapat maximum 5-ször próbálkozhat, akkor is, ha az idő nem telt le. Egy dobás után egy csapat pontot szerez, ha a labda a kosárba érkezett és benne is maradt.'
+        ]
+      },
+      {
+        title: 'A pálya',
+        text: [
+          'A pálya alapterülete x*x centiméter. A dobóterület x*x centiméter, a pontszerző terület, ahol a kosarak találhatóak, x*x centiméter.',
+          'A kosarak szabadon megépíthetőek a mellékelt építési útmutató alapján. A kosarak a pályán véletlenszerű helyen lesznek elhelyezve és stabilan rögzítve. Minimum távolság: x centiméter, maximum távolság: x centiméter.',
+          'A kosarak csak felülről nyitottak, és mögöttük egy palánk van hozzájuk rögzítve, amely szabadon használható. A kosarak magassága x centiméter.'
+        ]
+      },
+      {
+        title: 'Részletes szabálykönyv',
+        text: [
+          'Egy próbálkozás a zöld jelzés után indul, és véget ér, ha a csapat elérte az 5 szabályos dobást, vagy a 2 perc lejárt.',
+          'Egy dobás akkor érvényes, ha a robot dobókarjában a ping-pong labda benne van, a robot bármilyen helyváltoztató mozgást végzett a labdával, a labda elhagyta a dobóterületet, és a robot a dobás után is végzett helyváltoztató mozgást.',
+          'Ha a labdát a robot indítása után helyezi a versenyző a dobókarba, a dobást újra kell kezdeni, de próbálkozást nem veszít a csapat. Ugyanez igaz akkor is, ha a labda leesik a robotról a mozgás következében, de még a dobóterületen belül marad.',
+          'Ha a labda a csapattag miatt kerül a dobóterületen kívülre, az onnan visszavehető, próbálkozás elvesztése nélkül.',
+          'Ha a labdához nem a robot ért utoljára, de szabályos pontot szerez, a próbálkozás nem értékelhető.',
+          'A roboton a próbálkozás 2 percén belül bármilyen módosítás elvégezhető, program módosítására is lehetőség van.',
+          'Ha egy csapattag azután ér a robothoz, hogy az a dobás érvényességéhez szükséges legalább két pontot teljesített, és a labda még dobóterületen belül marad, a dobást meg kell ismételni, próbálkozást nem veszít a csapat.',
+          'Egy próbálkozás közben a bírói jelzések után történtek nem értékelhetőek.',
+          'Egy robot a 2 percen belül bármikor elindítható. Ha az idő lejár, és a robot éppen dobás közben van, a dobás értékelhető, de bármilyen hiba esetén már nem megismételhető. A 2 perc lejártával a próbálkozást be kell fejezni, bármi ami utána történik nem értékelhető.'
+        ]
+      }
     ]
   },
   {
