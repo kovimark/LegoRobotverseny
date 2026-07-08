@@ -329,7 +329,7 @@ function renderContentItems(content, sectionId) {
       elements.push(
         <div key={`${sectionId}-image-${index}`} className="mb-4">
           <p className="fw-bold fs-5 mb-2">{item.title}</p>
-          <div className="border rounded p-2 bg-light" style={{ maxHeight: '420px', overflow: 'auto' }}>
+          <div className="rules-image-preview border rounded p-2 bg-light">
             <img src={item.src} alt={item.alt || ''} className="img-fluid d-block mx-auto" />
           </div>
         </div>

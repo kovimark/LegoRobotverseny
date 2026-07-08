@@ -609,6 +609,11 @@ form {
   opacity: 1;
 }
 
+.rules-image-preview {
+  max-height: 420px;
+  overflow: auto;
+}
+
 .rules-body-inner {
   padding: 1rem 1.1rem 1.1rem;
 }
@@ -686,8 +691,18 @@ form {
     padding: 0.9rem 0.95rem;
   }
 
+  .rules-body.open {
+    max-height: none;
+    overflow: visible;
+  }
+
   .rules-body-inner {
     padding: 0.9rem 0.95rem 1rem;
+  }
+
+  .rules-image-preview {
+    max-height: none;
+    overflow: visible;
   }
 
   .rules-document-preview {
