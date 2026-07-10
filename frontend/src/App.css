@@ -373,12 +373,92 @@ form {
   max-height: 0;
   overflow: hidden;
   opacity: 0;
-  transition: max-height 0.3s ease, opacity 0.25s ease;
+  transition: max-height 0.35s ease, opacity 0.25s ease;
 }
 
 .team-details.open {
-  max-height: 500px;
+  max-height: 5000px;
   opacity: 1;
+}
+
+.pair-toggle-header {
+  width: 100%;
+}
+
+.pair-toggle-team {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: normal;
+}
+
+.pair-toggle-team--left {
+  text-align: left;
+}
+
+.pair-toggle-team--right {
+  text-align: right;
+}
+
+.pair-toggle-chevron {
+  flex: 0 0 auto;
+  color: var(--green);
+  font-size: 0.95rem;
+}
+
+.sumo-result-btn {
+  border: 2px solid var(--green) !important;
+  color: var(--green) !important;
+  background: transparent;
+  font-weight: 700;
+}
+
+.sumo-result-btn:hover,
+.sumo-result-btn:focus {
+  border-color: var(--green) !important;
+  color: var(--white) !important;
+  background: var(--green) !important;
+  box-shadow: none;
+}
+
+.sumo-result-btn.active {
+  border-color: var(--green) !important;
+  color: var(--white) !important;
+  background: var(--green) !important;
+  box-shadow: none;
+}
+
+.sumo-result-delete-btn {
+  color: var(--red) !important;
+  text-decoration: none;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.sumo-result-delete-btn:hover,
+.sumo-result-delete-btn:focus {
+  color: var(--red) !important;
+  text-decoration: none;
+  opacity: 0.8;
+  box-shadow: none;
+}
+
+.sumo-history-chip {
+  min-width: 2.25rem;
+  padding: 0.15rem 0.45rem;
+  border-color: rgba(0, 0, 0, 0.18) !important;
+  color: var(--black) !important;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 999px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.sumo-history-chip:hover,
+.sumo-history-chip:focus {
+  border-color: var(--red) !important;
+  color: var(--red) !important;
+  background: rgba(229, 89, 52, 0.08);
+  box-shadow: none;
 }
 
 .home-page {
