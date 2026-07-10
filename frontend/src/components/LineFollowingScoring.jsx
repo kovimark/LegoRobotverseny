@@ -257,8 +257,6 @@ export default function LineFollowingScoring() {
     ])
   }
 
-  const isLatestRound = (roundIndex) => roundIndex === rounds.length - 1
-
   return (
     <div>
       <div className="alert alert-info">Kiválasztott versenyszám: <strong>{competitionConfig.label}</strong></div>
