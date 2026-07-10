@@ -1,7 +1,28 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { getCompetitionConfig } from '../config/adminScoringConfig'
 
 const competitionConfig = getCompetitionConfig('kosarra-dobas')
+const BOARD_SCORES = [1, 2, 3, 4, 5]
+
+const createEmptyBoardDraft = () => BOARD_SCORES.reduce((accumulator, boardScore) => {
+  accumulator[`board${boardScore}`] = ''
+  return accumulator
+}, {})
+
+const calculateBoardPoints = (draft) => BOARD_SCORES.reduce((sum, boardScore) => {
+  const hits = Number(draft?.[`board${boardScore}`] ?? 0)
+  return sum + (Number.isNaN(hits) ? 0 : hits * boardScore)
+}, 0)
+
+const calculateTotalThrows = (draft) => BOARD_SCORES.reduce((sum, boardScore) => {
+  const hits = Number(draft?.[`board${boardScore}`] ?? 0)
+  return sum + (Number.isNaN(hits) ? 0 : hits)
+}, 0)
+
+const hasAnyBoardValue = (draft) => BOARD_SCORES.some((boardScore) => {
+  const value = draft?.[`board${boardScore}`]
+  return value !== '' && Number(value) > 0
+})
 
 export default function BasketThrowScoring() {
   const [teams, setTeams] = useState([])
@@ -9,10 +30,9 @@ export default function BasketThrowScoring() {
   const [error, setError] = useState('')
   const [openTeamName, setOpenTeamName] = useState(null)
   const [pendingUpdates, setPendingUpdates] = useState({})
+  const [savedBoardCounts, setSavedBoardCounts] = useState({})
   const [actionMessage, setActionMessage] = useState(null)
   const [sortBy, setSortBy] = useState('name')
-
-  const activeCompetition = useMemo(() => competitionConfig, [])
 
   useEffect(() => {
     const loadTeams = async () => {
@@ -21,7 +41,7 @@ export default function BasketThrowScoring() {
       setOpenTeamName(null)
 
       try {
-        const response = await fetch(`https://legocompetition.runasp.net/api/${activeCompetition.apiPath}`)
+        const response = await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`)
         if (!response.ok) {
           throw new Error('Nem sikerült betölteni a csapatokat.')
         }
@@ -36,7 +56,7 @@ export default function BasketThrowScoring() {
     }
 
     loadTeams()
-  }, [activeCompetition])
+  }, [])
 
   useEffect(() => {
     if (!actionMessage) {
@@ -51,24 +71,34 @@ export default function BasketThrowScoring() {
     setOpenTeamName((prev) => (prev === teamName ? null : teamName))
   }
 
-  const handleFieldChange = (teamName, value) => {
-    setPendingUpdates((prev) => ({
-      ...prev,
-      [teamName]: {
-        ...(prev[teamName] || {}),
-        points_scored: value
+  const handleFieldChange = (teamName, boardScore, value) => {
+    setPendingUpdates((prev) => {
+      const nextDraft = {
+        ...(prev[teamName] || createEmptyBoardDraft()),
+        [`board${boardScore}`]: value
       }
-    }))
+
+      if (calculateTotalThrows(nextDraft) > 5) {
+        setActionMessage({ type: 'danger', text: 'Kosárra dobásnál összesen legfeljebb 5 dobás adható meg.' })
+        return prev
+      }
+
+      return {
+        ...prev,
+        [teamName]: nextDraft
+      }
+    })
   }
 
   const hasPendingChange = (team) => {
     const teamName = team.team_name
     if (!teamName) return false
 
-    const currentValue = Number(team.points_scored ?? 0)
-    const pendingValue = Number(pendingUpdates[teamName]?.points_scored ?? team.points_scored ?? 0)
+    const draft = pendingUpdates[teamName]
+    if (!draft) return false
 
-    return pendingValue !== currentValue
+    const saved = savedBoardCounts[teamName] || createEmptyBoardDraft()
+    return BOARD_SCORES.some((boardScore) => Number(draft[`board${boardScore}`] ?? 0) !== Number(saved[`board${boardScore}`] ?? 0))
   }
 
   const getSortedTeams = (items) => {
@@ -92,28 +122,36 @@ export default function BasketThrowScoring() {
 
   const handleSave = async (team) => {
     const teamName = team.team_name
+    const draft = pendingUpdates[teamName] || null
+    const totalThrows = calculateTotalThrows(draft)
 
-    if (!teamName || !hasPendingChange(team)) {
+    if (!teamName || !draft || !hasAnyBoardValue(draft)) {
+      return
+    }
+
+    if (totalThrows > 5) {
+      setActionMessage({ type: 'danger', text: 'Kosárra dobásnál összesen legfeljebb 5 dobás adható meg.' })
       return
     }
 
     try {
-      const points = pendingUpdates[teamName]?.points_scored ?? team.points_scored ?? 0
+      const points = calculateBoardPoints(draft)
 
-      await fetch(`https://legocompetition.runasp.net/api/${activeCompetition.apiPath}/${encodeURIComponent(teamName)}/${points}`, {
+      await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(teamName)}/${points}`, {
         method: 'PATCH'
       })
 
       setActionMessage({ type: 'success', text: 'A frissítés sikeres volt.' })
+      setSavedBoardCounts((prev) => ({
+        ...prev,
+        [teamName]: draft
+      }))
       setPendingUpdates((prev) => {
         const next = { ...prev }
         delete next[teamName]
         return next
       })
-
-      const response = await fetch(`https://legocompetition.runasp.net/api/${activeCompetition.apiPath}`)
-      const data = await response.json()
-      setTeams(Array.isArray(data) ? data : [])
+      setTeams((prev) => prev.map((item) => (item.team_name === teamName ? { ...item, points_scored: points } : item)))
     } catch (err) {
       setActionMessage({ type: 'danger', text: err.message })
     }
@@ -122,7 +160,7 @@ export default function BasketThrowScoring() {
   return (
     <div>
       <div className="alert alert-info">
-        Kiválasztott versenyszám: <strong>{activeCompetition.label}</strong>
+        Kiválasztott versenyszám: <strong>{competitionConfig.label}</strong>
       </div>
 
       {actionMessage && (
@@ -155,7 +193,10 @@ export default function BasketThrowScoring() {
         {getSortedTeams(teams).map((team) => {
           const isOpen = openTeamName === team.team_name
           const draft = pendingUpdates[team.team_name] || {}
-          const points = draft.points_scored ?? team.points_scored ?? 0
+          const savedDraft = savedBoardCounts[team.team_name] || {}
+          const boardValues = BOARD_SCORES.map((boardScore) => draft[`board${boardScore}`] ?? savedDraft[`board${boardScore}`] ?? '')
+          const points = calculateBoardPoints(draft) || team.points_scored || calculateBoardPoints(savedDraft)
+          const totalThrows = calculateTotalThrows(draft) || calculateTotalThrows(savedDraft)
           const changed = hasPendingChange(team)
 
           return (
@@ -175,18 +216,27 @@ export default function BasketThrowScoring() {
 
               <div className={`team-details ${isOpen ? 'open' : ''}`}>
                 <div className="card-body border-top">
+                  <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                    <div className="fw-semibold">Összes pont: {Number(points) || 0}</div>
+                    <div className="text-muted small">Dobások száma: {totalThrows} / 5</div>
+                  </div>
+
                   <div className="row g-3">
-                    <div className="col-md-12">
-                      <label className="form-label">Pontszám</label>
-                      <input
-                        type="number"
-                        className="form-control form-control-sm scoring-number-input"
-                        value={points}
-                        onFocus={(event) => event.target.select()}
-                        onClick={(event) => event.target.select()}
-                        onChange={(event) => handleFieldChange(team.team_name, Number(event.target.value))}
-                      />
-                    </div>
+                    {BOARD_SCORES.map((boardScore) => (
+                      <div className="col-12 col-md-6 col-xl-4" key={`${team.team_name}-board-${boardScore}`}>
+                        <label className="form-label">{boardScore}. palánk</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          className="form-control form-control-sm scoring-number-input"
+                          value={boardValues[boardScore - 1]}
+                          onFocus={(event) => event.target.select()}
+                          onClick={(event) => event.target.select()}
+                          onChange={(event) => handleFieldChange(team.team_name, boardScore, event.target.value === '' ? '' : Number(event.target.value))}
+                        />
+                      </div>
+                    ))}
                   </div>
 
                   <div className="d-flex justify-content-end mt-3">
