@@ -12,9 +12,8 @@ export default function CompetitionRegistration({ user }) {
     teamMember2Age: '',
     teamCoach1: '',
     teamCoach1Email: '',
-    teamCoach2: '',
-    teamCoach2Email: '',
-    schoolName: ''
+    schoolName: '',
+    category: ''
   })
   const [errors, setErrors] = useState({})
   const [submitMessage, setSubmitMessage] = useState(null)
@@ -29,7 +28,8 @@ export default function CompetitionRegistration({ user }) {
     teamMember2Name: 'A 2. Versenyző nevének kitöltése kötelező.',
     teamMember2Age: 'A 2. Versenyző életkorának kitöltése kötelező.',
     teamCoach1: 'Az 1. felkészítő tanár nevének kitöltése kötelező.',
-    teamCoach1Email: 'Az 1. felkészítő tanár emailcímének kitöltése kötelező.'
+    teamCoach1Email: 'Az 1. felkészítő tanár emailcímének kitöltése kötelező.',
+    category: 'A kategória kiválasztása kötelező.'
   }
 
   useEffect(() => {
@@ -83,8 +83,7 @@ export default function CompetitionRegistration({ user }) {
     const emailFields = [
       { key: 'teamMember1Email', label: 'Az 1. versenyző email címe' },
       { key: 'teamMember2Email', label: 'A 2. versenyző email címe' },
-      { key: 'teamCoach1Email', label: 'Az 1. felkészítő tanár email címe' },
-      { key: 'teamCoach2Email', label: 'A 2. felkészítő tanár email címe' }
+      { key: 'teamCoach1Email', label: 'Az 1. felkészítő tanár email címe' }
     ]
 
     const normalizedEmails = emailFields.reduce((acc, field) => {
@@ -121,13 +120,18 @@ export default function CompetitionRegistration({ user }) {
     }
 
     try {
+      const payload = {
+        ...formData,
+        category: Number(formData.category)
+      }
+
       const response = await fetch('https://legocompetition.runasp.net/api/Teams/registerteam', {
         method: 'POST',
         headers: {
           accept: '*/*',
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       })
 
       if (!response.ok) {
@@ -146,9 +150,8 @@ export default function CompetitionRegistration({ user }) {
         teamMember2Age: '',
         teamCoach1: '',
         teamCoach1Email: '',
-        teamCoach2: '',
-        teamCoach2Email: '',
-        schoolName: ''
+        schoolName: '',
+        category: ''
       })
       setErrors({})
       setSubmitMessage({
@@ -340,26 +343,22 @@ export default function CompetitionRegistration({ user }) {
 
             <div className="row">
               <div className="col-md-6 mb-3">
-                <label htmlFor="teamCoach2" className="form-label">2. Felkészítő Tanár Neve (Opcionális)</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  id="teamCoach2"
-                  name="teamCoach2"
-                  value={formData.teamCoach2}
-                  onChange={handleChange}
-                />
-              </div>
-              <div className="col-md-6 mb-3">
-                <label htmlFor="teamCoach2Email" className="form-label">2. Felkészítő Tanár E-mail (Opcionális)</label>
-                <input
-                  type="email"
-                  className="form-control"
-                  id="teamCoach2Email"
-                  name="teamCoach2Email"
-                  value={formData.teamCoach2Email}
-                  onChange={handleChange}
-                />
+                <label htmlFor="category" className="form-label">Kategória</label>
+                <div className="position-relative">
+                  <select
+                    className={`form-select pe-4 ${errors.category ? 'border-danger' : ''}`}
+                    id="category"
+                    name="category"
+                    value={formData.category}
+                    onChange={handleChange}
+                  >
+                    <option value="">Válassz kategóriát</option>
+                    <option value="0">0 - általános iskola</option>
+                    <option value="1">1 - középiskola</option>
+                  </select>
+                  {requiredMark}
+                </div>
+                {errors.category && <div className="text-danger small mt-1">{errors.category}</div>}
               </div>
             </div>
 

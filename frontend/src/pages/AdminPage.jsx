@@ -62,8 +62,7 @@ export default function AdminPage() {
       team.teamMember2Email,
       team.teamCoach1,
       team.teamCoach1Email,
-      team.teamCoach2,
-      team.teamCoach2Email,
+      team.category,
       team.schoolName,
       team.id,
       team.teamMember1Age,
@@ -154,8 +153,7 @@ export default function AdminPage() {
                     <li><strong>2. versenyző életkora:</strong> {team.teamMember2Age ?? '-'}</li>
                     <li><strong>1. coach neve:</strong> {team.teamCoach1 || '-'}</li>
                     <li><strong>1. coach e-mail:</strong> {team.teamCoach1Email || '-'}</li>
-                    <li><strong>2. coach neve:</strong> {team.teamCoach2 || '-'}</li>
-                    <li><strong>2. coach e-mail:</strong> {team.teamCoach2Email || '-'}</li>
+                    <li><strong>Kategória:</strong> {team.category === 0 ? '0 - általános iskola' : team.category === 1 ? '1 - középiskola' : '-'}</li>
                     <li><strong>Iskola:</strong> {team.schoolName || '-'}</li>
                   </ul>
                   <button

@@ -139,6 +139,14 @@ export default function TeamDetailsPage() {
                           </div>
                           <div className="col-12 col-sm-6">
                             <div className="border rounded p-3 detail-stat">
+                              <div className="detail-label">Kategória</div>
+                              <div className="fw-semibold detail-value">
+                                {teamData.team.category === 0 ? '0 - általános iskola' : teamData.team.category === 1 ? '1 - középiskola' : '–'}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-12 col-sm-6">
+                            <div className="border rounded p-3 detail-stat">
                               <div className="detail-label">1. versenyző</div>
                               <div className="fw-semibold detail-value">{teamData.team.teamMember1Name || '–'}</div>
                               <div className="small text-muted detail-break">{teamData.team.teamMember1Email || '–'}</div>
@@ -158,13 +166,6 @@ export default function TeamDetailsPage() {
                               <div className="detail-label">Edző 1</div>
                               <div className="fw-semibold detail-value">{teamData.team.teamCoach1 || '–'}</div>
                               <div className="small text-muted detail-break">{teamData.team.teamCoach1Email || '–'}</div>
-                            </div>
-                          </div>
-                          <div className="col-12 col-sm-6">
-                            <div className="border rounded p-3 detail-stat">
-                              <div className="detail-label">Edző 2</div>
-                              <div className="fw-semibold detail-value">{teamData.team.teamCoach2 || '–'}</div>
-                              <div className="small text-muted detail-break">{teamData.team.teamCoach2Email || '–'}</div>
                             </div>
                           </div>
                         </div>

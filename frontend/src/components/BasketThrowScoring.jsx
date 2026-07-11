@@ -24,6 +24,23 @@ const hasAnyBoardValue = (draft) => BOARD_SCORES.some((boardScore) => {
   return value !== '' && Number(value) > 0
 })
 
+const logBasketballPayload = (label, payload) => {
+  if (typeof console !== 'undefined' && typeof console.log === 'function') {
+    console.log(`[BasketThrowScoring] ${label}`, payload)
+  }
+}
+
+const normalizeBoardCounts = (team) => BOARD_SCORES.reduce((accumulator, boardScore) => {
+  accumulator[`board${boardScore}`] = Number(team?.[`hoop${boardScore}`] ?? 0)
+  return accumulator
+}, {})
+
+const normalizeTeam = (team, index) => ({
+  ...team,
+  team_name: team.team_name || team.teamName || `Csapat ${index + 1}`,
+  points_scored: Number(team.points_scored ?? 0)
+})
+
 export default function BasketThrowScoring() {
   const [teams, setTeams] = useState([])
   const [loading, setLoading] = useState(true)
@@ -39,6 +56,7 @@ export default function BasketThrowScoring() {
       setLoading(true)
       setError('')
       setOpenTeamName(null)
+      setSavedBoardCounts({})
 
       try {
         const response = await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`)
@@ -47,7 +65,14 @@ export default function BasketThrowScoring() {
         }
 
         const data = await response.json()
-        setTeams(Array.isArray(data) ? data : [])
+        const normalizedTeams = Array.isArray(data) ? data.map(normalizeTeam) : []
+        const normalizedSavedCounts = normalizedTeams.reduce((accumulator, team) => {
+          accumulator[team.team_name] = normalizeBoardCounts(team)
+          return accumulator
+        }, {})
+
+        setTeams(normalizedTeams)
+        setSavedBoardCounts(normalizedSavedCounts)
       } catch (err) {
         setError(err.message)
       } finally {
@@ -135,16 +160,34 @@ export default function BasketThrowScoring() {
     }
 
     try {
+      const hoopCounts = BOARD_SCORES.map((boardScore) => Number(draft[`board${boardScore}`] ?? 0))
       const points = calculateBoardPoints(draft)
+      const scorePerHoop = hoopCounts.join(',')
 
-      await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(teamName)}/${points}`, {
+      const payload = hoopCounts
+      logBasketballPayload('PATCH payload', { teamName, scorePerHoop, payload, points })
+
+      const response = await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(teamName)}/${encodeURIComponent(scorePerHoop)}`, {
         method: 'PATCH'
+        ,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
       })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        logBasketballPayload('PATCH failed response', { status: response.status, body: errorText, teamName, scorePerHoop, payload })
+        throw new Error(errorText || 'A frissítés nem sikerült.')
+      }
 
       setActionMessage({ type: 'success', text: 'A frissítés sikeres volt.' })
       setSavedBoardCounts((prev) => ({
         ...prev,
-        [teamName]: draft
+        [teamName]: {
+          ...draft
+        }
       }))
       setPendingUpdates((prev) => {
         const next = { ...prev }
@@ -194,9 +237,9 @@ export default function BasketThrowScoring() {
           const isOpen = openTeamName === team.team_name
           const draft = pendingUpdates[team.team_name] || {}
           const savedDraft = savedBoardCounts[team.team_name] || {}
-          const boardValues = BOARD_SCORES.map((boardScore) => draft[`board${boardScore}`] ?? savedDraft[`board${boardScore}`] ?? '')
+            const boardValues = BOARD_SCORES.map((boardScore) => draft[`board${boardScore}`] ?? savedDraft[`board${boardScore}`] ?? '')
           const points = calculateBoardPoints(draft) || team.points_scored || calculateBoardPoints(savedDraft)
-          const totalThrows = calculateTotalThrows(draft) || calculateTotalThrows(savedDraft)
+            const totalThrows = calculateTotalThrows(draft) || calculateTotalThrows(savedDraft)
           const changed = hasPendingChange(team)
 
           return (
