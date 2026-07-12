@@ -196,7 +196,7 @@ const getKnockoutStage = (teamCount) => {
   return 'F'
 }
 
-const getKnockoutStageIndex = (stage) => KNOCKOUT_STAGES.indexOf(stage)
+//const getKnockoutStageIndex = (stage) => KNOCKOUT_STAGES.indexOf(stage)
 
 const getPairingSearchResult = (availableTeams, usedPairKeys) => {
   if (availableTeams.length === 0) {
