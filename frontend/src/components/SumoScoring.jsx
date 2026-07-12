@@ -206,7 +206,7 @@ const getPairingSearchResult = (availableTeams, usedPairKeys) => {
   if (availableTeams.length === 1) {
     return { pairings: [], byeTeam: availableTeams[0] }
   }
-
+ 
   const firstTeam = availableTeams[0]
 
   for (let index = availableTeams.length - 1; index >= 1; index -= 1) {
