@@ -269,6 +269,10 @@ const getPrimaryGenerationLabel = (roundLimit, matches, stageMode, selectedStage
     return 'Egyenes kieséses szakasz generálása'
   }
 
+  if (stageMode === 'knockout' || isKnockoutStage(selectedStage)) {
+    return 'Következő kieséses kör generálása'
+  }
+
   return 'Meccsek legenerálása'
 }
 
@@ -336,24 +340,36 @@ const buildStandings = (teams, matches) => {
   })
 }
 
-const buildRoundGroups = (matches) => {
+const buildRoundGroups = (matches, splitByStage = false) => {
   const grouped = new Map()
 
   matches.forEach((match) => {
-    const roundKey = Number(match.table ?? 0) || 1
+    const table = Number(match.table ?? 0) || 1
+    const stage = getMatchStage(match)
+    const roundKey = splitByStage ? `${stage}::${table}` : String(table)
 
     if (!grouped.has(roundKey)) {
-      grouped.set(roundKey, [])
+      grouped.set(roundKey, { stage, table, matches: [] })
     }
 
-    grouped.get(roundKey).push(match)
+    grouped.get(roundKey).matches.push(match)
   })
 
-  return Array.from(grouped.entries())
-    .sort((left, right) => left[0] - right[0])
-    .map(([table, roundMatches]) => ({
-      table,
-      matches: roundMatches.sort((left, right) => {
+  return Array.from(grouped.values())
+    .sort((left, right) => {
+      if (splitByStage) {
+        const stageComparison = KNOCKOUT_STAGES.indexOf(left.stage) - KNOCKOUT_STAGES.indexOf(right.stage)
+
+        if (left.stage === GROUP_STAGE && right.stage !== GROUP_STAGE) return -1
+        if (left.stage !== GROUP_STAGE && right.stage === GROUP_STAGE) return 1
+        if (stageComparison !== 0) return stageComparison
+      }
+
+      return left.table - right.table
+    })
+    .map((roundGroup) => ({
+      ...roundGroup,
+      matches: roundGroup.matches.sort((left, right) => {
         const leftName = `${left.team1Name} ${left.team2Name}`.toLowerCase()
         const rightName = `${right.team1Name} ${right.team2Name}`.toLowerCase()
         return leftName.localeCompare(rightName)
@@ -383,6 +399,7 @@ export default function SumoScoring() {
   const [matchDrafts, setMatchDrafts] = useState({})
   const [openMatches, setOpenMatches] = useState({})
   const [actionMessage, setActionMessage] = useState(null)
+  const [matchToDelete, setMatchToDelete] = useState(null)
 
   useEffect(() => {
     const loadData = async () => {
@@ -443,10 +460,18 @@ export default function SumoScoring() {
   }, [matches, selectedStage, stageMode])
 
   const stageMatches = useMemo(
-    () => (selectedStage === ALL_STAGE_VALUE
-      ? matches
-      : matches.filter((match) => getMatchStage(match) === selectedStage)),
-    [matches, selectedStage]
+    () => {
+      if (selectedStage === ALL_STAGE_VALUE) {
+        return matches
+      }
+
+      if (stageMode === 'knockout') {
+        return matches.filter((match) => isKnockoutStage(getMatchStage(match)))
+      }
+
+      return matches.filter((match) => getMatchStage(match) === selectedStage)
+    },
+    [matches, selectedStage, stageMode]
   )
 
   const groupStageMatches = useMemo(
@@ -458,9 +483,20 @@ export default function SumoScoring() {
   const isGroupStageComplete = roundLimit > 0 && groupRoundCount >= roundLimit
   const primaryActionLabel = getPrimaryGenerationLabel(roundLimit, matches, stageMode, selectedStage)
 
-  const roundGroups = useMemo(() => buildRoundGroups(stageMatches), [stageMatches])
+  const shouldSplitRoundGroupsByStage = selectedStage === ALL_STAGE_VALUE || stageMode === 'knockout'
+  const roundGroups = useMemo(() => buildRoundGroups(stageMatches, shouldSplitRoundGroupsByStage), [stageMatches, shouldSplitRoundGroupsByStage])
   const standings = useMemo(() => buildStandings(teams, stageMatches), [teams, stageMatches])
   const standingsByName = useMemo(() => new Map(standings.map((item) => [item.name, item])), [standings])
+  const isKnockoutView = stageMode === 'knockout' || isKnockoutStage(selectedStage)
+  const hasKnockoutStarted = useMemo(
+    () => matches.some((match) => isKnockoutStage(getMatchStage(match))),
+    [matches]
+  )
+  const finalWinnerName = useMemo(() => {
+    const finalMatch = matches.find((match) => getMatchStage(match) === 'F')
+    return finalMatch ? getKnockoutWinnerName(finalMatch) : null
+  }, [matches])
+  const isGroupGenerationLocked = hasKnockoutStarted && (stageMode === 'group' || selectedStage === GROUP_STAGE)
 
   const nextRoundNumber = roundGroups.length > 0 ? Math.max(...roundGroups.map((round) => round.table)) + 1 : 1
   //const canGenerateAnotherRound = roundLimit > 0 && nextRoundNumber <= roundLimit
@@ -519,27 +555,93 @@ export default function SumoScoring() {
   }
 
   const generateKnockoutPairings = () => {
-    const sortedTeams = getCurrentRoundTeams()
-    const stage = getKnockoutStage(sortedTeams.length)
-    const bracketSize = stage === 'RO16' ? 16 : stage === 'QF' ? 8 : stage === 'SF' ? 4 : 2
-    const bracketTeams = sortedTeams.slice(0, Math.min(sortedTeams.length, bracketSize))
-    const half = Math.floor(bracketTeams.length / 2)
-    const usedPairKeys = new Set(matches.map((match) => buildPairKey(match.team1Name, match.team2Name)))
+    const teamByName = new Map(teams.map((team) => [team.name, team]))
+    const knockoutMatches = matches.filter((match) => isKnockoutStage(getMatchStage(match)))
+    const existingStages = KNOCKOUT_STAGES.filter((stage) => knockoutMatches.some((match) => getMatchStage(match) === stage))
+
+    if (existingStages.length === 0) {
+      const groupStandingsByName = new Map(buildStandings(teams, groupStageMatches).map((item) => [item.name, item]))
+      const sortedTeams = teams
+        .map((team) => ({
+          ...team,
+          points: groupStandingsByName.get(team.name)?.points ?? 0,
+          matchesPlayed: groupStandingsByName.get(team.name)?.matchesPlayed ?? 0
+        }))
+        .sort((left, right) => {
+          if (right.points !== left.points) return right.points - left.points
+          if (left.matchesPlayed !== right.matchesPlayed) return left.matchesPlayed - right.matchesPlayed
+          return left.name.localeCompare(right.name)
+        })
+      const stage = getKnockoutStage(sortedTeams.length)
+      const bracketSize = stage === 'RO16' ? 16 : stage === 'QF' ? 8 : stage === 'SF' ? 4 : 2
+      const bracketTeams = sortedTeams.slice(0, Math.min(sortedTeams.length, bracketSize))
+      const half = Math.floor(bracketTeams.length / 2)
+      const pairings = []
+
+      for (let index = 0; index < half; index += 1) {
+        const team1 = bracketTeams[index]
+        const team2 = bracketTeams[bracketTeams.length - 1 - index]
+
+        if (team1 && team2) {
+          pairings.push({ team1, team2, table: 1, stage })
+        }
+      }
+
+      return pairings
+    }
+
+    const currentStage = existingStages[existingStages.length - 1]
+    const currentStageMatches = knockoutMatches.filter((match) => getMatchStage(match) === currentStage)
+    const winners = []
+    const losers = []
+
+    for (const match of currentStageMatches) {
+      const winnerName = getKnockoutWinnerName(match)
+
+      if (!winnerName) {
+        setActionMessage({
+          type: 'info',
+          text: 'A következő kieséses kör csak akkor generálható, ha az aktuális szakasz minden meccsén van 6 pontos győztes.'
+        })
+        return []
+      }
+
+      const loserName = winnerName === match.team1Name ? match.team2Name : match.team1Name
+      winners.push(teamByName.get(winnerName) || { id: winnerName, name: winnerName })
+      losers.push(teamByName.get(loserName) || { id: loserName, name: loserName })
+    }
+
+    if (currentStage === 'F') {
+      setActionMessage({ type: 'success', text: 'A döntőnek már van győztese, nincs több generálható szakasz.' })
+      return []
+    }
+
+    if (currentStage === 'SF') {
+      const nextPairings = []
+
+      if (!matches.some((match) => getMatchStage(match) === 'F') && winners.length >= 2) {
+        nextPairings.push({ team1: winners[0], team2: winners[1], table: 1, stage: 'F' })
+      }
+
+      if (!matches.some((match) => getMatchStage(match) === 'BM') && losers.length >= 2) {
+        nextPairings.push({ team1: losers[0], team2: losers[1], table: 1, stage: 'BM' })
+      }
+
+      return nextPairings
+    }
+
+    const nextStage = getNextKnockoutStage(currentStage)
+
+    if (!nextStage || matches.some((match) => getMatchStage(match) === nextStage)) {
+      return []
+    }
+
     const pairings = []
 
-    for (let index = 0; index < half; index += 1) {
-      const team1 = bracketTeams[index]
-      const team2 = bracketTeams[bracketTeams.length - 1 - index]
-
-      if (!team1 || !team2) {
-        continue
+    for (let index = 0; index < winners.length; index += 2) {
+      if (winners[index] && winners[index + 1]) {
+        pairings.push({ team1: winners[index], team2: winners[index + 1], table: 1, stage: nextStage })
       }
-
-      if (usedPairKeys.has(buildPairKey(team1.name, team2.name))) {
-        logSumoPayload('Skipped knockout rematch', { team1: team1.name, team2: team2.name })
-      }
-
-      pairings.push({ team1, team2, table: 1, stage })
     }
 
     return pairings
@@ -580,10 +682,33 @@ export default function SumoScoring() {
       return
     }
 
-    const shouldGenerateKnockout = isGroupStageComplete && (stageMode === 'group' || selectedStage === ALL_STAGE_VALUE || selectedStage === GROUP_STAGE)
+    if (finalWinnerName) {
+      setActionMessage({ type: 'success', text: `A szumó döntő győztese: ${finalWinnerName}. Nem lehet több meccset generálni.` })
+      return
+    }
+
+    if (isGroupGenerationLocked) {
+      setActionMessage({ type: 'info', text: 'A csoportkörben már nem lehet új meccset generálni, mert elkezdődött az egyenes kieséses szakasz.' })
+      return
+    }
+
+    const isGroupToKnockoutGeneration = isGroupStageComplete && (stageMode === 'group' || selectedStage === ALL_STAGE_VALUE || selectedStage === GROUP_STAGE)
+    const shouldGenerateKnockout = isGroupToKnockoutGeneration || stageMode === 'knockout' || isKnockoutStage(selectedStage)
     const pairings = shouldGenerateKnockout ? generateKnockoutPairings() : generateRoundMatches()
 
     if (!pairings || pairings.length === 0) {
+      if (shouldGenerateKnockout) {
+        const finalMatch = matches.find((match) => getMatchStage(match) === 'F')
+        const finalWinnerName = finalMatch ? getKnockoutWinnerName(finalMatch) : null
+
+        setActionMessage({
+          type: finalWinnerName ? 'success' : 'info',
+          text: finalWinnerName
+            ? `A szumó döntő győztese: ${finalWinnerName}.`
+            : 'A következő kieséses kör még nem generálható. Az aktuális szakasz minden meccsén 6 pontos győztes kell.'
+        })
+        return
+      }
       if (shouldGenerateKnockout) {
         setActionMessage({ type: 'danger', text: 'Nem sikerült egyenes kieséses párosítást generálni a jelenlegi csapatszámmal.' })
       } else {
@@ -592,10 +717,9 @@ export default function SumoScoring() {
       return
     }
 
-    const stageToGenerate = shouldGenerateKnockout ? pairings[0].stage : GROUP_STAGE
-
     try {
       for (const pairing of pairings) {
+        const stageToGenerate = shouldGenerateKnockout ? pairing.stage : GROUP_STAGE
         const payload = createSumoPayload({
           team1Name: pairing.team1.name,
           team2Name: pairing.team2.name,
@@ -626,7 +750,7 @@ export default function SumoScoring() {
       }
 
       const generatedMatches = pairings.map((pairing) => ({
-        id: `${stageToGenerate}::${pairing.table}::${pairing.team1.name}::${pairing.team2.name}::local`,
+        id: `${shouldGenerateKnockout ? pairing.stage : GROUP_STAGE}::${pairing.table}::${pairing.team1.name}::${pairing.team2.name}::local`,
         team1Name: pairing.team1.name,
         team2Name: pairing.team2.name,
         team1Results: [],
@@ -634,13 +758,13 @@ export default function SumoScoring() {
         team1Point: 0,
         team2Point: 0,
         table: pairing.table,
-        tournamentStage: stageToGenerate
+        tournamentStage: shouldGenerateKnockout ? pairing.stage : GROUP_STAGE
       }))
 
       logSumoPayload('Generated matches', generatedMatches)
       setMatches((prev) => [...prev, ...generatedMatches])
       if (shouldGenerateKnockout) {
-        setSelectedStage(stageToGenerate)
+        setSelectedStage(generatedMatches[0]?.tournamentStage || KNOCKOUT_STAGES[0])
         setStageMode('knockout')
       }
       setActionMessage({ type: 'success', text: 'A meccsek sikeresen legenerálva.' })
@@ -649,11 +773,65 @@ export default function SumoScoring() {
     }
   }
 
+  const handleDeleteMatch = async () => {
+    const match = matchToDelete
+
+    if (!match) {
+      return
+    }
+
+    try {
+      const response = await fetch(
+        `https://legocompetition.runasp.net/api/Sumo/${encodeURIComponent(match.team1Name)}/${encodeURIComponent(match.team2Name)}/${encodeURIComponent(match.tournamentStage)}`,
+        {
+          method: 'DELETE',
+          headers: {
+            accept: '*/*'
+          }
+        }
+      )
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        logSumoPayload('DELETE failed response', {
+          status: response.status,
+          body: errorText,
+          team1: match.team1Name,
+          team2: match.team2Name,
+          tournamentStage: match.tournamentStage
+        })
+        throw new Error(errorText || 'A szumo meccs torlese sikertelen volt.')
+      }
+
+      setMatches((prev) => prev.filter((item) => item.id !== match.id))
+      setOpenMatches((prev) => {
+        const next = { ...prev }
+        delete next[match.id]
+        return next
+      })
+      setMatchDrafts((prev) => {
+        const next = { ...prev }
+        delete next[match.id]
+        return next
+      })
+      setMatchToDelete(null)
+      setActionMessage({ type: 'success', text: 'A szumo meccs torolve lett.' })
+    } catch (err) {
+      setActionMessage({ type: 'danger', text: err.message })
+      setMatchToDelete(null)
+    }
+  }
+
   const handleSaveMatch = async (matchId) => {
     const selectedValue = matchDrafts[matchId]
     const match = matches.find((item) => item.id === matchId)
 
     if (!match || !selectedValue) {
+      return
+    }
+
+    if (getKnockoutWinnerName(match)) {
+      setActionMessage({ type: 'info', text: 'Ez a kieséses meccs már lezárult, mert az egyik csapat elérte a 6 pontot.' })
       return
     }
 
@@ -828,30 +1006,32 @@ export default function SumoScoring() {
                   type="button"
                   className="btn btn-primary px-4"
                   onClick={handleGenerateMatches}
-                  disabled={!teams.length}
+                  disabled={!teams.length || Boolean(finalWinnerName) || isGroupGenerationLocked}
                 >
                   {primaryActionLabel}
                 </button>
               </div>
 
               <div className="row g-3 align-items-end mb-3">
-                <div className="col-md-3 col-lg-2">
-                  <label className="form-label fw-semibold" htmlFor="sumo-round-limit">Max. fordulók</label>
-                  <input
-                    id="sumo-round-limit"
-                    type="number"
-                    min="1"
-                    max="20"
-                    className="form-control"
-                    value={roundLimit}
-                    onChange={(event) => {
-                      const parsedValue = Number.parseInt(event.target.value, 10)
-                      setRoundLimit(Number.isNaN(parsedValue) ? 1 : Math.min(20, Math.max(1, parsedValue)))
-                    }}
-                  />
-                </div>
+                {!isKnockoutView && (
+                  <div className="col-md-3 col-lg-2">
+                    <label className="form-label fw-semibold" htmlFor="sumo-round-limit">Max. fordulók</label>
+                    <input
+                      id="sumo-round-limit"
+                      type="number"
+                      min="1"
+                      max="20"
+                      className="form-control"
+                      value={roundLimit}
+                      onChange={(event) => {
+                        const parsedValue = Number.parseInt(event.target.value, 10)
+                        setRoundLimit(Number.isNaN(parsedValue) ? 1 : Math.min(20, Math.max(1, parsedValue)))
+                      }}
+                    />
+                  </div>
+                )}
 
-                <div className="col-md-9 col-lg-10">
+                <div className={isKnockoutView ? 'col-12' : 'col-md-9 col-lg-10'}>
                   <div className="d-flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -879,8 +1059,12 @@ export default function SumoScoring() {
               </div>
 
               <div className="d-flex flex-wrap gap-2 align-items-center">
-                <div className="text-muted">Jelenlegi nézet: {getStageLabel(selectedStage)} ({currentRoundLabel})</div>
-                <div className="text-muted">Legfeljebb {roundLimit} forduló generálható ezen a nézeten.</div>
+                <div className="text-muted">Jelenlegi nézet: {stageMode === 'knockout' ? 'egyenes kiesés' : getStageLabel(selectedStage)} ({currentRoundLabel})</div>
+                <div className="text-muted">
+                  {isKnockoutView
+                    ? 'Kieséses szakaszban minden meccs addig tart, amíg valamelyik csapat eléri a 6 pontot.'
+                    : `Legfeljebb ${roundLimit} forduló generálható ezen a nézeten.`}
+                </div>
               </div>
             </div>
           </div>
@@ -930,10 +1114,12 @@ export default function SumoScoring() {
       {roundGroups.length > 0 && (
         <div className="d-grid gap-3">
           {roundGroups.map((round) => (
-            <div className="card shadow-sm team-card no-hover-card" key={`round-${round.table}`}>
+            <div className="card shadow-sm team-card no-hover-card" key={`round-${round.stage}-${round.table}`}>
               <div className="card-body border-bottom py-3 px-4 bg-light">
                 <div className="d-flex justify-content-between align-items-center gap-3">
-                  <h5 className="mb-0">{round.table}. forduló</h5>
+                  <h5 className="mb-0">
+                    {shouldSplitRoundGroupsByStage ? `${getStageLabel(round.stage)} - ` : ''}{round.table}. forduló
+                  </h5>
                   <span className="text-muted">{round.matches.length} meccs</span>
                 </div>
               </div>
@@ -943,6 +1129,8 @@ export default function SumoScoring() {
                   {round.matches.map((match) => {
                     const isOpen = openMatches[match.id] === true
                     const selectedValue = matchDrafts[match.id] ?? ''
+                    const knockoutWinnerName = getKnockoutWinnerName(match)
+                    const isMatchComplete = Boolean(knockoutWinnerName)
                     const team1History = match.team1Results
                     const team2History = match.team2Results
 
@@ -1022,9 +1210,15 @@ export default function SumoScoring() {
 
                               <div className="d-flex flex-column flex-md-row gap-2 align-items-stretch">
                                 <div className="d-grid gap-2 flex-grow-1" role="group" aria-label={`${match.team1Name} vs ${match.team2Name}`}>
+                                  {isMatchComplete && (
+                                    <div className="alert alert-success py-2 mb-1">
+                                      Győztes: {knockoutWinnerName} ({KNOCKOUT_WIN_POINTS} pont)
+                                    </div>
+                                  )}
                                   <button
                                     type="button"
                                     className={`btn btn-sm sumo-result-btn ${selectedValue === 'team1' ? 'active' : ''}`}
+                                    disabled={isMatchComplete}
                                     onClick={() => handleMatchDraftChange(match.id, 'team1')}
                                   >
                                     {match.team1Name}
@@ -1032,6 +1226,7 @@ export default function SumoScoring() {
                                   <button
                                     type="button"
                                     className={`btn btn-sm sumo-result-btn ${selectedValue === 'team2' ? 'active' : ''}`}
+                                    disabled={isMatchComplete}
                                     onClick={() => handleMatchDraftChange(match.id, 'team2')}
                                   >
                                     {match.team2Name}
@@ -1039,6 +1234,7 @@ export default function SumoScoring() {
                                   <button
                                     type="button"
                                     className={`btn btn-sm sumo-result-btn ${selectedValue === 'draw' ? 'active' : ''}`}
+                                    disabled={isMatchComplete}
                                     onClick={() => handleMatchDraftChange(match.id, 'draw')}
                                   >
                                     Döntetlen
@@ -1048,10 +1244,17 @@ export default function SumoScoring() {
                                 <button
                                   type="button"
                                   className="btn btn-outline-success align-self-md-center"
-                                  disabled={!selectedValue}
+                                  disabled={!selectedValue || isMatchComplete}
                                   onClick={() => handleSaveMatch(match.id)}
                                 >
                                   Mentés
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline-danger align-self-md-center"
+                                  onClick={() => setMatchToDelete(match)}
+                                >
+                                  Meccs törlése
                                 </button>
                               </div>
                             </div>
@@ -1064,6 +1267,32 @@ export default function SumoScoring() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+      {matchToDelete && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.35)', zIndex: 1050 }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="modal-dialog modal-sm m-0" role="document">
+            <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden bg-white text-dark">
+              <div className="modal-header border-0 px-4 py-3 bg-white">
+                <h5 className="modal-title fw-bold text-dark">Szumó meccs törlése</h5>
+                <button type="button" className="btn-close" aria-label="Close" onClick={() => setMatchToDelete(null)}></button>
+              </div>
+              <div className="modal-body px-4 py-4">
+                <p className="mb-2 text-dark">Biztosan törölni szeretnéd ezt a szumó meccset?</p>
+                <p className="fw-semibold mb-1 text-dark">{matchToDelete.team1Name} vs {matchToDelete.team2Name}</p>
+                <p className="small mb-0 text-dark">Szakasz: {getStageLabel(matchToDelete.tournamentStage)}</p>
+              </div>
+              <div className="modal-footer border-0 px-4 pb-4 pt-0">
+                <button type="button" className="btn btn-outline-secondary" onClick={() => setMatchToDelete(null)}>Mégse</button>
+                <button type="button" className="btn btn-danger" onClick={handleDeleteMatch}>Törlés</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
