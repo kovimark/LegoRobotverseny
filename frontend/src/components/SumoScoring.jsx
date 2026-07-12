@@ -3,6 +3,7 @@ import { getCompetitionConfig } from '../config/adminScoringConfig'
 
 const competitionConfig = getCompetitionConfig('szumo')
 const GROUP_STAGE = 'GS'
+const KNOCKOUT_WIN_POINTS = 6
 const KNOCKOUT_STAGES = ['RO16', 'QF', 'SF', 'BM', 'F']
 const KNOCKOUT_STAGE_PRIORITY = [
   { minTeams: 16, stage: 'RO16' },
@@ -128,9 +129,34 @@ const normalizeMatch = (match, index) => {
 
 const getMatchStage = (match) => match.tournamentStage || match.tournament_stage || GROUP_STAGE
 
+const isKnockoutStage = (stage) => KNOCKOUT_STAGES.includes(stage)
+
+const getNextKnockoutStage = (stage) => {
+  if (stage === 'RO16') return 'QF'
+  if (stage === 'QF') return 'SF'
+  if (stage === 'SF') return 'F'
+  return null
+}
+
 const getResultPoints = (result) => RESULT_POINTS[result] ?? 0
 
 const calculateTotalPoints = (history) => history.reduce((sum, result) => sum + getResultPoints(result), 0)
+
+const getKnockoutWinnerName = (match) => {
+  if (!isKnockoutStage(getMatchStage(match))) {
+    return null
+  }
+
+  if (match.team1Point >= KNOCKOUT_WIN_POINTS && match.team1Point > match.team2Point) {
+    return match.team1Name
+  }
+
+  if (match.team2Point >= KNOCKOUT_WIN_POINTS && match.team2Point > match.team1Point) {
+    return match.team2Name
+  }
+
+  return null
+}
 
 const getStageLabel = (stage) => STAGE_LABELS[stage] || stage
 
@@ -169,6 +195,8 @@ const getKnockoutStage = (teamCount) => {
 
   return 'F'
 }
+
+const getKnockoutStageIndex = (stage) => KNOCKOUT_STAGES.indexOf(stage)
 
 const getPairingSearchResult = (availableTeams, usedPairKeys) => {
   if (availableTeams.length === 0) {
