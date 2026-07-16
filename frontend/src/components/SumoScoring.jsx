@@ -71,6 +71,24 @@ const normalizeTeam = (team, index) => ({
   name: getTeamName(team, index)
 })
 
+const normalizeGroupStanding = (standing, index) => ({
+  id: standing.id ?? standing.team_name ?? `group-standing-${index}`,
+  team_name: standing.team_name || '',
+  point: Number(standing.point ?? 0),
+  rounds: Number(standing.rounds ?? 0),
+  wins: Number(standing.wins ?? 0),
+  draws: Number(standing.draws ?? 0),
+  losses: Number(standing.losses ?? 0)
+})
+
+const sortGroupStandings = (standings) => [...standings].sort((left, right) => {
+  if (right.point !== left.point) return right.point - left.point
+  if (right.wins !== left.wins) return right.wins - left.wins
+  if (right.draws !== left.draws) return right.draws - left.draws
+  if (left.losses !== right.losses) return left.losses - right.losses
+  return left.team_name.localeCompare(right.team_name)
+})
+
 const normalizeMatchesResponse = (data) => {
   if (Array.isArray(data)) {
     return data
@@ -294,70 +312,6 @@ const getPrimaryGenerationLabel = (roundLimit, matches, stageMode, selectedStage
   return 'Meccsek legenerálása'
 }
 
-const buildStandings = (teams, matches) => {
-  const standings = new Map()
-
-  teams.forEach((team) => {
-    standings.set(team.name, {
-      id: team.id,
-      name: team.name,
-      points: 0,
-      wins: 0,
-      draws: 0,
-      losses: 0,
-      matchesPlayed: 0
-    })
-  })
-
-  matches.forEach((match) => {
-    const team1Standing = standings.get(match.team1Name)
-    const team2Standing = standings.get(match.team2Name)
-
-    if (!team1Standing || !team2Standing) {
-      return
-    }
-
-    const roundCount = Math.max(match.team1Results.length, match.team2Results.length)
-
-    for (let roundIndex = 0; roundIndex < roundCount; roundIndex += 1) {
-      const team1Result = match.team1Results[roundIndex]
-      const team2Result = match.team2Results[roundIndex]
-
-      if (!team1Result || !team2Result) {
-        continue
-      }
-
-      team1Standing.matchesPlayed += 1
-      team2Standing.matchesPlayed += 1
-      team1Standing.points += getResultPoints(team1Result)
-      team2Standing.points += getResultPoints(team2Result)
-
-      if (team1Result === 'W') {
-        team1Standing.wins += 1
-        team2Standing.losses += 1
-        continue
-      }
-
-      if (team1Result === 'L') {
-        team1Standing.losses += 1
-        team2Standing.wins += 1
-        continue
-      }
-
-      if (team1Result === 'D') {
-        team1Standing.draws += 1
-        team2Standing.draws += 1
-      }
-    }
-  })
-
-  return Array.from(standings.values()).sort((left, right) => {
-    if (right.points !== left.points) return right.points - left.points
-    if (left.matchesPlayed !== right.matchesPlayed) return left.matchesPlayed - right.matchesPlayed
-    return left.name.localeCompare(right.name)
-  })
-}
-
 const buildRoundGroups = (matches, splitByStage = false) => {
   const grouped = new Map()
 
@@ -409,6 +363,7 @@ const buildRoundGroups = (matches, splitByStage = false) => {
 export default function SumoScoring() {
   const [teams, setTeams] = useState([])
   const [matches, setMatches] = useState([])
+  const [groupStandings, setGroupStandings] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [stageMode, setStageMode] = useState('group')
@@ -425,9 +380,10 @@ export default function SumoScoring() {
       setError('')
 
       try {
-        const [teamsResponse, matchesResponse] = await Promise.all([
+        const [teamsResponse, matchesResponse, groupStandingsResponse] = await Promise.all([
           fetch('https://legocompetition.runasp.net/api/Teams'),
-          fetch('https://legocompetition.runasp.net/api/Sumo/matches')
+          fetch('https://legocompetition.runasp.net/api/Sumo/matches'),
+          fetch('https://legocompetition.runasp.net/api/Sumo/group')
         ])
 
         if (!teamsResponse.ok) {
@@ -438,11 +394,19 @@ export default function SumoScoring() {
           throw new Error('Nem sikerült betölteni a szumó meccseket.')
         }
 
+        if (!groupStandingsResponse.ok) {
+          throw new Error('Nem sikerült betölteni a szumó tabellát.')
+        }
+
         const teamsData = await teamsResponse.json()
         const matchesData = await matchesResponse.json()
+        const groupStandingsData = await groupStandingsResponse.json()
 
         setTeams(Array.isArray(teamsData) ? teamsData.map(normalizeTeam) : [])
         setMatches(dedupeMatches(normalizeMatchesResponse(matchesData).map(normalizeMatch)))
+        setGroupStandings(Array.isArray(groupStandingsData)
+          ? sortGroupStandings(groupStandingsData.map(normalizeGroupStanding).filter((standing) => standing.team_name))
+          : [])
       } catch (err) {
         setError(err.message)
       } finally {
@@ -503,8 +467,7 @@ export default function SumoScoring() {
 
   const shouldSplitRoundGroupsByStage = selectedStage === ALL_STAGE_VALUE || stageMode === 'knockout'
   const roundGroups = useMemo(() => buildRoundGroups(stageMatches, shouldSplitRoundGroupsByStage), [stageMatches, shouldSplitRoundGroupsByStage])
-  const standings = useMemo(() => buildStandings(teams, stageMatches), [teams, stageMatches])
-  const standingsByName = useMemo(() => new Map(standings.map((item) => [item.name, item])), [standings])
+  const standingsByName = useMemo(() => new Map(groupStandings.map((item) => [item.team_name, item])), [groupStandings])
   const isKnockoutView = stageMode === 'knockout' || isKnockoutStage(selectedStage)
   const hasKnockoutStarted = useMemo(
     () => matches.some((match) => isKnockoutStage(getMatchStage(match))),
@@ -556,12 +519,24 @@ export default function SumoScoring() {
     setMatches(dedupeMatches(normalizeMatchesResponse(refreshedData).map(normalizeMatch)))
   }
 
+  const refreshGroupStandings = async () => {
+    const response = await fetch('https://legocompetition.runasp.net/api/Sumo/group')
+    if (!response.ok) {
+      return
+    }
+
+    const refreshedData = await response.json()
+    setGroupStandings(Array.isArray(refreshedData)
+      ? sortGroupStandings(refreshedData.map(normalizeGroupStanding).filter((standing) => standing.team_name))
+      : [])
+  }
+
   const getCurrentRoundTeams = () => {
     const sortedTeams = teams
       .map((team) => ({
         ...team,
-        points: standingsByName.get(team.name)?.points ?? 0,
-        matchesPlayed: standingsByName.get(team.name)?.matchesPlayed ?? 0
+        points: standingsByName.get(team.name)?.point ?? 0,
+        matchesPlayed: standingsByName.get(team.name)?.rounds ?? 0
       }))
       .sort((left, right) => {
         if (right.points !== left.points) return right.points - left.points
@@ -578,12 +553,12 @@ export default function SumoScoring() {
     const existingStages = KNOCKOUT_STAGES.filter((stage) => knockoutMatches.some((match) => getMatchStage(match) === stage))
 
     if (existingStages.length === 0) {
-      const groupStandingsByName = new Map(buildStandings(teams, groupStageMatches).map((item) => [item.name, item]))
+      const groupStandingsByName = new Map(groupStandings.map((item) => [item.team_name, item]))
       const sortedTeams = teams
         .map((team) => ({
           ...team,
-          points: groupStandingsByName.get(team.name)?.points ?? 0,
-          matchesPlayed: groupStandingsByName.get(team.name)?.matchesPlayed ?? 0
+          points: groupStandingsByName.get(team.name)?.point ?? 0,
+          matchesPlayed: groupStandingsByName.get(team.name)?.rounds ?? 0
         }))
         .sort((left, right) => {
           if (right.points !== left.points) return right.points - left.points
@@ -833,6 +808,7 @@ export default function SumoScoring() {
         return next
       })
       setMatchToDelete(null)
+      await refreshGroupStandings()
       setActionMessage({ type: 'success', text: 'A szumómeccs törölve lett.' })
     } catch (err) {
       setActionMessage({ type: 'danger', text: err.message })
@@ -906,7 +882,7 @@ export default function SumoScoring() {
           throw new Error(fallbackErrorText || errorText || 'A meccs frissítése sikertelen volt.')
         }
 
-        await refreshMatches()
+        await Promise.all([refreshMatches(), refreshGroupStandings()])
         setMatchDrafts((prev) => {
           const next = { ...prev }
           delete next[matchId]
@@ -924,6 +900,7 @@ export default function SumoScoring() {
         team1Point: payload.team1Point,
         team2Point: payload.team2Point
       }))
+      await refreshGroupStandings()
 
       setMatchDrafts((prev) => {
         const next = { ...prev }
@@ -983,6 +960,7 @@ export default function SumoScoring() {
         team1Point: payload.team1Point,
         team2Point: payload.team2Point
       }))
+      await refreshGroupStandings()
 
       setActionMessage({ type: 'success', text: 'A kiválasztott kör törölve lett.' })
     } catch (err) {
@@ -1090,25 +1068,25 @@ export default function SumoScoring() {
           <div className="card shadow-sm team-card mb-4">
             <div className="card-body p-4">
               <h5 className="mb-3">Aktuális sorrend</h5>
-              {standings.length > 0 ? (
+              {groupStandings.length > 0 ? (
                 <div className="table-responsive">
                   <table className="table table-sm align-middle mb-0">
                     <thead>
                       <tr>
                         <th>Csapat</th>
                         <th className="text-end">Pont</th>
-                        <th className="text-end">Meccsek</th>
+                        <th className="text-end">Körök</th>
                         <th className="text-end">W</th>
                         <th className="text-end">D</th>
                         <th className="text-end">L</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {standings.map((team) => (
+                      {groupStandings.map((team) => (
                         <tr key={team.id}>
-                          <td>{team.name}</td>
-                          <td className="text-end">{team.points}</td>
-                          <td className="text-end">{team.matchesPlayed}</td>
+                          <td>{team.team_name}</td>
+                          <td className="text-end">{team.point}</td>
+                          <td className="text-end">{team.rounds}</td>
                           <td className="text-end">{team.wins}</td>
                           <td className="text-end">{team.draws}</td>
                           <td className="text-end">{team.losses}</td>
