@@ -818,7 +818,7 @@ export default function SumoScoring() {
           team2: match.team2Name,
           tournamentStage: match.tournamentStage
         })
-        throw new Error(errorText || 'A szumo meccs torlese sikertelen volt.')
+        throw new Error(errorText || 'A szumómeccs törlése sikertelen volt.')
       }
 
       setMatches((prev) => prev.filter((item) => item.id !== match.id))
@@ -833,7 +833,7 @@ export default function SumoScoring() {
         return next
       })
       setMatchToDelete(null)
-      setActionMessage({ type: 'success', text: 'A szumo meccs torolve lett.' })
+      setActionMessage({ type: 'success', text: 'A szumómeccs törölve lett.' })
     } catch (err) {
       setActionMessage({ type: 'danger', text: err.message })
       setMatchToDelete(null)

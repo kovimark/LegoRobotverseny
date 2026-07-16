@@ -3,10 +3,11 @@ import { getCompetitionConfig } from '../config/adminScoringConfig'
 
 const competitionConfig = getCompetitionConfig('vonalkovetes')
 const MIN_FINAL_TEAMS = 3
+const LINE_FOLLOWING_STAGE_STORAGE_KEY = 'lineFollowingCurrentStage'
 const LINE_FOLLOWING_STAGES = [
-  { value: 1, label: 'Csoportkor' },
+  { value: 1, label: 'Csoportkör' },
   { value: 2, label: 'Legjobb 16' },
-  { value: 3, label: 'Negyeddonto' },
+  { value: 3, label: 'Negyeddöntő' },
   { value: 4, label: 'Legjobb 4 (final four)' }
 ]
 
@@ -40,6 +41,82 @@ const getRoundDraft = (roundDrafts, roundId, teamName) => roundDrafts[roundId]?.
 const getRoundSavedResult = (roundResults, roundId, teamName) => roundResults[roundId]?.[teamName] || null
 
 const getResultKey = (team) => team.resultKey || team.team_name
+
+const getStageValueFromRoundId = (roundId) => {
+  const stage = Number(String(roundId).replace('round-', ''))
+  return Number.isFinite(stage) && stage > 0 ? stage : 1
+}
+
+const getStoredLineFollowingStage = () => {
+  try {
+    const stage = Number(window.localStorage.getItem(LINE_FOLLOWING_STAGE_STORAGE_KEY))
+    return Number.isFinite(stage) && stage > 0 ? stage : null
+  } catch (err) {
+    return null
+  }
+}
+
+const setStoredLineFollowingStage = (stage) => {
+  try {
+    window.localStorage.setItem(LINE_FOLLOWING_STAGE_STORAGE_KEY, String(stage))
+  } catch (err) {
+    // localStorage can be unavailable in some browser modes.
+  }
+}
+
+const getUniqueAdvancingEntries = (roundEntries, advancingCount) => {
+  const entriesByTeam = new Map()
+
+  roundEntries
+    .filter((entry) => entry.bestTime !== '')
+    .forEach((entry) => {
+      const teamName = entry.team.team_name
+      const existingEntry = entriesByTeam.get(teamName)
+
+      if (!existingEntry || entry.bestTime < existingEntry.bestTime) {
+        entriesByTeam.set(teamName, entry)
+      }
+    })
+
+  return Array.from(entriesByTeam.values())
+    .sort((a, b) => a.bestTime - b.bestTime || a.team.team_name.localeCompare(b.team.team_name))
+    .slice(0, advancingCount)
+}
+
+const createCurrentStagePlaceholderRound = (results, teamNames, storedStage) => {
+  if (!Array.isArray(teamNames) || teamNames.length === 0) {
+    return null
+  }
+
+  const maxResultStage = results.reduce((maxStage, result) => Math.max(maxStage, result.stage), 0)
+  const maxStageTeamCount = new Set(
+    results
+      .filter((result) => result.stage === maxResultStage)
+      .map((result) => result.team_name)
+  ).size
+  const shouldMoveToNextStage = maxResultStage > 0 && teamNames.length < maxStageTeamCount
+  const currentStageHasResult = results.some((result) => (
+    result.stage === storedStage && teamNames.includes(result.team_name)
+  ))
+  const shouldUseStoredStage = storedStage && (
+    storedStage === maxResultStage + 1 || (storedStage === maxResultStage && currentStageHasResult && !shouldMoveToNextStage)
+  )
+  const stageValue = shouldUseStoredStage
+    ? storedStage
+    : maxResultStage === 0
+      ? 1
+      : shouldMoveToNextStage
+        ? Math.min(LINE_FOLLOWING_STAGES.length, maxResultStage + 1)
+        : maxResultStage
+  const stageConfig = LINE_FOLLOWING_STAGES.find((stage) => stage.value === stageValue)
+
+  return {
+    id: `round-${stageValue}`,
+    label: stageConfig?.label || `${stageValue}. kör`,
+    teams: [],
+    advancingCount: getAdvancingCount(teamNames.length)
+  }
+}
 
 const normalizeLineFollowingResult = (result, index) => {
   const teamName = result.team_name || result.teamName || ''
@@ -100,6 +177,7 @@ export default function LineFollowingScoring() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [rounds, setRounds] = useState([])
+  const [closedRoundIds, setClosedRoundIds] = useState([])
   const [roundDrafts, setRoundDrafts] = useState({})
   const [roundResults, setRoundResults] = useState({})
   const [openEntries, setOpenEntries] = useState({})
@@ -108,7 +186,6 @@ export default function LineFollowingScoring() {
   const [resultSearchTerm, setResultSearchTerm] = useState('')
   const [selectedResultTeam, setSelectedResultTeam] = useState(null)
   const [resultTime, setResultTime] = useState('')
-  const [resultStage, setResultStage] = useState(1)
   const [resultToDelete, setResultToDelete] = useState(null)
   const [displaySearchTerm, setDisplaySearchTerm] = useState('')
   const resultSearchInputRef = useRef(null)
@@ -120,13 +197,15 @@ export default function LineFollowingScoring() {
       setError('')
 
       try {
-        const [response, teamNamesResponse] = await Promise.all([
+        const [response, lineFollowingTeamNamesResponse, teamNamesResponse] = await Promise.all([
           fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`),
+          fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/teamnames`),
           fetch('https://legocompetition.runasp.net/api/Teams/teamnames')
         ])
-        if (!response.ok) throw new Error('Nem sikerult betolteni a csapatokat.')
+        if (!response.ok) throw new Error('Nem sikerült betölteni a csapatokat.')
 
         const data = await response.json()
+        const lineFollowingTeamNamesData = lineFollowingTeamNamesResponse.ok ? await lineFollowingTeamNamesResponse.json() : []
         const teamNamesData = teamNamesResponse.ok ? await teamNamesResponse.json() : []
         const normalizedResults = Array.isArray(data)
           ? data.map(normalizeLineFollowingResult).filter(Boolean)
@@ -139,10 +218,26 @@ export default function LineFollowingScoring() {
           }
         ])).values())
 
-        setTeamNames(Array.isArray(teamNamesData) && teamNamesData.length > 0
+        const activeLineFollowingTeamNames = Array.isArray(lineFollowingTeamNamesData)
+          ? lineFollowingTeamNamesData.filter(Boolean)
+          : []
+        const fallbackTeamNames = Array.isArray(teamNamesData) && teamNamesData.length > 0
           ? teamNamesData.filter(Boolean)
-          : normalizedTeams.map((team) => team.team_name).filter(Boolean))
-        setRounds(createRoundsFromLineFollowingResults(normalizedResults))
+          : normalizedTeams.map((team) => team.team_name).filter(Boolean)
+        const loadedRounds = createRoundsFromLineFollowingResults(normalizedResults)
+        const placeholderRound = createCurrentStagePlaceholderRound(normalizedResults, activeLineFollowingTeamNames, getStoredLineFollowingStage())
+        const nextRounds = placeholderRound && !loadedRounds.some((round) => round.id === placeholderRound.id)
+          ? [...loadedRounds, placeholderRound]
+          : loadedRounds
+        const closedRoundIdsFromTeamNames = activeLineFollowingTeamNames.length > 0 && placeholderRound
+          ? [`round-${Math.max(1, getStageValueFromRoundId(placeholderRound.id) - 1)}`]
+          : []
+
+        setTeamNames(activeLineFollowingTeamNames.length > 0
+          ? activeLineFollowingTeamNames
+          : fallbackTeamNames)
+        setRounds(nextRounds)
+        setClosedRoundIds(closedRoundIdsFromTeamNames)
         setRoundDrafts({})
         setRoundResults(createRoundResultsFromLineFollowingResults(normalizedResults))
         setOpenEntries({})
@@ -219,7 +314,10 @@ export default function LineFollowingScoring() {
     return sorted
   }
 
-  const selectedStageRoundId = `round-${resultStage}`
+  const currentRound = rounds[rounds.length - 1] || null
+  const currentResultStage = currentRound ? getStageValueFromRoundId(currentRound.id) : 1
+  const currentStageConfig = LINE_FOLLOWING_STAGES.find((stage) => stage.value === currentResultStage) || LINE_FOLLOWING_STAGES[0]
+  const selectedStageRoundId = `round-${currentResultStage}`
   const resultSearchResults = resultSearchTerm.trim()
     ? teamNames
         .filter((teamName) => teamName.toLowerCase().includes(resultSearchTerm.trim().toLowerCase()))
@@ -274,7 +372,7 @@ export default function LineFollowingScoring() {
     const secondTime = Number(draft.secondTime)
 
     if (!teamName || !Number.isFinite(firstTime) || !Number.isFinite(secondTime) || firstTime <= 0 || secondTime <= 0) {
-      setActionMessage({ type: 'danger', text: 'Mindket idot ki kell tolteni masodpercben.' })
+      setActionMessage({ type: 'danger', text: 'Mindkét időt ki kell tölteni másodpercben.' })
       return
     }
 
@@ -289,7 +387,7 @@ export default function LineFollowingScoring() {
         method: 'PATCH'
       })
 
-      setActionMessage({ type: 'success', text: 'A frissites sikeres volt.' })
+      setActionMessage({ type: 'success', text: 'A frissítés sikeres volt.' })
       setRoundResults((prev) => ({
         ...prev,
         [roundId]: {
@@ -326,7 +424,7 @@ export default function LineFollowingScoring() {
   const handleSaveTopResult = async () => {
     const teamName = selectedResultTeam?.team_name || resultSearchTerm.trim()
     const time = Number(resultTime)
-    const tournamentStage = Number(resultStage)
+    const tournamentStage = currentResultStage
 
     if (!teamName) {
       setActionMessage({ type: 'danger', text: 'Adj meg egy csapatnevet.' })
@@ -334,7 +432,7 @@ export default function LineFollowingScoring() {
     }
 
     if (!Number.isFinite(time) || time <= 0) {
-      setActionMessage({ type: 'danger', text: 'Adj meg egy ervenyes idot masodpercben.' })
+      setActionMessage({ type: 'danger', text: 'Adj meg egy érvényes időt másodpercben.' })
       return
     }
 
@@ -355,10 +453,11 @@ export default function LineFollowingScoring() {
 
       if (!response.ok) {
         errorText = await response.text()
-        throw new Error(errorText || 'Az eredmeny mentese sikertelen volt.')
+        throw new Error(errorText || 'Az eredmény mentése sikertelen volt.')
       }
 
       const resultKey = `${tournamentStage}-${teamName}-${time}-${Date.now()}`
+      setStoredLineFollowingStage(tournamentStage)
 
       setRoundResults((prev) => ({
         ...prev,
@@ -415,7 +514,7 @@ export default function LineFollowingScoring() {
 
         return next
       })
-      setActionMessage({ type: 'success', text: 'Az eredmeny mentese sikeres volt.' })
+      setActionMessage({ type: 'success', text: 'Az eredmény mentése sikeres volt.' })
       setResultTime('')
       setResultSearchTerm('')
       setSelectedResultTeam(null)
@@ -435,7 +534,7 @@ export default function LineFollowingScoring() {
     const stage = Number(result.stage)
 
     if (!result.teamName || !Number.isFinite(time) || !Number.isInteger(time) || !Number.isFinite(stage)) {
-      setActionMessage({ type: 'danger', text: 'Az eredmeny torlesehez hianyos vagy hibas adat tartozik.' })
+      setActionMessage({ type: 'danger', text: 'Az eredmény törléséhez hiányos vagy hibás adat tartozik.' })
       setResultToDelete(null)
       return
     }
@@ -450,7 +549,7 @@ export default function LineFollowingScoring() {
 
       if (!response.ok) {
         const errorText = await response.text()
-        throw new Error(errorText || 'Az eredmeny torlese sikertelen volt.')
+        throw new Error(errorText || 'Az eredmény törlése sikertelen volt.')
       }
 
       const roundId = `round-${stage}`
@@ -488,7 +587,7 @@ export default function LineFollowingScoring() {
         delete next[`${roundId}:${result.resultKey || result.teamName}`]
         return next
       })
-      setActionMessage({ type: 'success', text: 'Az eredmeny torolve lett.' })
+      setActionMessage({ type: 'success', text: 'Az eredmény törölve lett.' })
       setResultToDelete(null)
     } catch (err) {
       setActionMessage({ type: 'danger', text: err.message })
@@ -515,78 +614,107 @@ export default function LineFollowingScoring() {
     }
   })
 
-  const createNextRound = (round, roundIndex) => {
+  const createNextRound = async (round) => {
     const roundEntries = getRoundEntries(round)
-    const advancingCount = Math.min(round.teams.length, Math.max(MIN_FINAL_TEAMS, round.advancingCount || getAdvancingCount(round.teams.length)))
-    const advancingTeams = roundEntries
-      .slice()
-      .sort((a, b) => {
-        const aBest = a.bestTime === '' ? Number.POSITIVE_INFINITY : a.bestTime
-        const bBest = b.bestTime === '' ? Number.POSITIVE_INFINITY : b.bestTime
-        return aBest - bBest || a.team.team_name.localeCompare(b.team.team_name)
-      })
-      .slice(0, advancingCount)
-      .map((entry) => entry.team)
+    const uniqueTeamCount = new Set(round.teams.map((team) => team.team_name)).size
+    const advancingCount = Math.min(uniqueTeamCount, Math.max(MIN_FINAL_TEAMS, round.advancingCount || getAdvancingCount(uniqueTeamCount)))
+    const advancingEntries = getUniqueAdvancingEntries(roundEntries, advancingCount)
+    const advancingTeamNames = advancingEntries.map((entry) => entry.team.team_name)
 
-    if (advancingTeams.length < MIN_FINAL_TEAMS) {
+    if (advancingTeamNames.length < MIN_FINAL_TEAMS) {
       return
     }
 
-    setRounds((prev) => [
-      ...prev,
-      {
-        id: `round-${roundIndex + 2}`,
-        label: advancingTeams.length <= MIN_FINAL_TEAMS ? 'Top 3 donto' : `${roundIndex + 2}. kor`,
-        teams: advancingTeams,
-        advancingCount: getAdvancingCount(advancingTeams.length)
+    try {
+      const response = await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/remainingteams`, {
+        method: 'POST',
+        headers: {
+          accept: '*/*',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(advancingTeamNames)
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || 'A továbbjutók feltöltése sikertelen volt.')
       }
-    ])
+
+      const teamNamesResponse = await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/teamnames`, {
+        headers: {
+          accept: '*/*'
+        }
+      })
+      const nextTeamNamesData = teamNamesResponse.ok ? await teamNamesResponse.json() : []
+      const nextTeamNames = Array.isArray(nextTeamNamesData) && nextTeamNamesData.length > 0
+        ? nextTeamNamesData.filter(Boolean)
+        : advancingTeamNames
+      const nextStage = Math.min(LINE_FOLLOWING_STAGES.length, getStageValueFromRoundId(round.id) + 1)
+      const nextStageConfig = LINE_FOLLOWING_STAGES.find((stage) => stage.value === nextStage)
+      setStoredLineFollowingStage(nextStage)
+      setTeamNames(nextTeamNames)
+      setResultSearchTerm('')
+      setSelectedResultTeam(null)
+      setClosedRoundIds((prev) => (
+        prev.includes(round.id)
+          ? prev
+          : [...prev, round.id]
+      ))
+      setRounds((prev) => {
+        const nextRound = {
+          id: `round-${nextStage}`,
+          label: nextStageConfig?.label || `${nextStage}. kör`,
+          teams: [],
+          advancingCount: getAdvancingCount(nextTeamNames.length)
+        }
+        const hasNextRound = prev.some((existingRound) => existingRound.id === nextRound.id)
+
+        return hasNextRound
+          ? prev.map((existingRound) => (existingRound.id === nextRound.id ? nextRound : existingRound))
+          : [...prev, nextRound]
+      })
+      setActionMessage({ type: 'success', text: 'A továbbjutók feltöltése sikeres volt.' })
+    } catch (err) {
+      setActionMessage({ type: 'danger', text: err.message })
+    }
   }
 
   return (
     <div>
-      <div className="alert alert-info">Kivalasztott versenyszam: <strong>{competitionConfig.label}</strong></div>
+      <div className="alert alert-info">Kiválasztott versenyszám: <strong>{competitionConfig.label}</strong></div>
 
       {actionMessage && <div className={`alert ${actionMessage.type === 'success' ? 'alert-success' : 'alert-danger'} mb-3`} role="status">{actionMessage.text}</div>}
-      {loading && <div className="alert alert-secondary">Csapatok betoltese...</div>}
+      {loading && <div className="alert alert-secondary">Csapatok betöltése...</div>}
       {error && <div className="alert alert-danger">{error}</div>}
 
       {!loading && !error && (
         <>
         <div className="card shadow-sm team-card no-hover-card mb-3">
           <div className="card-body p-3 p-md-4">
-            <div className="home-kicker">Eredmenyfelvitel</div>
-            <h4 className="mb-1">Vonalkovetes eredmeny rogzitese</h4>
-            <p className="text-muted">Keress csapatot, valaszd ki a szakaszt, majd add meg az idot masodpercben.</p>
+            <div className="home-kicker">Eredményfelvitel</div>
+            <h4 className="mb-1">Vonalkövetés eredményének rögzítése</h4>
+            <p className="text-muted">Keress csapatot, válaszd ki a szakaszt, majd add meg az időt másodpercben.</p>
 
             <div className="row g-3 align-items-end">
               <div className="col-12 col-lg-3">
                 <label className="form-label" htmlFor="line-stage-select">Szakasz</label>
-                <select
+                <input
                   id="line-stage-select"
                   className="form-control"
-                  value={resultStage}
-                  onChange={(event) => {
-                    setResultStage(Number(event.target.value))
-                    setSelectedResultTeam(null)
-                    setResultSearchTerm('')
-                  }}
-                >
-                  {LINE_FOLLOWING_STAGES.map((stage) => (
-                    <option key={stage.value} value={stage.value}>{stage.value} - {stage.label}</option>
-                  ))}
-                </select>
+                  value={`${currentResultStage} - ${currentStageConfig.label}`}
+                  readOnly
+                />
               </div>
 
               <div className="col-12 col-lg-5 position-relative">
-                <label className="form-label" htmlFor="line-team-search">Csapat keresese</label>
+                <label className="form-label" htmlFor="line-team-search">Csapat keresése</label>
                 <input
                   ref={resultSearchInputRef}
                   id="line-team-search"
                   type="text"
                   className="form-control"
                   value={resultSearchTerm}
-                  placeholder="Kezdj el gepelni..."
+                  placeholder="Kezdj el gépelni..."
                   onChange={(event) => {
                     setResultSearchTerm(event.target.value)
                     setSelectedResultTeam(null)
@@ -596,7 +724,7 @@ export default function LineFollowingScoring() {
                     <div className="list-group shadow-lg bg-white border border-dark rounded overflow-hidden" style={resultDropdownStyle}>
       {resultSearchResults.map((teamName) => (
         <button
-          key={`${resultStage}-${teamName}`}
+          key={`${currentResultStage}-${teamName}`}
           type="button"
           className="list-group-item list-group-item-action"
           onClick={() => {
@@ -609,11 +737,10 @@ export default function LineFollowingScoring() {
       ))}
                   </div>
                 )}
-                {selectedResultTeam && <div className="small text-muted mt-2">Kivalasztva: {selectedResultTeam.team_name}</div>}
               </div>
 
               <div className="col-12 col-lg-2">
-                <label className="form-label" htmlFor="line-result-time">Ido (s)</label>
+                <label className="form-label" htmlFor="line-result-time">Idő (s)</label>
                 <input
                   id="line-result-time"
                   type="number"
@@ -628,7 +755,7 @@ export default function LineFollowingScoring() {
 
               <div className="col-12 col-lg-2">
                 <button type="button" className="btn btn-primary w-100" onClick={handleSaveTopResult}>
-                  Mentes
+                  Mentés
                 </button>
               </div>
             </div>
@@ -636,24 +763,24 @@ export default function LineFollowingScoring() {
           </div>
 
           <div className="mb-3">
-            <label className="form-label" htmlFor="line-display-search">Eredmenyek keresese</label>
+            <label className="form-label" htmlFor="line-display-search">Eredmények keresése</label>
             <input
               id="line-display-search"
               type="text"
               className="form-control"
               value={displaySearchTerm}
-              placeholder="Kereses nev, ido, szakasz vagy allapot alapjan"
+              placeholder="Keresés név, idő, szakasz vagy állapot alapján"
               onChange={(event) => setDisplaySearchTerm(event.target.value)}
             />
           </div>
 
           <div className="d-flex justify-content-end mb-3">
-          <div className="btn-group" role="group" aria-label="Rendezes">
+          <div className="btn-group" role="group" aria-label="Rendezés">
             <button type="button" className={`btn btn-sm ${sortBy === 'name' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setSortBy('name')}>
-              Nev szerint
+              Név szerint
             </button>
             <button type="button" className={`btn btn-sm ${sortBy === 'time' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setSortBy('time')}>
-              Ido szerint
+              Idő szerint
             </button>
           </div>
         </div>
@@ -668,35 +795,31 @@ export default function LineFollowingScoring() {
             ? roundEntries.filter((entry) => {
                 const values = [
                   entry.team.team_name,
-                  entry.bestTime === '' ? 'nincs eredmeny' : `${entry.bestTime} s`,
-                  entry.saved ? 'mentve' : 'varakozik',
+                  entry.bestTime === '' ? 'nincs eredmény' : `${entry.bestTime} s`,
+                  entry.saved ? 'mentve' : 'várakozik',
                   round.label
                 ]
 
                 return values.some((value) => value.toLowerCase().includes(normalizedDisplaySearch))
               })
             : roundEntries
-          const advancingCount = Math.min(round.teams.length, Math.max(MIN_FINAL_TEAMS, round.advancingCount || getAdvancingCount(round.teams.length)))
-          const advancingTeams = roundEntries
-            .slice()
-            .sort((a, b) => {
-              const aBest = a.bestTime === '' ? Number.POSITIVE_INFINITY : a.bestTime
-              const bBest = b.bestTime === '' ? Number.POSITIVE_INFINITY : b.bestTime
-              return aBest - bBest || a.team.team_name.localeCompare(b.team.team_name)
-            })
-            .slice(0, advancingCount)
-          const roundComplete = round.teams.every((team) => Boolean(getRoundSavedResult(roundResults, round.id, getResultKey(team))))
-          const isFinalRound = round.teams.length <= MIN_FINAL_TEAMS
-          const canAdvance = roundIndex === rounds.length - 1 && !isFinalRound && roundComplete
+          const uniqueRoundTeamNames = Array.from(new Set(round.teams.map((team) => team.team_name)))
+          const uniqueRoundTeamCount = uniqueRoundTeamNames.length
+          const advancingCount = Math.min(uniqueRoundTeamCount, Math.max(MIN_FINAL_TEAMS, round.advancingCount || getAdvancingCount(uniqueRoundTeamCount)))
+          const advancingTeams = getUniqueAdvancingEntries(roundEntries, advancingCount)
+          const roundComplete = uniqueRoundTeamNames.every((teamName) => roundEntries.some((entry) => entry.team.team_name === teamName && entry.bestTime !== ''))
+          const isFinalRound = uniqueRoundTeamCount <= MIN_FINAL_TEAMS
+          const isRoundClosed = closedRoundIds.includes(round.id)
+          const canAdvance = roundIndex === rounds.length - 1 && !isFinalRound && roundComplete && !isRoundClosed
 
           return (
             <div key={round.id} className="card shadow-sm team-card no-hover-card">
               <div className="card-body p-3 p-md-4 border-bottom">
                 <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
                   <div>
-                    <div className="home-kicker">Vonalkovetes</div>
+                    <div className="home-kicker">Vonalkövetés</div>
                     <h4 className="mb-1">{round.label}</h4>
-                    <p className="text-muted mb-0">Ket idot adj meg masodpercben, a gyorsabb eredmeny szamit.</p>
+                    <p className="text-muted mb-0">Két időt adj meg másodpercben, a gyorsabb eredmény számít.</p>
                   </div>
                   
                 </div>
@@ -721,7 +844,7 @@ export default function LineFollowingScoring() {
                             <span className="fw-semibold">{teamName}</span>
                             <div className="d-flex align-items-center gap-2 flex-wrap justify-content-end">
                               <span className="badge rounded-pill bg-light text-dark">{entry.bestTime === '' ? '-' : `${entry.bestTime} s`}</span>
-                              <span className="small text-muted">{entry.saved ? 'Mentve' : 'Varakozik'}</span>
+                              <span className="small text-muted">{entry.saved ? 'Mentve' : 'Várakozik'}</span>
                               <span>{isOpen ? '^' : 'v'}</span>
                             </div>
                           </div>
@@ -730,13 +853,13 @@ export default function LineFollowingScoring() {
                         <div className={`team-details ${isOpen ? 'open' : ''}`}>
                           <div className="card-body border-top bg-white">
                             <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                              <div className="small text-muted">Legjobb ido: {entry.bestTime === '' ? '-' : `${entry.bestTime} s`}</div>
-                              <div className="small text-muted">Ket idot adj meg masodpercben</div>
+                              <div className="small text-muted">Legjobb idő: {entry.bestTime === '' ? '-' : `${entry.bestTime} s`}</div>
+                              <div className="small text-muted">Két időt adj meg másodpercben</div>
                             </div>
 
                             <div className="row g-3 d-none">
                               <div className="col-12 col-md-4">
-                                <label className="form-label mb-1">1. ido (s)</label>
+                                <label className="form-label mb-1">1. idő (s)</label>
                                 <input
                                   type="number"
                                   min="0"
@@ -750,7 +873,7 @@ export default function LineFollowingScoring() {
                                 />
                               </div>
                               <div className="col-12 col-md-4">
-                                <label className="form-label mb-1">2. ido (s)</label>
+                                <label className="form-label mb-1">2. idő (s)</label>
                                 <input
                                   type="number"
                                   min="0"
@@ -765,15 +888,15 @@ export default function LineFollowingScoring() {
                               </div>
                               <div className="col-12 col-md-4 d-flex align-items-end justify-content-md-end">
                                 <button type="button" className="btn btn-primary w-100 w-md-auto" onClick={() => handleSave(round.id, entry.team)} disabled={!entry.changed}>
-                                  Mentes
+                                  Mentés
                                 </button>
                               </div>
                             </div>
                             <div className="row g-3">
                               <div className="col-12 col-md-4">
                                 <div className="border rounded p-3 bg-light h-100">
-                                  <div className="small text-muted">Rogzitett ido</div>
-                                  <div className="fw-bold">{entry.bestTime === '' ? 'Nincs eredmeny' : `${entry.bestTime} s`}</div>
+                                  <div className="small text-muted">Rögzített idő</div>
+                                  <div className="fw-bold">{entry.bestTime === '' ? 'Nincs eredmény' : `${entry.bestTime} s`}</div>
                                 </div>
                               </div>
                               <div className="col-12 col-md-4">
@@ -784,8 +907,8 @@ export default function LineFollowingScoring() {
                               </div>
                               <div className="col-12 col-md-4">
                                 <div className="border rounded p-3 bg-light h-100">
-                                  <div className="small text-muted">Allapot</div>
-                                  <div className="fw-bold">{entry.saved ? 'Mentve' : 'Nincs meg mentett eredmeny'}</div>
+                                  <div className="small text-muted">Állapot</div>
+                                  <div className="fw-bold">{entry.saved ? 'Mentve' : 'Nincs még mentett eredmény'}</div>
                                 </div>
                               </div>
                             </div>
@@ -802,7 +925,7 @@ export default function LineFollowingScoring() {
                                 })}
                                 disabled={!entry.saved || entry.bestTime === ''}
                               >
-                                torles
+                                Törlés
                               </button>
                             </div>
                           </div>
@@ -811,7 +934,7 @@ export default function LineFollowingScoring() {
                     )
                   })}
                   {visibleRoundEntries.length === 0 && (
-                    <div className="alert alert-secondary mb-0">Nincs talalat ebben a korben.</div>
+                    <div className="alert alert-secondary mb-0">Ide kerülnek majd ennek a szakasznak az eredményei.</div>
                   )}
                 </div>                  
                 <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-4">
@@ -829,23 +952,23 @@ export default function LineFollowingScoring() {
                   {canAdvance && (
                     <div className="d-flex flex-column align-items-start align-items-md-end gap-2">
                       <label className="form-label mb-0 fw-semibold" htmlFor={`advancing-count-${round.id}`}>
-                        Hany csapat jut tovabb
+                        Hány csapat jut tovább
                       </label>
                       <input
                         id={`advancing-count-${round.id}`}
                         type="number"
                         min={MIN_FINAL_TEAMS}
-                        max={round.teams.length}
+                        max={uniqueRoundTeamCount}
                         step="1"
                         className="form-control form-control-sm scoring-number-input text-end"
                         value={advancingCount}
                         onFocus={(event) => event.target.select()}
                         onClick={(event) => event.target.select()}
-                        onChange={(event) => handleAdvancingCountChange(round.id, event.target.value, round.teams.length)}
+                        onChange={(event) => handleAdvancingCountChange(round.id, event.target.value, uniqueRoundTeamCount)}
                       />
-                      <div className="text-muted small">A kovetkezo korbe ennyi legjobb csapat megy tovabb.</div>
-                      <button type="button" className="btn btn-outline-primary" onClick={() => createNextRound(round, roundIndex)} disabled={!roundComplete}>
-                        Kovetkezo kor letrehozasa
+                      <div className="text-muted small">A következő körbe ennyi legjobb csapat megy tovább.</div>
+                      <button type="button" className="btn btn-outline-primary" onClick={() => createNextRound(round)} disabled={!roundComplete}>
+                        Következő kör létrehozása
                       </button>
                     </div>
                   )}
@@ -862,18 +985,18 @@ export default function LineFollowingScoring() {
             <div className="modal-dialog modal-dialog-centered" role="document">
               <div className="modal-content border-0 shadow-lg">
                 <div className="modal-header">
-                  <h5 className="modal-title fw-bold text-dark">Vonalkovetes eredmeny torlese</h5>
+                  <h5 className="modal-title fw-bold text-dark">Vonalkövetés eredményének törlése</h5>
                   <button type="button" className="btn-close" aria-label="Close" onClick={() => setResultToDelete(null)}></button>
                 </div>
                 <div className="modal-body">
-                  <p className="mb-2 text-dark">Biztosan torlod ezt az eredmenyt?</p>
+                  <p className="mb-2 text-dark">Biztosan törlöd ezt az eredményt?</p>
                   <p className="fw-semibold mb-1 text-dark">{resultToDelete.teamName}</p>
-                  <p className="small mb-0 text-dark">Ido: {resultToDelete.time} s</p>
+                  <p className="small mb-0 text-dark">Idő: {resultToDelete.time} s</p>
                   <p className="small mb-0 text-dark">Szakasz: {resultToDelete.stageLabel}</p>
                 </div>
                 <div className="modal-footer">
-                  <button type="button" className="btn btn-outline-secondary" onClick={() => setResultToDelete(null)}>Megse</button>
-                  <button type="button" className="btn btn-danger" onClick={handleDeleteResult}>torles</button>
+                  <button type="button" className="btn btn-outline-secondary" onClick={() => setResultToDelete(null)}>Mégse</button>
+                  <button type="button" className="btn btn-danger" onClick={handleDeleteResult}>Törlés</button>
                 </div>
               </div>
             </div>
