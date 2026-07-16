@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { getCompetitionConfig } from '../config/adminScoringConfig'
 
 const competitionConfig = getCompetitionConfig('vonalkovetes')
@@ -96,7 +96,6 @@ const createRoundResultsFromLineFollowingResults = (results) => results.reduce((
 }, {})
 
 export default function LineFollowingScoring() {
-  const [teams, setTeams] = useState([])
   const [teamNames, setTeamNames] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -140,7 +139,6 @@ export default function LineFollowingScoring() {
           }
         ])).values())
 
-        setTeams(normalizedTeams)
         setTeamNames(Array.isArray(teamNamesData) && teamNamesData.length > 0
           ? teamNamesData.filter(Boolean)
           : normalizedTeams.map((team) => team.team_name).filter(Boolean))
