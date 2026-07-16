@@ -29,6 +29,20 @@ const STAGE_LABELS = {
   F: 'döntő'
 }
 
+const STAGE_API_VALUES = {
+  GS: 1,
+  RO16: 2,
+  QF: 3,
+  SF: 4,
+  BM: 5,
+  F: 6
+}
+
+const API_VALUE_STAGES = Object.entries(STAGE_API_VALUES).reduce((accumulator, [stage, value]) => ({
+  ...accumulator,
+  [value]: stage
+}), {})
+
 const RESULT_POINTS = {
   W: 2,
   D: 1,
@@ -108,10 +122,14 @@ const dedupeMatches = (matches) => {
   return Array.from(byKey.values())
 }
 
+const normalizeTournamentStage = (stage) => API_VALUE_STAGES[stage] || API_VALUE_STAGES[Number(stage)] || stage || GROUP_STAGE
+
+const getApiTournamentStage = (stage) => STAGE_API_VALUES[normalizeTournamentStage(stage)] || STAGE_API_VALUES[GROUP_STAGE]
+
 const normalizeMatch = (match, index) => {
   const team1Name = match.team1Name || match.team1_name || ''
   const team2Name = match.team2Name || match.team2_name || ''
-  const tournamentStage = match.tournamentStage || match.tournament_stage || 'GS'
+  const tournamentStage = normalizeTournamentStage(match.tournamentStage || match.tournament_stage || GROUP_STAGE)
   const table = Number(match.table ?? 0)
 
   return {
@@ -127,7 +145,7 @@ const normalizeMatch = (match, index) => {
   }
 }
 
-const getMatchStage = (match) => match.tournamentStage || match.tournament_stage || GROUP_STAGE
+const getMatchStage = (match) => normalizeTournamentStage(match.tournamentStage || match.tournament_stage || GROUP_STAGE)
 
 const isKnockoutStage = (stage) => KNOCKOUT_STAGES.includes(stage)
 
@@ -172,8 +190,8 @@ const createSumoPayload = (match) => ({
   team2Point: match.team2Point,
   team2_point: match.team2Point,
   table: match.table,
-  tournamentStage: match.tournamentStage,
-  tournament_stage: match.tournamentStage,
+  tournamentStage: getApiTournamentStage(match.tournamentStage),
+  tournament_stage: getApiTournamentStage(match.tournamentStage),
   team1Result: match.team1Result,
   team1result: match.team1Result,
   team2Result: match.team2Result,
@@ -782,7 +800,7 @@ export default function SumoScoring() {
 
     try {
       const response = await fetch(
-        `https://legocompetition.runasp.net/api/Sumo/${encodeURIComponent(match.team1Name)}/${encodeURIComponent(match.team2Name)}/${encodeURIComponent(match.tournamentStage)}`,
+        `https://legocompetition.runasp.net/api/Sumo/${encodeURIComponent(match.team1Name)}/${encodeURIComponent(match.team2Name)}/${encodeURIComponent(getApiTournamentStage(match.tournamentStage))}`,
         {
           method: 'DELETE',
           headers: {
