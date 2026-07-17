@@ -9,25 +9,159 @@ const ruleSections = [
     fileName: 'altalanos-szabalyok.doc',
     content: [
       {
-        title: 'A verseny lebonyolítása',
+        title: '1. A szabályzat célja',
         text: [
-          'A robotversenyre 2 fős csapatokkal lehet jelentkezni középiskolás diákoknak, egy vagy legfeljebb két felkészítő tanárral.',
-          'A versenyzőknek a saját robotjukkal kell a feladatokat az előre megírt szabályok alapján megoldaniuk. A szabályzat nem ismerete nem mentesít a szabályok betartása alól.',
-          'A helyszínen a csapatok saját asztalt kapnak, amelyen dolgozhatnak és a felszerelésüket tárolhatják. A nap elejétől minden csapat megtekintheti a saját beosztását a weboldalon, a regisztrált fiókjával bejelentkezve. Ha egy csapat nem jelenik meg időben az adott versenyszámnál, automatikusan 0 pontot kap, és később nem javíthatja ezt az eredményt.'
+          'Jelen szabályzat célja, hogy biztosítsa a verseny tisztaságát, az esélyegyenlőséget és a sportszerű lebonyolítást. A szabályzat minden résztvevő csapatra, felkészítőre és versenybíróra egyaránt kötelező érvényű.',
+          'A versenyre történő nevezéssel minden csapat elfogadja a jelen szabályzatban foglaltakat.',
+          'A szabályzat nem ismerete semmilyen esetben sem mentesít a szabályok betartása alól.'
         ]
       },
       {
-        title: 'A robot',
+        title: '2.1 Résztvevők',
         text: [
-          'A robotok kizárólag hivatalos, LEGO által gyártott alkatrészekből épülhetnek. A robot legnagyobb mérete 40 × 40 × 40 centiméter lehet.',
-          'A méreteket minden versenyszám előtt ellenőrizzük egy megfelelő méretű, felülről nyitott kerettel. A robot a versenyszámok között átépíthető és módosítható. Ha a robot túllépi az előírt méretet, a versenyszám helyszínén szabályos méretűre kell alakítani. Ha ez nem történik meg, a csapat az adott versenyszámban 0 pontot kap.'
+          'A versenyen kizárólag általános- és középiskolás diákok vehetnek részt.',
+          'Egy csapat 2 versenyzőből áll, és 1 felkészítő tanár vagy mentor tartozik hozzá.',
+          'A nevezést követően a csapat összetétele kizárólag a szervezők engedélyével módosítható, miután a csapat e-mailben felvette a kapcsolatot a szervezőkkel.'
         ]
       },
       {
-        title: 'A versenyszámok',
+        title: '2.2 Regisztráció',
         text: [
-          'Minden évben egy Joker versenyszámot véletlenszerűen választunk ki. A végleges versenyszámok a jelentkezés megnyitásakor válnak ismertté.',
-          'A versenyszámok alatt a versenyző az adott feladat szabályainak megfelelően nyúlhat a robothoz. A versenyszámok alatt nincs videóbíró.'
+          'A csapatok kötelesek a verseny napján a meghatározott időpontban regisztrálni.',
+          'A regisztráció során ellenőrizzük a csapat nevét, a versenyzők személyazonosságát, a robotot, a nevezési adatokat, valamint a szükséges nyilatkozatokat és dokumentumokat.'
+        ]
+      },
+      {
+        title: '2.3 Versenybeosztás',
+        text: [
+          'A verseny napján minden csapat megtekintheti saját időbeosztását a verseny hivatalos weboldalán.',
+          'A beosztás a regisztrált felhasználói fiókkal, illetve a nevezés során megadott e-mail-címmel történő bejelentkezést követően tekinthető meg.',
+          'A csapatok kötelesek figyelemmel követni saját időpontjaikat. A szervezők nem vállalnak felelősséget azért, ha egy csapat elmulasztja saját versenyidőpontját.'
+        ]
+      },
+      {
+        title: '2.4 Késés',
+        text: [
+          'A csapatnak a kiírt időpont előtt meg kell jelennie a versenypályán.',
+          'Ha a csapat nem jelenik meg, elkésik, vagy nem áll készen a verseny megkezdésére, az adott versenyszámban automatikusan 0 pontot kap.',
+          'Utólagos újrafutásra vagy javításra nincs lehetőség.'
+        ]
+      },
+      {
+        title: '2.5 Csapatasztalok',
+        text: [
+          'A szervezők minden csapat számára külön munkaasztalt biztosítanak.',
+          'Az asztal használható a robot szerelésére és programozására, az akkumulátorok töltésére, valamint a szerszámok és felszerelések tárolására.',
+          'A csapatok kötelesek saját területüket tisztán tartani, és a többi csapat területét tiszteletben tartani.'
+        ]
+      },
+      {
+        title: '3.1 Megengedett alkatrészek',
+        text: [
+          'A robot kizárólag eredeti LEGO® alkatrészekből épülhet.',
+          'Megengedettek például a LEGO Technic elemek, a LEGO SPIKE Prime és LEGO Mindstorms alkatrészek, a hivatalos LEGO motorok, érzékelők és kábelek, az eredeti LEGO akkumulátor, valamint bármilyen más eredeti LEGO alkatrész vagy elem.',
+          'Nem megengedettek a 3D nyomtatott elemek, az utángyártott LEGO-kompatibilis elemek, a fém alkatrészek, a ragasztás, a csavarozás, a forrasztás, a nem LEGO elemből készült gumiszalagos rögzítés és bármilyen más, nem LEGO szerkezeti elem.'
+        ]
+      },
+      {
+        title: '3.2 A robot mérete',
+        text: [
+          'A robot maximális mérete 30 × 30 × 30 cm.',
+          'A méretellenőrzés minden versenyszám előtt megtörténhet. A robotnak egy felül nyitott, 30 × 30 × 30 cm-es ellenőrződobozba minden erőltetés nélkül bele kell férnie. A doboz leemelése után sem lóghat túl semmi a megadott határokon.',
+          'A mérés során minden felszerelt elem, minden kinyúló rész – például kábel – és minden felszerelt tartozék beleszámít a robot méretébe.'
+        ]
+      },
+      {
+        title: '3.3 A mérethatár túllépése',
+        text: [
+          'Ha a robot nem fér bele az ellenőrződobozba, a csapat lehetőséget kap a helyszíni módosításra. A módosítást még a futam megkezdése előtt el kell végezni.',
+          'Ha a robot ezt követően sem felel meg az előírásoknak, a csapat az adott versenyszámban 0 pontot kap.'
+        ]
+      },
+      {
+        title: '3.4 A robot módosítása',
+        text: [
+          'A csapatok a versenyszámok között átépíthetik, módosíthatják, újraprogramozhatják vagy javíthatják a robotjukat.',
+          'A robotnak minden versenyszám előtt ismét meg kell felelnie az összes műszaki előírásnak.'
+        ]
+      },
+      {
+        title: '3.5 Robotok cseréje',
+        text: [
+          'Egy csapat kizárólag egy központi egységet (bricket) használhat.'
+        ]
+      },
+      {
+        title: '4. A versenyszámok',
+        text: [
+          'A verseny több különálló versenyszámból áll. Minden versenyszám saját feladatszabályzattal rendelkezik.',
+          'Az adott feladatszabályzat kiegészíti, de nem írja felül a jelen általános szabályzatot.'
+        ]
+      },
+      {
+        title: '5. A futamok lebonyolítása',
+        text: [
+          'A futam kezdetét és végét kizárólag a versenybíró jelzi.',
+          'A futam során a csapat kizárólag a feladatszabályzatban megengedett módon érhet hozzá a robothoz.',
+          'Ha a feladatszabályzat nem engedélyezi a robot megfogását, áthelyezését, javítását vagy újraindítását, ezek tilosnak minősülnek.'
+        ]
+      },
+      {
+        title: '6. Bíráskodás',
+        text: [
+          'A verseny során a pályán tartózkodó versenybíró döntése minden futamra nézve végleges.',
+          'A versenyszámok alatt videóbíró nem működik, és videófelvétel alapján utólagos óvás nem nyújtható be.',
+          'A bíró jogosult figyelmeztetni, megállítani vagy érvényteleníteni a futamot, illetve 0 pontot megállapítani.'
+        ]
+      },
+      {
+        title: '7. Pontozás',
+        text: [
+          'Minden versenyszám saját pontozási rendszerrel rendelkezik.',
+          'A végső eredményt a versenyszámok során szerzett pontok összege adja.'
+        ]
+      },
+      {
+        title: '8. Sportszerűség',
+        text: [
+          'Minden résztvevő köteles tisztelettel viselkedni, elfogadni a bíró döntését, nem zavarni más csapatokat, és a verseny eszközeit rendeltetésszerűen használni.',
+          'Tilos más csapat robotjához hozzáérni; más csapat programját vagy felszerelését annak engedélye nélkül használni; a pályát szándékosan módosítani; valamint más csapat munkáját akadályozni.'
+        ]
+      },
+      {
+        title: '9. Biztonsági szabályok',
+        text: [
+          'A versenyzők kötelesek ügyelni saját és mások testi épségére, rendben tartani a munkaasztalukat, megfelelően kezelni az elektromos eszközöket, és az akkumulátorokat kizárólag rendeltetésszerűen használni.',
+          'A szervezők jogosultak megtiltani bármely balesetveszélyes eszköz használatát.'
+        ]
+      },
+      {
+        title: '10. Kizárás',
+        text: [
+          'A szervezők jogosultak kizárni egy csapatot különösen szándékos csalás, tiltott alkatrész használata, hamis nevezési adatok, a bíró döntésének ismételt figyelmen kívül hagyása, sportszerűtlen viselkedés, más csapat szándékos akadályozása vagy a verseny szándékos megzavarása esetén.',
+          'A kizárásról a verseny főbírója vagy szervezője dönt.'
+        ]
+      },
+      {
+        title: '11. Óvás',
+        text: [
+          'Ha a versenyszám szabályzata másként nem rendelkezik, a csapatok a futam eredménye ellen nem nyújthatnak be óvást.',
+          'A bíró helyszíni döntése végleges. A döntés meghozatalához kérhető a szervezők segítsége.'
+        ]
+      },
+      {
+        title: '12. Adatkezelés és média',
+        text: [
+          'A versenyen fénykép- és videófelvételek készülhetnek.',
+          'A nevezéssel a résztvevők hozzájárulnak ahhoz, hogy a szervezők a felvételeket a verseny dokumentálására, a hivatalos weboldalon, közösségimédia-felületeken, valamint a következő évek versenyeinek népszerűsítésére felhasználják.'
+        ]
+      },
+      {
+        title: '13. Záró rendelkezések',
+        text: [
+          'A szervezők fenntartják a jogot a szabályzat módosítására, ha ezt a verseny biztonságos vagy igazságos lebonyolítása indokolja. A módosításról a csapatokat e-mailben értesíteni kell.',
+          'A szabályzatban nem rendezett kérdésekben a verseny szervezőjének vagy főbírójának döntése az irányadó.',
+          'A nevezéssel minden résztvevő kijelenti, hogy a jelen szabályzatot elolvasta, megértette, és magára nézve kötelezőnek fogadja el.'
         ]
       }
     ]

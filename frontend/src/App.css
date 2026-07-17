@@ -685,7 +685,8 @@ form {
 }
 
 .rules-body.open {
-  max-height: 3000px;
+  max-height: none;
+  overflow: visible;
   opacity: 1;
 }
 
