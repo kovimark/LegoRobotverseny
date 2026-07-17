@@ -632,7 +632,39 @@ form {
 }
 
 .rules-actions {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
   margin: 1.25rem 0 1.5rem;
+}
+
+.rules-track-download {
+  display: grid;
+  gap: 0.55rem;
+  max-width: 31rem;
+}
+
+.rules-track-download .btn {
+  justify-self: start;
+}
+
+.rules-track-download-info {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.65rem 0.8rem;
+  border-left: 4px solid var(--red);
+  background: rgba(255, 255, 255, 0.75);
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.rules-track-download-info strong {
+  color: var(--black);
+}
+
+.rules-track-download-info span {
+  color: #555;
 }
 
 .rules-list {

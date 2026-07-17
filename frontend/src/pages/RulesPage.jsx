@@ -734,13 +734,19 @@ export default function RulesPage() {
             <button className="btn btn-primary" type="button" onClick={handleDownloadAll}>
               Összes letöltése
             </button>
-            <a
-              className="btn btn-theme-secondary"
-              href={publicImage('vonalkovetesNagyfelbontas.png')}
-              download="vonalkovetes-nagyfelbontas.png"
-            >
-              Vonalkövető pálya letöltése
-            </a>
+            <div className="rules-track-download">
+              <a
+                className="btn btn-theme-secondary"
+                href={publicImage('vonalkovetesNagyfelbontas.png')}
+                download="vonalkovetes-nagyfelbontas.png"
+              >
+                Vonalkövető pálya letöltése
+              </a>
+              <div className="rules-track-download-info">
+                <strong>Nyomtatásra kész pályakép</strong>
+                <span>20 164 × 30 000 px · 300 DPI · nagyfelbontású PNG · kb. 4,1 MB</span>
+              </div>
+            </div>
           </div>
 
           <div className="rules-list">
