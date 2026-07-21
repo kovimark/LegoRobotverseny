@@ -360,6 +360,46 @@ form {
   color: var(--black);
 }
 
+.team-card-header {
+  background:
+    linear-gradient(90deg, rgba(155, 197, 61, 0.28), rgba(253, 231, 76, 0.28)),
+    var(--white);
+}
+
+.team-info-box {
+  padding: 1rem;
+  border: 1px solid rgba(24, 24, 24, 0.12);
+  border-radius: 0.85rem;
+  background: var(--white);
+  box-shadow: 0 0.25rem 0.8rem rgba(24, 24, 24, 0.08);
+}
+
+.team-info-category {
+  background: linear-gradient(145deg, rgba(253, 231, 76, 0.22), rgba(155, 197, 61, 0.18));
+}
+
+.team-info-title {
+  margin-bottom: 0.75rem;
+  color: var(--red);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.team-info-value {
+  font-size: 1rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.team-info-meta {
+  margin-top: 0.3rem;
+  color: rgba(24, 24, 24, 0.68);
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+
 .card-body {
   background: rgba(255, 255, 255, 0.82);
   text-align: left;

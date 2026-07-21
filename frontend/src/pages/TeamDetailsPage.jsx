@@ -150,7 +150,7 @@ export default function TeamDetailsPage() {
                               <div className="detail-label">1. versenyző</div>
                               <div className="fw-semibold detail-value">{teamData.team.teamMember1Name || '–'}</div>
                               <div className="small text-muted detail-break">{teamData.team.teamMember1Email || '–'}</div>
-                              <div className="small text-muted">{teamData.team.teamMember1Age ? `${teamData.team.teamMember1Age} év` : '–'}</div>
+                              <div className="small text-muted">{teamData.team.teamMember1Class ? `${teamData.team.teamMember1Class}. osztály` : '–'}</div>
                             </div>
                           </div>
                           <div className="col-12 col-sm-6">
@@ -158,7 +158,7 @@ export default function TeamDetailsPage() {
                               <div className="detail-label">2. versenyző</div>
                               <div className="fw-semibold detail-value">{teamData.team.teamMember2Name || '–'}</div>
                               <div className="small text-muted detail-break">{teamData.team.teamMember2Email || '–'}</div>
-                              <div className="small text-muted">{teamData.team.teamMember2Age ? `${teamData.team.teamMember2Age} év` : '–'}</div>
+                              <div className="small text-muted">{teamData.team.teamMember2Class ? `${teamData.team.teamMember2Class}. osztály` : '–'}</div>
                             </div>
                           </div>
                           <div className="col-12 col-sm-6">

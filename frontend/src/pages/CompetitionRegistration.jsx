@@ -8,12 +8,12 @@ export default function CompetitionRegistration({ user }) {
     teamMember2Email: '',
     teamMember1Name: '',
     teamMember2Name: '',
-    teamMember1Age: '',
-    teamMember2Age: '',
+    teamMember1Class: '',
+    teamMember2Class: '',
     teamCoach1: '',
     teamCoach1Email: '',
     schoolName: '',
-    category: ''
+    category: 0
   })
   const [errors, setErrors] = useState({})
   const [submitMessage, setSubmitMessage] = useState(null)
@@ -24,13 +24,18 @@ export default function CompetitionRegistration({ user }) {
     teamMember1Email: 'Az 1. versenyző emailcímének kitöltése kötelező.',
     teamMember2Email: 'A 2. versenyző emailcímének kitöltése kötelező.',
     teamMember1Name: 'Az 1. Versenyző nevének kitöltése kötelező.',
-    teamMember1Age: 'Az 1. Versenyző életkorának kitöltése kötelező.',
+    teamMember1Class: 'Az 1. versenyző osztályának kitöltése kötelező.',
     teamMember2Name: 'A 2. Versenyző nevének kitöltése kötelező.',
-    teamMember2Age: 'A 2. Versenyző életkorának kitöltése kötelező.',
+    teamMember2Class: 'A 2. versenyző osztályának kitöltése kötelező.',
     teamCoach1: 'Az 1. felkészítő tanár nevének kitöltése kötelező.',
-    teamCoach1Email: 'Az 1. felkészítő tanár emailcímének kitöltése kötelező.',
-    category: 'A kategória kiválasztása kötelező.'
+    teamCoach1Email: 'Az 1. felkészítő tanár emailcímének kitöltése kötelező.'
   }
+
+  const getCategory = (member1Class, member2Class) => (
+    Number(member1Class) >= 9 || Number(member2Class) >= 9 ? 1 : 0
+  )
+
+  const category = getCategory(formData.teamMember1Class, formData.teamMember2Class)
 
   useEffect(() => {
     if (user?.email) {
@@ -49,11 +54,19 @@ export default function CompetitionRegistration({ user }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target
-    const parsedValue = name.includes('Age') && value !== '' ? Number(value) : value
+    const parsedValue = name.includes('Class') && value !== ''
+      ? Math.min(13, Number(value))
+      : value
 
     setFormData(prev => ({
       ...prev,
-      [name]: parsedValue
+      [name]: parsedValue,
+      ...(name.includes('Class') ? {
+        category: getCategory(
+          name === 'teamMember1Class' ? parsedValue : prev.teamMember1Class,
+          name === 'teamMember2Class' ? parsedValue : prev.teamMember2Class
+        )
+      } : {})
     }))
     setSubmitMessage(null)
 
@@ -85,6 +98,13 @@ export default function CompetitionRegistration({ user }) {
       { key: 'teamMember2Email', label: 'A 2. versenyző email címe' },
       { key: 'teamCoach1Email', label: 'Az 1. felkészítő tanár email címe' }
     ]
+
+    ;['teamMember1Class', 'teamMember2Class'].forEach((fieldName) => {
+      const value = Number(formData[fieldName])
+      if (formData[fieldName] !== '' && (!Number.isInteger(value) || value < 1 || value > 13)) {
+        validationErrors[fieldName] = 'Az osztály csak 1 és 13 közötti egész szám lehet.'
+      }
+    })
 
     const normalizedEmails = emailFields.reduce((acc, field) => {
       const value = typeof formData[field.key] === 'string' ? formData[field.key].trim().toLowerCase() : ''
@@ -122,7 +142,9 @@ export default function CompetitionRegistration({ user }) {
     try {
       const payload = {
         ...formData,
-        category: Number(formData.category)
+        teamMember1Class: Number(formData.teamMember1Class),
+        teamMember2Class: Number(formData.teamMember2Class),
+        category
       }
 
       const response = await fetch('https://legocompetition.runasp.net/api/Teams/registerteam', {
@@ -146,12 +168,12 @@ export default function CompetitionRegistration({ user }) {
         teamMember2Email: '',
         teamMember1Name: '',
         teamMember2Name: '',
-        teamMember1Age: '',
-        teamMember2Age: '',
+        teamMember1Class: '',
+        teamMember2Class: '',
         teamCoach1: '',
         teamCoach1Email: '',
         schoolName: '',
-        category: ''
+        category: 0
       })
       setErrors({})
       setSubmitMessage({
@@ -241,19 +263,22 @@ export default function CompetitionRegistration({ user }) {
 
             <div className="row">
               <div className="col-md-6 mb-3">
-                <label htmlFor="teamMember1Age" className="form-label">1. Versenyző Életkora</label>
+                <label htmlFor="teamMember1Class" className="form-label">1. Versenyző osztálya</label>
                 <div className="position-relative">
                   <input
                     type="number"
-                    className={`form-control pe-4 ${errors.teamMember1Age ? 'border-danger' : ''}`}
-                    id="teamMember1Age"
-                    name="teamMember1Age"
-                    value={formData.teamMember1Age}
+                    min="1"
+                    max="13"
+                    step="1"
+                    className={`form-control pe-4 ${errors.teamMember1Class ? 'border-danger' : ''}`}
+                    id="teamMember1Class"
+                    name="teamMember1Class"
+                    value={formData.teamMember1Class}
                     onChange={handleChange}
                   />
                   {requiredMark}
                 </div>
-                {errors.teamMember1Age && <div className="text-danger small mt-1">{errors.teamMember1Age}</div>}
+                {errors.teamMember1Class && <div className="text-danger small mt-1">{errors.teamMember1Class}</div>}
               </div>
             </div>
 
@@ -292,19 +317,22 @@ export default function CompetitionRegistration({ user }) {
 
             <div className="row">
               <div className="col-md-6 mb-3">
-                <label htmlFor="teamMember2Age" className="form-label">2. Versenyző Életkora</label>
+                <label htmlFor="teamMember2Class" className="form-label">2. Versenyző osztálya</label>
                 <div className="position-relative">
                   <input
                     type="number"
-                    className={`form-control pe-4 ${errors.teamMember2Age ? 'border-danger' : ''}`}
-                    id="teamMember2Age"
-                    name="teamMember2Age"
-                    value={formData.teamMember2Age}
+                    min="1"
+                    max="13"
+                    step="1"
+                    className={`form-control pe-4 ${errors.teamMember2Class ? 'border-danger' : ''}`}
+                    id="teamMember2Class"
+                    name="teamMember2Class"
+                    value={formData.teamMember2Class}
                     onChange={handleChange}
                   />
                   {requiredMark}
                 </div>
-                {errors.teamMember2Age && <div className="text-danger small mt-1">{errors.teamMember2Age}</div>}
+                {errors.teamMember2Class && <div className="text-danger small mt-1">{errors.teamMember2Class}</div>}
               </div>
             </div>
 
@@ -343,22 +371,14 @@ export default function CompetitionRegistration({ user }) {
 
             <div className="row">
               <div className="col-md-6 mb-3">
-                <label htmlFor="category" className="form-label">Kategória</label>
-                <div className="position-relative">
-                  <select
-                    className={`form-select pe-4 ${errors.category ? 'border-danger' : ''}`}
-                    id="category"
-                    name="category"
-                    value={formData.category}
-                    onChange={handleChange}
-                  >
-                    <option value="">Válassz kategóriát</option>
-                    <option value="0">0 - általános iskola</option>
-                    <option value="1">1 - középiskola</option>
-                  </select>
-                  {requiredMark}
-                </div>
-                {errors.category && <div className="text-danger small mt-1">{errors.category}</div>}
+                <label htmlFor="category" className="form-label">Automatikus korosztály</label>
+                <input
+                  className="form-control"
+                  id="category"
+                  value={category === 1 ? 'Középiskolás (9–13. osztály)' : 'Általános iskolás (1–8. osztály)'}
+                  readOnly
+                />
+                <div className="form-text">Ha legalább az egyik versenyző 9–13. osztályos, a csapat középiskolás kategóriába kerül.</div>
               </div>
             </div>
 
