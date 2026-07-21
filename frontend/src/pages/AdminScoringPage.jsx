@@ -5,6 +5,8 @@ import LineFollowingScoring from '../components/LineFollowingScoring'
 import SumoScoring from '../components/SumoScoring'
 import HillClimbingScoring from '../components/HillClimbingScoring'
 import OverallStandings from '../components/OverallStandings'
+import TieBreakerManager from '../components/TieBreakerManager'
+import SumoScheduleSettings from '../components/SumoScheduleSettings'
 import { competitionTypes } from '../config/adminScoringConfig'
 import { judgeCompetitionByPrivilege } from '../config/privilegeConfig'
 
@@ -17,7 +19,7 @@ export default function AdminScoringPage({ userPrivilege }) {
   ))
 
   const activeCompetition = competitionTypes.find((item) => item.slug === competitionType) || null
-  const canAccessActiveCompetition = !activeCompetition || isAdmin || activeCompetition.slug === allowedJudgeCompetition
+  const canAccessActiveCompetition = !activeCompetition || isAdmin || activeCompetition.slug === allowedJudgeCompetition || activeCompetition.slug === 'osszesitett'
 
   return (
     <div className="container py-4">
@@ -36,11 +38,11 @@ export default function AdminScoringPage({ userPrivilege }) {
             </Link>
           </div>
         ))}
-        {isAdmin && <div className="col-12">
+        <div className="col-12">
           <Link to="/admin/pontozas/osszesitett" className={`btn w-100 py-3 admin-competition-btn ${competitionType === 'osszesitett' ? 'active' : ''}`}>
             Összesített ponttáblázat
           </Link>
-        </div>}
+        </div>
       </div>
 
       {!canAccessActiveCompetition ? (
@@ -52,9 +54,15 @@ export default function AdminScoringPage({ userPrivilege }) {
       ) : activeCompetition.slug === 'vonalkovetes' ? (
         <LineFollowingScoring />
       ) : activeCompetition.slug === 'szumo' ? (
-        <SumoScoring />
+        <>
+          <SumoScheduleSettings />
+          <SumoScoring />
+        </>
       ) : activeCompetition.slug === 'hegymaszas' ? (
-        <HillClimbingScoring />
+        <>
+          <TieBreakerManager competitionId={3} />
+          <HillClimbingScoring />
+        </>
       ) : activeCompetition.slug === 'osszesitett' ? (
         <OverallStandings />
       ) : (

@@ -30,7 +30,7 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
             <nav className="navbar navbar-expand-lg navbar-light bg-light custom-navbar">
                 <div className="container-fluid">
                     <Link className="navbar-brand" to="/" onClick={closeMenu}>
-                        Lego Robotverseny
+                        Robotverseny
                     </Link>
                     <button
                         className={`navbar-toggler ${isMenuOpen ? 'active' : ''}`}
@@ -111,9 +111,14 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                                     Saját versenyszám pontozása
                                 </Link>
                             ) : (
-                                <Link className="btn btn-outline-primary w-100" to="/allasok" onClick={() => setIsProfileOpen(false)}>
-                                    Állások
-                                </Link>
+                                <div className="d-grid gap-2">
+                                    <Link className="btn btn-primary w-100" to="/sajat-csapataim" onClick={() => setIsProfileOpen(false)}>
+                                        Saját csapatom
+                                    </Link>
+                                    <Link className="btn btn-outline-primary w-100" to="/allasok" onClick={() => setIsProfileOpen(false)}>
+                                        Állások
+                                    </Link>
+                                </div>
                             )}
                             <hr />
                         </div>

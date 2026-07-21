@@ -12,6 +12,7 @@ import TeamDetailsPage from './pages/TeamDetailsPage';
 import Navbar from './components/Navbar';
 import LoginPage from './pages/LoginPage';
 import PrivilegeManagementPage from './pages/PrivilegeManagementPage';
+import MyTeamsPage from './pages/MyTeamsPage';
 import { auth, googleProvider } from './firebase';
 import { isJudgePrivilege } from './config/privilegeConfig';
 
@@ -131,6 +132,7 @@ function App() {
         <Route path="/szabalyzat" element={<RulesPage />} />
         <Route path="/allasok" element={<StandingsPage />} />
         <Route path="/csapat/:teamName" element={<TeamDetailsPage />} />
+        <Route path="/sajat-csapataim" element={user ? <MyTeamsPage user={user} /> : <LoginPage user={user} authLoading={authLoading} authError={authError} onGoogleSignIn={handleGoogleSignIn} onSignOut={handleSignOut} />} />
         <Route path="/admin" element={userRole === 'admin' ? <AdminPage /> : <HomePage />} />
         <Route path="/admin/jogosultsagok" element={userRole === 'admin' ? <PrivilegeManagementPage /> : <HomePage />} />
         <Route path="/admin/pontozas" element={userRole === 'admin' || userRole === 'judge' ? <AdminScoringPage userPrivilege={userPrivilege} /> : <HomePage />} />
@@ -148,6 +150,9 @@ function App() {
           }
         />
       </Routes>
+      <footer className="container py-4 mt-4 border-top text-center text-muted small">
+        A LEGO® a LEGO Group védjegye. Ez egy független rendezvény és weboldal, amely nem áll kapcsolatban a LEGO Grouppal, és amelyet a LEGO Group nem szponzorál.
+      </footer>
     </div>
   );
 }

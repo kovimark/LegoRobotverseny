@@ -1,20 +1,14 @@
 import React from 'react'
+import OverallStandings from '../components/OverallStandings'
 
 export default function StandingsPage() {
   return (
-    <div className="container py-5">
-      <div className="row justify-content-center">
-        <div className="col-lg-8">
-          <div className="card shadow-sm border-0">
-            <div className="card-body p-4">
-              <h2 className="mb-3">Állások</h2>
-              <p className="text-muted mb-0">
-                Az állások listája hamarosan elérhető lesz.
-              </p>
-            </div>
-          </div>
-        </div>
+    <div className="container py-4 py-md-5">
+      <div className="mb-4">
+        <h2 className="mb-1">Összesített állás</h2>
+        <p className="text-muted mb-0">A csapatok pontjai és helyezései minden versenyszámban.</p>
       </div>
+      <OverallStandings />
     </div>
   )
 }

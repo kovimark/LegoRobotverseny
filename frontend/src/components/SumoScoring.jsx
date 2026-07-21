@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { getCompetitionConfig } from '../config/adminScoringConfig'
+import { loadSumoScheduleConfig, SUMO_CONFIG_CHANGED_EVENT } from '../services/sumoScheduleConfigApi'
 
 const competitionConfig = getCompetitionConfig('szumo')
 const GROUP_STAGE = 'GS'
@@ -13,7 +14,7 @@ const KNOCKOUT_STAGE_PRIORITY = [
 ]
 
 const STAGE_GROUPS = [
-  { id: 'group', label: 'Csoportkör', stages: ['GS'] },
+  { id: 'group', label: 'Alapszakasz', stages: ['GS'] },
   { id: 'knockout', label: 'Kieséses szakasz', stages: ['RO16', 'QF', 'SF', 'BM', 'F'] }
 ]
 
@@ -21,7 +22,7 @@ const ALL_STAGE_VALUE = 'ALL'
 
 const STAGE_LABELS = {
   [ALL_STAGE_VALUE]: 'összes',
-  GS: 'csoportkör',
+  GS: 'alapszakasz',
   RO16: 'legjobb 16',
   QF: 'negyeddöntő',
   SF: 'elődöntő',
@@ -68,7 +69,8 @@ const getTeamName = (team, index) => team.teamName || team.team_name || `Csapat 
 
 const normalizeTeam = (team, index) => ({
   id: team.id ?? `${getTeamName(team, index)}-${index}`,
-  name: getTeamName(team, index)
+  name: getTeamName(team, index),
+  category: Number(team.category) === 1 ? 1 : 0
 })
 
 const normalizeGroupStanding = (standing, index) => ({
@@ -245,7 +247,7 @@ const getPairingSearchResult = (availableTeams, usedPairKeys) => {
  
   const firstTeam = availableTeams[0]
 
-  for (let index = availableTeams.length - 1; index >= 1; index -= 1) {
+  for (let index = 1; index < availableTeams.length; index += 1) {
     const candidateTeam = availableTeams[index]
     const pairKey = buildPairKey(firstTeam.name, candidateTeam.name)
 
@@ -295,21 +297,12 @@ const getRoundPairings = (teamsToPair, usedPairKeys) => {
   return null
 }
 
-const getGroupRoundCount = (matches) => buildRoundGroups(matches.filter((match) => getMatchStage(match) === GROUP_STAGE)).length
-
-const getPrimaryGenerationLabel = (roundLimit, matches, stageMode, selectedStage) => {
-  const groupRoundCount = getGroupRoundCount(matches)
-  const isGroupView = stageMode === 'group' || selectedStage === ALL_STAGE_VALUE || selectedStage === GROUP_STAGE
-
-  if (isGroupView && groupRoundCount >= roundLimit) {
-    return 'Egyenes kieséses szakasz generálása'
-  }
-
+const getPrimaryGenerationLabel = (stageMode, selectedStage) => {
   if (stageMode === 'knockout' || isKnockoutStage(selectedStage)) {
     return 'Következő kieséses kör generálása'
   }
 
-  return 'Meccsek legenerálása'
+  return 'Következő alapszakaszforduló'
 }
 
 const buildRoundGroups = (matches, splitByStage = false) => {
@@ -368,11 +361,23 @@ export default function SumoScoring() {
   const [error, setError] = useState('')
   const [stageMode, setStageMode] = useState('group')
   const [selectedStage, setSelectedStage] = useState(ALL_STAGE_VALUE)
-  const [roundLimit, setRoundLimit] = useState(5)
+  const [minimumRounds, setMinimumRounds] = useState(4)
   const [matchDrafts, setMatchDrafts] = useState({})
   const [openMatches, setOpenMatches] = useState({})
   const [actionMessage, setActionMessage] = useState(null)
   const [matchToDelete, setMatchToDelete] = useState(null)
+
+  useEffect(() => {
+    const applyConfiguration = (configuration) => {
+      const value = Number(configuration?.minimumRounds)
+      setMinimumRounds(Number.isInteger(value) && value > 0 ? value : 4)
+    }
+
+    loadSumoScheduleConfig().then(applyConfiguration).catch(() => applyConfiguration(null))
+    const handleConfigurationChange = (event) => applyConfiguration(event.detail)
+    window.addEventListener(SUMO_CONFIG_CHANGED_EVENT, handleConfigurationChange)
+    return () => window.removeEventListener(SUMO_CONFIG_CHANGED_EVENT, handleConfigurationChange)
+  }, [])
 
   useEffect(() => {
     const loadData = async () => {
@@ -462,8 +467,8 @@ export default function SumoScoring() {
   )
 
   const groupRoundCount = useMemo(() => buildRoundGroups(groupStageMatches).length, [groupStageMatches])
-  const isGroupStageComplete = roundLimit > 0 && groupRoundCount >= roundLimit
-  const primaryActionLabel = getPrimaryGenerationLabel(roundLimit, matches, stageMode, selectedStage)
+  const hasReachedMinimumRounds = groupRoundCount >= minimumRounds
+  const primaryActionLabel = getPrimaryGenerationLabel(stageMode, selectedStage)
 
   const shouldSplitRoundGroupsByStage = selectedStage === ALL_STAGE_VALUE || stageMode === 'knockout'
   const roundGroups = useMemo(() => buildRoundGroups(stageMatches, shouldSplitRoundGroupsByStage), [stageMatches, shouldSplitRoundGroupsByStage])
@@ -643,33 +648,34 @@ export default function SumoScoring() {
   const generateRoundMatches = () => {
     const sortedTeams = getCurrentRoundTeams()
     const usedPairKeys = new Set(matches.map((match) => buildPairKey(match.team1Name, match.team2Name)))
-    const roundTeams = [...sortedTeams]
     const pairings = []
+    const byeTeams = []
 
-    if (roundTeams.length < 2) {
-      return pairings
+    for (const category of [0, 1]) {
+      const categoryTeams = sortedTeams.filter((team) => team.category === category)
+      if (categoryTeams.length < 2) continue
+
+      const result = getRoundPairings(categoryTeams, usedPairKeys)
+      if (!result) return null
+
+      result.pairings.forEach((pairing) => {
+        usedPairKeys.add(buildPairKey(pairing.team1.name, pairing.team2.name))
+        pairings.push({ ...pairing, table: nextRoundNumber })
+      })
+      if (result.byeTeam) byeTeams.push(result.byeTeam.name)
     }
 
-    const result = getRoundPairings(roundTeams, usedPairKeys)
-
-    if (!result) {
-      return null
-    }
-
-    if (result.byeTeam) {
+    if (byeTeams.length > 0) {
       setActionMessage({
         type: 'info',
-        text: `${result.byeTeam.name} most pihenővel kimarad a ${nextRoundNumber}. fordulóból.`
+        text: `${byeTeams.join(', ')} pihenővel kimarad a ${nextRoundNumber}. fordulóból.`
       })
     }
 
-    return result.pairings.map((pairing) => ({
-      ...pairing,
-      table: nextRoundNumber
-    }))
+    return pairings
   }
 
-  const handleGenerateMatches = async () => {
+  const handleGenerateMatches = async (startKnockout = false) => {
     if (!teams.length) {
       setActionMessage({ type: 'danger', text: 'Előbb töltsd be a nevezett csapatokat.' })
       return
@@ -681,12 +687,16 @@ export default function SumoScoring() {
     }
 
     if (isGroupGenerationLocked) {
-      setActionMessage({ type: 'info', text: 'A csoportkörben már nem lehet új meccset generálni, mert elkezdődött az egyenes kieséses szakasz.' })
+      setActionMessage({ type: 'info', text: 'Az alapszakaszban már nem lehet új meccset generálni, mert elkezdődött az egyenes kieséses szakasz.' })
       return
     }
 
-    const isGroupToKnockoutGeneration = isGroupStageComplete && (stageMode === 'group' || selectedStage === ALL_STAGE_VALUE || selectedStage === GROUP_STAGE)
-    const shouldGenerateKnockout = isGroupToKnockoutGeneration || stageMode === 'knockout' || isKnockoutStage(selectedStage)
+    if (startKnockout && !hasReachedMinimumRounds) {
+      setActionMessage({ type: 'danger', text: `Az egyenes kiesés csak legalább ${minimumRounds} alapszakaszforduló után indítható.` })
+      return
+    }
+
+    const shouldGenerateKnockout = startKnockout || stageMode === 'knockout' || isKnockoutStage(selectedStage)
     const pairings = shouldGenerateKnockout ? generateKnockoutPairings() : generateRoundMatches()
 
     if (!pairings || pairings.length === 0) {
@@ -1001,33 +1011,25 @@ export default function SumoScoring() {
                 <button
                   type="button"
                   className="btn btn-primary px-4"
-                  onClick={handleGenerateMatches}
+                  onClick={() => handleGenerateMatches(false)}
                   disabled={!teams.length || Boolean(finalWinnerName) || isGroupGenerationLocked}
                 >
                   {primaryActionLabel}
                 </button>
+                {!isKnockoutView && hasReachedMinimumRounds && !hasKnockoutStarted && (
+                  <button
+                    type="button"
+                    className="btn btn-success px-4"
+                    onClick={() => handleGenerateMatches(true)}
+                    disabled={!teams.length || Boolean(finalWinnerName)}
+                  >
+                    Egyenes kiesés indítása
+                  </button>
+                )}
               </div>
 
               <div className="row g-3 align-items-end mb-3">
-                {!isKnockoutView && (
-                  <div className="col-md-3 col-lg-2">
-                    <label className="form-label fw-semibold" htmlFor="sumo-round-limit">Max. fordulók</label>
-                    <input
-                      id="sumo-round-limit"
-                      type="number"
-                      min="1"
-                      max="20"
-                      className="form-control"
-                      value={roundLimit}
-                      onChange={(event) => {
-                        const parsedValue = Number.parseInt(event.target.value, 10)
-                        setRoundLimit(Number.isNaN(parsedValue) ? 1 : Math.min(20, Math.max(1, parsedValue)))
-                      }}
-                    />
-                  </div>
-                )}
-
-                <div className={isKnockoutView ? 'col-12' : 'col-md-9 col-lg-10'}>
+                <div className="col-12">
                   <div className="d-flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -1041,7 +1043,7 @@ export default function SumoScoring() {
                       className={`btn btn-sm px-3 ${stageMode === 'group' ? 'btn-primary' : 'btn-outline-primary'}`}
                       onClick={() => handleStageModeChange('group')}
                     >
-                      Csoportkör
+                      Alapszakasz
                     </button>
                     <button
                       type="button"
@@ -1059,7 +1061,7 @@ export default function SumoScoring() {
                 <div className="text-muted">
                   {isKnockoutView
                     ? 'Kieséses szakaszban minden meccs addig tart, amíg valamelyik csapat eléri a 6 pontot.'
-                    : `Legfeljebb ${roundLimit} forduló generálható ezen a nézeten.`}
+                    : `${groupRoundCount} / ${minimumRounds} garantált forduló teljesítve. Maximum nincs; a minimum után az admin indíthatja az egyenes kiesést.`}
                 </div>
               </div>
             </div>

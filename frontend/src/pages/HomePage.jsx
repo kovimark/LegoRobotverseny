@@ -7,7 +7,7 @@ export default function HomePage() {
       <section className="home-hero">
         <div className="home-panel">
           <span className="home-kicker">Őszi robotverseny</span>
-          <h1 className="home-title">Lego Robotverseny</h1>
+          <h1 className="home-title">Robotverseny</h1>
           <p className="home-copy">
             Jelentkezzetek max 2 fős csapattal, hozzátok az ötleteket, és mutassátok meg, mire képes a robototok a pályán.
           </p>

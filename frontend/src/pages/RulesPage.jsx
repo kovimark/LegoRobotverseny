@@ -65,8 +65,8 @@ const ruleSections = [
         title: '3.1 Megengedett alkatrészek',
         text: [
           'A robot kizárólag eredeti LEGO® alkatrészekből épülhet.',
-          'Megengedettek például a LEGO Technic elemek, a LEGO SPIKE Prime és LEGO Mindstorms alkatrészek, a hivatalos LEGO motorok, érzékelők és kábelek, az eredeti LEGO akkumulátor, valamint bármilyen más eredeti LEGO alkatrész vagy elem.',
-          'Nem megengedettek a 3D nyomtatott elemek, az utángyártott LEGO-kompatibilis elemek, a fém alkatrészek, a ragasztás, a csavarozás, a forrasztás, a nem LEGO elemből készült gumiszalagos rögzítés és bármilyen más, nem LEGO szerkezeti elem.'
+          'Megengedettek például a LEGO® Technic elemek, a LEGO® SPIKE Prime és LEGO® Mindstorms alkatrészek, a hivatalos LEGO® motorok, érzékelők és kábelek, az eredeti LEGO® akkumulátor, valamint bármilyen más eredeti LEGO® alkatrész vagy elem.',
+          'Nem megengedettek a 3D nyomtatott elemek, az utángyártott LEGO®-kompatibilis elemek, a fém alkatrészek, a ragasztás, a csavarozás, a forrasztás, a nem LEGO® elemből készült gumiszalagos rögzítés és bármilyen más, nem LEGO® szerkezeti elem.'
         ]
       },
       {
@@ -667,7 +667,7 @@ function buildDocument(section) {
     </style>
   </head>
   <body><div class="page">
-    <div class="meta">Lego Robotverseny • Szabályzat</div>
+    <div class="meta">Robotverseny • Szabályzat</div>
     <h1>${escapeHtml(section.title)}</h1>
     ${buildContentHtml(section.content)}
     <div class="footer">A szabályok nem ismerete nem mentesít azok betartása alól.</div>
@@ -772,7 +772,7 @@ export default function RulesPage() {
                   <div className={`rules-body ${isOpen ? 'open' : ''}`}>
                     <div className="rules-body-inner">
                       <div className="rules-document-preview">
-                        <div className="rules-document-meta">Lego Robotverseny • Szabályzat</div>
+                        <div className="rules-document-meta">Robotverseny • Szabályzat</div>
                         <h3>{section.title}</h3>
                         <div className="rules-list-items">
                           {renderContentItems(section.content, section.id, setSelectedImage)}
