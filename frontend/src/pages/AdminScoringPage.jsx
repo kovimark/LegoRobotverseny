@@ -6,11 +6,18 @@ import SumoScoring from '../components/SumoScoring'
 import HillClimbingScoring from '../components/HillClimbingScoring'
 import OverallStandings from '../components/OverallStandings'
 import { competitionTypes } from '../config/adminScoringConfig'
+import { judgeCompetitionByPrivilege } from '../config/privilegeConfig'
 
-export default function AdminScoringPage() {
+export default function AdminScoringPage({ userPrivilege }) {
   const { competitionType } = useParams()
+  const allowedJudgeCompetition = judgeCompetitionByPrivilege[Number(userPrivilege)] || null
+  const isAdmin = Number(userPrivilege) === 1
+  const visibleCompetitions = competitionTypes.filter((item) => (
+    item.slug !== 'osszesitett' && (isAdmin || item.slug === allowedJudgeCompetition)
+  ))
 
   const activeCompetition = competitionTypes.find((item) => item.slug === competitionType) || null
+  const canAccessActiveCompetition = !activeCompetition || isAdmin || activeCompetition.slug === allowedJudgeCompetition
 
   return (
     <div className="container py-4">
@@ -22,21 +29,23 @@ export default function AdminScoringPage() {
       </div>
 
       <div className="row g-3 mb-4">
-        {competitionTypes.filter((item) => item.slug !== 'osszesitett').map((item) => (
+        {visibleCompetitions.map((item) => (
           <div className="col-md-6 col-xl-3" key={item.slug}>
             <Link to={`/admin/pontozas/${item.slug}`} className={`btn w-100 py-3 admin-competition-btn ${competitionType === item.slug ? 'active' : ''}`}>
               {item.label}
             </Link>
           </div>
         ))}
-        <div className="col-12">
+        {isAdmin && <div className="col-12">
           <Link to="/admin/pontozas/osszesitett" className={`btn w-100 py-3 admin-competition-btn ${competitionType === 'osszesitett' ? 'active' : ''}`}>
             Összesített ponttáblázat
           </Link>
-        </div>
+        </div>}
       </div>
 
-      {!activeCompetition ? (
+      {!canAccessActiveCompetition ? (
+        <div className="alert alert-danger">Ehhez a versenyszámhoz nincs pontozási jogosultságod.</div>
+      ) : !activeCompetition ? (
         <div className="alert alert-info">Válassz egy versenyszámot a kezdéshez.</div>
       ) : activeCompetition.slug === 'kosarra-dobas' ? (
         <BasketThrowScoring />

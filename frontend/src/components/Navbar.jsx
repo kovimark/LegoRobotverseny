@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import './Navbar.css'
 import React, { useState } from 'react'
 
-export default function Navbar({ user, userRole, authLoading, authError, onGoogleSignIn, onSignOut }) {
+export default function Navbar({ user, userRole, userPrivilege, authLoading, authError, onGoogleSignIn, onSignOut }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [isProfileOpen, setIsProfileOpen] = useState(false)
 
@@ -94,7 +94,7 @@ export default function Navbar({ user, userRole, authLoading, authError, onGoogl
                         </div>
                         <div className="profile-drawer-content">
                             <p>Google fiókkal bejelentkezve.</p>
-                            {userRole === 'admin' ? (
+                            {userRole === 'admin' || Number(userPrivilege) === 1 ? (
                                 <div className="d-grid gap-2">
                                     <Link className="btn btn-outline-primary w-100" to="/admin" onClick={() => setIsProfileOpen(false)}>
                                         Csapatok
@@ -102,7 +102,14 @@ export default function Navbar({ user, userRole, authLoading, authError, onGoogl
                                     <Link className="btn btn-outline-primary w-100" to="/admin/pontozas" onClick={() => setIsProfileOpen(false)}>
                                         Pontozás kezelése
                                     </Link>
+                                    <Link className="btn btn-outline-primary w-100" to="/admin/jogosultsagok" onClick={() => setIsProfileOpen(false)}>
+                                        E-mailek és jogosultságok kezelése
+                                    </Link>
                                 </div>
+                            ) : userRole === 'judge' ? (
+                                <Link className="btn btn-outline-primary w-100" to="/admin/pontozas" onClick={() => setIsProfileOpen(false)}>
+                                    Saját versenyszám pontozása
+                                </Link>
                             ) : (
                                 <Link className="btn btn-outline-primary w-100" to="/allasok" onClick={() => setIsProfileOpen(false)}>
                                     Állások

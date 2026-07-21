@@ -11,11 +11,14 @@ import StandingsPage from './pages/StandingsPage';
 import TeamDetailsPage from './pages/TeamDetailsPage';
 import Navbar from './components/Navbar';
 import LoginPage from './pages/LoginPage';
+import PrivilegeManagementPage from './pages/PrivilegeManagementPage';
 import { auth, googleProvider } from './firebase';
+import { isJudgePrivilege } from './config/privilegeConfig';
 
 function App() {
   const [user, setUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
+  const [userPrivilege, setUserPrivilege] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState('');
 
@@ -34,18 +37,35 @@ function App() {
 
       if (!currentUser?.email) {
         setUserRole(null);
+        setUserPrivilege(null);
         return;
       }
 
       try {
-        const response = await fetch(`https://legocompetition.runasp.net/api/Teams/privilege/${encodeURIComponent(currentUser.email)}`);
-        if (!response.ok) {
-          throw new Error('Privilege lookup failed');
+        const encodedEmail = encodeURIComponent(currentUser.email);
+        const [privilegeResult, legacyResult] = await Promise.allSettled([
+          fetch(`https://legocompetition.runasp.net/api/Privilege/${encodedEmail}`),
+          fetch(`https://legocompetition.runasp.net/api/Teams/privilege/${encodedEmail}`)
+        ]);
+
+        let roleValue = 0;
+        let isLegacyAdmin = false;
+
+        if (privilegeResult.status === 'fulfilled' && privilegeResult.value.ok) {
+          const privilege = await privilegeResult.value.json();
+          roleValue = Number(privilege.privilege1) || 0;
         }
 
-        const roleValue = await response.text();
-        setUserRole(roleValue === '1' ? 'admin' : 'competitor');
+        if (legacyResult.status === 'fulfilled' && legacyResult.value.ok) {
+          const legacyValue = (await legacyResult.value.text()).trim().replace(/^"|"$/g, '');
+          isLegacyAdmin = Number(legacyValue) === 1;
+        }
+
+        const effectivePrivilege = isLegacyAdmin ? 1 : roleValue;
+        setUserPrivilege(effectivePrivilege);
+        setUserRole(effectivePrivilege === 1 ? 'admin' : isJudgePrivilege(effectivePrivilege) ? 'judge' : 'competitor');
       } catch (error) {
+        setUserPrivilege(0);
         setUserRole('competitor');
       }
     });
@@ -98,6 +118,7 @@ function App() {
       <Navbar
         user={user}
         userRole={userRole}
+        userPrivilege={userPrivilege}
         authLoading={authLoading}
         authError={authError}
         onGoogleSignIn={handleGoogleSignIn}
@@ -111,8 +132,9 @@ function App() {
         <Route path="/allasok" element={<StandingsPage />} />
         <Route path="/csapat/:teamName" element={<TeamDetailsPage />} />
         <Route path="/admin" element={userRole === 'admin' ? <AdminPage /> : <HomePage />} />
-        <Route path="/admin/pontozas" element={userRole === 'admin' ? <AdminScoringPage /> : <HomePage />} />
-        <Route path="/admin/pontozas/:competitionType" element={userRole === 'admin' ? <AdminScoringPage /> : <HomePage />} />
+        <Route path="/admin/jogosultsagok" element={userRole === 'admin' ? <PrivilegeManagementPage /> : <HomePage />} />
+        <Route path="/admin/pontozas" element={userRole === 'admin' || userRole === 'judge' ? <AdminScoringPage userPrivilege={userPrivilege} /> : <HomePage />} />
+        <Route path="/admin/pontozas/:competitionType" element={userRole === 'admin' || userRole === 'judge' ? <AdminScoringPage userPrivilege={userPrivilege} /> : <HomePage />} />
         <Route
           path="/bejelentkezes"
           element={
