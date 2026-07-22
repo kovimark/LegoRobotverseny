@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
 import FloatingFeedback from '../components/FloatingFeedback'
+import TeamGroupManager from '../components/TeamGroupManager'
 import {
   addCompetitionPhase,
   getAllCompetitionPhases,
@@ -20,7 +21,7 @@ const toTimeInput = (value) => {
   return timeMatch ? `${timeMatch[1]}:${timeMatch[2]}` : ''
 }
 
-export default function SettingsManagementPage() {
+export default function SettingsManagementPage({ groupOnly = false }) {
   const [settings, setSettings] = useState({ ageGroupBreakdown: 0, competitionPhase: '', minSumoRoundTime: '', maxSumoRoundTime: '' })
   const [phases, setPhases] = useState([])
   const [phaseDraft, setPhaseDraft] = useState(emptyPhase)
@@ -48,7 +49,7 @@ export default function SettingsManagementPage() {
     } finally { setLoading(false) }
   }
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => { if (!groupOnly) loadData() }, [groupOnly])
   const updateSettings = (name, value) => setSettings((current) => ({ ...current, [name]: value }))
   const updatePhase = (name, value) => setPhaseDraft((current) => ({ ...current, [name]: value }))
 
@@ -111,6 +112,8 @@ export default function SettingsManagementPage() {
     finally { setSaving(false) }
   }
 
+  if (groupOnly) return <div className="container py-4"><h1 className="h2 mb-1">Beállítások</h1><p className="text-muted mb-4">Csapatcsoportok kezelése.</p><TeamGroupManager /></div>
+
   return (
     <div className="container py-4">
       <h2 className="mb-1">Versenybeállítások</h2>
@@ -138,6 +141,7 @@ export default function SettingsManagementPage() {
 
         <div className="row g-3 mb-4">{phases.map((phase) => { const name = phaseNameOf(phase); return <div className="col-md-6 col-xl-4" key={phase.id ?? name}><article className="team-info-box h-100"><h4 className="h5">{name}</h4><div className="small text-muted">{toTimeInput(phaseStartOf(phase)) || 'Nincs kezdés'} – {toTimeInput(phaseEndOf(phase)) || 'Nincs befejezés'}</div><button type="button" className="btn btn-outline-primary btn-sm mt-3" onClick={() => editPhase(phase)}>Módosítás</button></article></div> })}</div>
 
+        <TeamGroupManager />
         <section className="card border-danger mb-4"><div className="card-body"><h3 className="h5 text-danger">Veszélyes műveletek</h3><div className="d-flex flex-wrap gap-2"><button type="button" className="btn btn-outline-danger" onClick={() => setDangerAction('settings')}>Beállítások alaphelyzetbe állítása</button><button type="button" className="btn btn-danger" onClick={() => setDangerAction('scores')}>Minden pont törlése</button></div></div></section>
       </>}
       <ConfirmModal

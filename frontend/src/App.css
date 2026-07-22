@@ -985,6 +985,10 @@ form {
 .floating-feedback-success { background: #177245; }
 .floating-feedback-info { background: #075eb5; }
 
+.team-group-search {
+  width: min(100%, 360px);
+}
+
 .message-link-number {
   min-width: 1.6rem;
   font-weight: 800;

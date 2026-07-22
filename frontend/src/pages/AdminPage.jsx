@@ -192,8 +192,8 @@ export default function AdminPage() {
         : teamToEdit[fieldName]
       return result
     }, {
-      id: teamToEdit.id,
-      category: getCategory(teamToEdit.teamMember1Class, teamToEdit.teamMember2Class)
+      category: getCategory(teamToEdit.teamMember1Class, teamToEdit.teamMember2Class),
+      group: teamToEdit.group || null
     })
 
     payload.teamMember1Class = Number(teamToEdit.teamMember1Class)

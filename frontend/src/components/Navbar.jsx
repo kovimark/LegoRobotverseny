@@ -113,9 +113,7 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                                     </Link>
                                 </div>
                             ) : userRole === 'judge' ? (
-                                <Link className="btn btn-outline-primary w-100" to="/admin/pontozas" onClick={() => setIsProfileOpen(false)}>
-                                    Saját versenyszám pontozása
-                                </Link>
+                                <div className="d-grid gap-2"><Link className="btn btn-outline-primary w-100" to="/admin/pontozas" onClick={() => setIsProfileOpen(false)}>Saját versenyszám pontozása</Link><Link className="btn btn-outline-primary w-100" to="/admin/beallitasok" onClick={() => setIsProfileOpen(false)}>Csapatcsoportok</Link></div>
                             ) : (
                                 <div className="d-grid gap-2">
                                     <Link className="btn btn-primary w-100" to="/sajat-csapataim" onClick={() => setIsProfileOpen(false)}>
