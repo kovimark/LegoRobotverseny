@@ -953,6 +953,10 @@ form {
   background: #f8f9fa;
 }
 
+.message-edit-form {
+  scroll-margin-top: 1.5rem;
+}
+
 .message-link-manager-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto auto;

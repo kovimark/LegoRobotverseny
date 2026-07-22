@@ -37,7 +37,9 @@ export default function MessageManagementPage() {
   const [newManagedLink, setNewManagedLink] = useState('')
   const [managedLinkError, setManagedLinkError] = useState('')
   const [linkDeleteIndex, setLinkDeleteIndex] = useState(null)
+  const [confirmAction, setConfirmAction] = useState(null)
   const messageTextRef = useRef(null)
+  const messageFormRef = useRef(null)
 
   const normalizedMessageSearch = messageSearch.trim().toLocaleLowerCase('hu-HU')
   const filteredMessages = messages.filter((message) => (
@@ -128,7 +130,7 @@ export default function MessageManagementPage() {
   }
 
   const handleSave = async (event) => {
-    event.preventDefault()
+    event?.preventDefault()
     if (!draft.title.trim() || !draft.text.trim() || !draft.type) {
       setStatus({ type: 'danger', text: 'A cím, a szöveg és a típus kötelező.' })
       return
@@ -155,11 +157,26 @@ export default function MessageManagementPage() {
     }
   }
 
-  const editMessage = (message) => setDraft({
-    ...message,
-    start: toLocalDateTimeInput(message.start),
-    end: toLocalDateTimeInput(message.end)
-  })
+  const editMessage = (message) => {
+    setDraft({
+      ...message,
+      start: toLocalDateTimeInput(message.start),
+      end: toLocalDateTimeInput(message.end)
+    })
+    setLinkSelection(null)
+    setLinkToolError('')
+    setManagedLinkError('')
+    requestAnimationFrame(() => messageFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
+
+  const executeConfirmedAction = () => {
+    const action = confirmAction
+    setConfirmAction(null)
+    if (action?.kind === 'save-message') handleSave()
+    if (action?.kind === 'add-type') handleAddType()
+    if (action?.kind === 'rename-type') handleRenameType()
+    if (action?.kind === 'edit-message') editMessage(action.message)
+  }
 
   const handleDeleteMessage = async (message) => {
     try {
@@ -226,13 +243,13 @@ export default function MessageManagementPage() {
           <div className="row g-2 mb-3 align-items-end">
             <div className="col-md-5"><label className="form-label" htmlFor="new-type-name">Típus neve</label><input id="new-type-name" className="form-control" placeholder="Új típus neve" value={newType} onChange={(event) => setNewType(event.target.value)} /></div>
             <div className="col-md-3"><label className="form-label" htmlFor="new-type-color">Szín</label><div className="input-group"><input id="new-type-color" type="color" className="form-control form-control-color" value={normalizeHexColor(newTypeHex)} onChange={(event) => setNewTypeHex(event.target.value)} /><input className="form-control" aria-label="Hex színkód" value={newTypeHex} maxLength="7" onChange={(event) => setNewTypeHex(event.target.value)} /></div></div>
-            <div className="col-md-4"><button type="button" className="btn btn-primary w-100" onClick={handleAddType}>Típus hozzáadása</button></div>
+            <div className="col-md-4"><button type="button" className="btn btn-primary w-100" onClick={() => setConfirmAction({ kind: 'add-type' })}>Típus hozzáadása</button></div>
           </div>
           <div className="d-flex flex-column gap-2">
             {types.map((type) => (
               <div className="border rounded p-2 d-flex flex-wrap align-items-center gap-2" key={type.id ?? type.name}>
                 {renamingType === type.name ? (
-                  <><input className="form-control flex-grow-1" aria-label="Típus neve" value={renamedType} onChange={(event) => setRenamedType(event.target.value)} /><div className="input-group message-type-color-edit"><input type="color" className="form-control form-control-color" aria-label="Típus színe" value={normalizeHexColor(renamedTypeHex)} onChange={(event) => setRenamedTypeHex(event.target.value)} /><input className="form-control" aria-label="Hex színkód" value={renamedTypeHex} maxLength="7" onChange={(event) => setRenamedTypeHex(event.target.value)} /></div><button type="button" className="btn btn-success btn-sm" onClick={handleRenameType}>Mentés</button><button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => { setRenamingType(null); setRenamedTypeHex('#198754') }}>Mégse</button></>
+                  <><input className="form-control flex-grow-1" aria-label="Típus neve" value={renamedType} onChange={(event) => setRenamedType(event.target.value)} /><div className="input-group message-type-color-edit"><input type="color" className="form-control form-control-color" aria-label="Típus színe" value={normalizeHexColor(renamedTypeHex)} onChange={(event) => setRenamedTypeHex(event.target.value)} /><input className="form-control" aria-label="Hex színkód" value={renamedTypeHex} maxLength="7" onChange={(event) => setRenamedTypeHex(event.target.value)} /></div><button type="button" className="btn btn-success btn-sm" onClick={() => setConfirmAction({ kind: 'rename-type' })}>Mentés</button><button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => { setRenamingType(null); setRenamedTypeHex('#198754') }}>Mégse</button></>
                 ) : (
                   <><span className="badge" style={getCategoryBadgeStyle(type.hex)}>{type.name}</span><span className="small text-muted flex-grow-1">{type.hex || 'Nincs szín megadva'}</span><button type="button" className="btn btn-outline-primary btn-sm" onClick={() => { setRenamingType(type.name); setRenamedType(type.name); setRenamedTypeHex(normalizeHexColor(type.hex)) }}>Szerkesztés</button><button type="button" className="btn btn-outline-danger btn-sm" onClick={() => setDeleteRequest({ kind: 'type', item: type })}>Törlés</button></>
                 )}
@@ -242,7 +259,7 @@ export default function MessageManagementPage() {
         </div>
       </section>
 
-      <form className="card shadow-sm team-card no-hover-card mb-4" onSubmit={handleSave}>
+      <form ref={messageFormRef} className="card shadow-sm team-card no-hover-card mb-4 message-edit-form" onSubmit={(event) => { event.preventDefault(); setConfirmAction({ kind: 'save-message' }) }}>
         <div className="card-body p-4">
           <div className="d-flex justify-content-between mb-3"><h3 className="h5 mb-0">{draft.id ? 'Üzenet szerkesztése' : 'Új üzenet'}</h3>{draft.id && <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setDraft({ ...emptyDraft, type: types[0]?.name || '' })}>Mégse</button>}</div>
           <div className="row g-3">
@@ -289,7 +306,7 @@ export default function MessageManagementPage() {
               <MessageText text={message.text} links={message.links} />
               <MessageLinks links={message.links} compact />
               <div className="small text-muted mb-3"><strong>Megjelenés:</strong> {message.start ? new Date(message.start).toLocaleString('hu-HU') : 'Azonnal'}<br /><strong>Lejárat:</strong> {message.end ? new Date(message.end).toLocaleString('hu-HU') : 'Nincs lejárat'}</div>
-              <div className="d-flex flex-wrap gap-2"><button type="button" className="btn btn-outline-primary btn-sm" onClick={() => editMessage(message)}>Szerkesztés</button><button type="button" className="btn btn-outline-danger btn-sm" onClick={() => setDeleteRequest({ kind: 'message', item: message })}>Törlés</button></div>
+              <div className="d-flex flex-wrap gap-2"><button type="button" className="btn btn-outline-primary btn-sm" onClick={() => setConfirmAction({ kind: 'edit-message', message })}>Szerkesztés</button><button type="button" className="btn btn-outline-danger btn-sm" onClick={() => setDeleteRequest({ kind: 'message', item: message })}>Törlés</button></div>
             </div>
           </details>
         ))}</div> : <div className="alert alert-secondary">Nincs a keresésnek megfelelő üzenet.</div>
@@ -315,6 +332,19 @@ export default function MessageManagementPage() {
         <p className="mb-2">Biztosan törlöd ezt a linket?</p>
         <div className="small text-break">{linkDeleteIndex !== null ? draftLinkLines[linkDeleteIndex] : ''}</div>
         <p className="small text-muted mt-2 mb-0">A hozzá kapcsolt szavak megmaradnak, de többé nem lesznek kattinthatók. A többi link sorszámát automatikusan javítjuk.</p>
+      </ConfirmModal>
+      <ConfirmModal
+        open={Boolean(confirmAction)}
+        title={confirmAction?.kind === 'edit-message' ? 'Hír szerkesztése' : confirmAction?.kind === 'add-type' ? 'Üzenettípus hozzáadása' : confirmAction?.kind === 'rename-type' ? 'Üzenettípus módosítása' : 'Üzenet mentése'}
+        confirmLabel={confirmAction?.kind === 'edit-message' ? 'Szerkesztés megnyitása' : confirmAction?.kind === 'add-type' ? 'Típus hozzáadása' : 'Mentés'}
+        confirmVariant={confirmAction?.kind === 'edit-message' ? 'primary' : 'success'}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={executeConfirmedAction}
+      >
+        {confirmAction?.kind === 'edit-message' && <p className="mb-0">Megnyitod szerkesztésre ezt a hírt: <strong>{confirmAction.message?.title}</strong>?</p>}
+        {confirmAction?.kind === 'add-type' && <p className="mb-0">Hozzáadod a(z) <strong>{newType || 'név nélküli'}</strong> üzenettípust?</p>}
+        {confirmAction?.kind === 'rename-type' && <p className="mb-0">Elmented a(z) <strong>{renamingType}</strong> kategória nevét és színét?</p>}
+        {confirmAction?.kind === 'save-message' && <p className="mb-0">Biztosan elmented a(z) <strong>{draft.title || 'cím nélküli'}</strong> üzenetet?</p>}
       </ConfirmModal>
     </div>
   )
