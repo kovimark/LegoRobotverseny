@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
 import MessageLinks from '../components/MessageLinks'
 import MessageText from '../components/MessageText'
+import FloatingFeedback from '../components/FloatingFeedback'
 import { getMessageLinkLines } from '../utils/messageContent'
 import { getCategoryBadgeStyle, normalizeHexColor } from '../utils/categoryColor'
 import {
@@ -173,7 +174,6 @@ export default function MessageManagementPage() {
     const action = confirmAction
     setConfirmAction(null)
     if (action?.kind === 'save-message') handleSave()
-    if (action?.kind === 'add-type') handleAddType()
     if (action?.kind === 'rename-type') handleRenameType()
     if (action?.kind === 'edit-message') editMessage(action.message)
   }
@@ -235,7 +235,7 @@ export default function MessageManagementPage() {
     <div className="container py-4">
       <h2 className="mb-1">Üzenetek kezelése</h2>
       <p className="text-muted mb-4">Üzenetek és üzenettípusok kezelése a backendben.</p>
-      {status && <div className={`alert alert-${status.type}`} role="status">{status.text}</div>}
+      <FloatingFeedback message={status} onClose={() => setStatus(null)} />
 
       <section className="card shadow-sm team-card no-hover-card mb-4">
         <div className="card-body p-4">
@@ -243,7 +243,7 @@ export default function MessageManagementPage() {
           <div className="row g-2 mb-3 align-items-end">
             <div className="col-md-5"><label className="form-label" htmlFor="new-type-name">Típus neve</label><input id="new-type-name" className="form-control" placeholder="Új típus neve" value={newType} onChange={(event) => setNewType(event.target.value)} /></div>
             <div className="col-md-3"><label className="form-label" htmlFor="new-type-color">Szín</label><div className="input-group"><input id="new-type-color" type="color" className="form-control form-control-color" value={normalizeHexColor(newTypeHex)} onChange={(event) => setNewTypeHex(event.target.value)} /><input className="form-control" aria-label="Hex színkód" value={newTypeHex} maxLength="7" onChange={(event) => setNewTypeHex(event.target.value)} /></div></div>
-            <div className="col-md-4"><button type="button" className="btn btn-primary w-100" onClick={() => setConfirmAction({ kind: 'add-type' })}>Típus hozzáadása</button></div>
+            <div className="col-md-4"><button type="button" className="btn btn-primary w-100" onClick={handleAddType}>Típus hozzáadása</button></div>
           </div>
           <div className="d-flex flex-column gap-2">
             {types.map((type) => (
@@ -335,14 +335,13 @@ export default function MessageManagementPage() {
       </ConfirmModal>
       <ConfirmModal
         open={Boolean(confirmAction)}
-        title={confirmAction?.kind === 'edit-message' ? 'Hír szerkesztése' : confirmAction?.kind === 'add-type' ? 'Üzenettípus hozzáadása' : confirmAction?.kind === 'rename-type' ? 'Üzenettípus módosítása' : 'Üzenet mentése'}
-        confirmLabel={confirmAction?.kind === 'edit-message' ? 'Szerkesztés megnyitása' : confirmAction?.kind === 'add-type' ? 'Típus hozzáadása' : 'Mentés'}
+        title={confirmAction?.kind === 'edit-message' ? 'Hír szerkesztése' : confirmAction?.kind === 'rename-type' ? 'Üzenettípus módosítása' : 'Üzenet mentése'}
+        confirmLabel={confirmAction?.kind === 'edit-message' ? 'Szerkesztés megnyitása' : 'Mentés'}
         confirmVariant={confirmAction?.kind === 'edit-message' ? 'primary' : 'success'}
         onClose={() => setConfirmAction(null)}
         onConfirm={executeConfirmedAction}
       >
         {confirmAction?.kind === 'edit-message' && <p className="mb-0">Megnyitod szerkesztésre ezt a hírt: <strong>{confirmAction.message?.title}</strong>?</p>}
-        {confirmAction?.kind === 'add-type' && <p className="mb-0">Hozzáadod a(z) <strong>{newType || 'név nélküli'}</strong> üzenettípust?</p>}
         {confirmAction?.kind === 'rename-type' && <p className="mb-0">Elmented a(z) <strong>{renamingType}</strong> kategória nevét és színét?</p>}
         {confirmAction?.kind === 'save-message' && <p className="mb-0">Biztosan elmented a(z) <strong>{draft.title || 'cím nélküli'}</strong> üzenetet?</p>}
       </ConfirmModal>

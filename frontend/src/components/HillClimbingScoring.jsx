@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import FloatingFeedback from './FloatingFeedback'
 import { getCompetitionConfig } from '../config/adminScoringConfig'
 
 const competitionConfig = getCompetitionConfig('hegymaszas')
@@ -140,7 +141,7 @@ export default function HillClimbingScoring() {
   return (
     <div>
       <div className="alert alert-info">Kiválasztott versenyszám: <strong>{competitionConfig.label}</strong></div>
-      {actionMessage && <div className={`alert ${actionMessage.type === 'success' ? 'alert-success' : 'alert-danger'} mb-3`} role="status">{actionMessage.text}</div>}
+      <FloatingFeedback message={actionMessage} onClose={() => setActionMessage(null)} />
       {loading && <div className="alert alert-secondary">Csapatok betöltése...</div>}
       {error && <div className="alert alert-danger">{error}</div>}
       {!loading && !error && teams.length === 0 && <div className="alert alert-secondary">Ebben a versenyszámban még nincs csapat.</div>}

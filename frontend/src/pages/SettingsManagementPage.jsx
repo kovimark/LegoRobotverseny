@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
+import FloatingFeedback from '../components/FloatingFeedback'
 import {
   addCompetitionPhase,
   getAllCompetitionPhases,
@@ -114,7 +115,7 @@ export default function SettingsManagementPage() {
     <div className="container py-4">
       <h2 className="mb-1">Versenybeállítások</h2>
       <p className="text-muted mb-4">Korosztály, aktuális szakasz, időintervallumok és a teljes szumóforduló időkerete.</p>
-      {status && <div className={`alert alert-${status.type}`} role="status">{status.text}</div>}
+      <FloatingFeedback message={status} onClose={() => setStatus(null)} />
       {loading ? <div className="alert alert-info">Beállítások betöltése...</div> : <>
         <form className="card shadow-sm team-card no-hover-card mb-4" onSubmit={saveMainSettings}>
           <div className="card-body p-4"><h3 className="h5 mb-3">Aktuális beállítások</h3><div className="row g-3">

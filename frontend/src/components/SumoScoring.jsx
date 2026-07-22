@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import FloatingFeedback from './FloatingFeedback'
 import { getCompetitionConfig } from '../config/adminScoringConfig'
 import { loadSumoScheduleConfig, SUMO_CONFIG_CHANGED_EVENT } from '../services/sumoScheduleConfigApi'
 
@@ -1041,11 +1042,7 @@ export default function SumoScoring() {
         Kiválasztott versenyszám: <strong>{competitionConfig?.label || 'Szumó'}</strong>
       </div>
 
-      {actionMessage && (
-        <div className={`alert alert-${actionMessage.type === 'success' ? 'success' : actionMessage.type === 'info' ? 'info' : 'danger'} mb-3`} role="status">
-          {actionMessage.text}
-        </div>
-      )}
+      <FloatingFeedback message={actionMessage} onClose={() => setActionMessage(null)} />
 
       {loading && <div className="alert alert-secondary">Csapatok és meccsek betöltése...</div>}
       {error && <div className="alert alert-danger">{error}</div>}

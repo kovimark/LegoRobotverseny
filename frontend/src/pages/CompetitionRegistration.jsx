@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import FloatingFeedback from '../components/FloatingFeedback'
 
 export default function CompetitionRegistration({ user }) {
   const [formData, setFormData] = useState({
@@ -383,11 +384,7 @@ export default function CompetitionRegistration({ user }) {
             </div>
 
             <button type="submit" className="btn btn-primary w-100">Jelentkezés</button>
-            {submitMessage && (
-              <div className={`alert alert-${submitMessage.type} mt-3 mb-0`} role="alert">
-                {submitMessage.text}
-              </div>
-            )}
+            <FloatingFeedback message={submitMessage} onClose={() => setSubmitMessage(null)} />
           </form>
         </div>
       </div>

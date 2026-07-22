@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import FloatingFeedback from './FloatingFeedback'
 
 const API_URL = 'https://legocompetition.runasp.net/api/TieBreaker'
 
@@ -131,7 +132,7 @@ export default function TieBreakerManager({ competitionId, competitionLabel = 'V
           <button type="button" className="btn btn-outline-secondary btn-sm" onClick={loadTieBreakers} disabled={loading}>Frissítés</button>
         </div>
 
-        {message && <div className={`alert alert-${message.type}`} role="status">{message.text}</div>}
+        <FloatingFeedback message={message} onClose={() => setMessage(null)} />
         {loading && <div className="alert alert-info">Döntetlenek betöltése...</div>}
         {!loading && pendingTieBreakers.length === 0 && <div className="alert alert-success">Nincs eldöntésre váró döntetlen ennél a versenyszámnál.</div>}
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import FloatingFeedback from '../components/FloatingFeedback'
 import { Link, useParams } from 'react-router-dom'
 import BasketThrowScoring from '../components/BasketThrowScoring'
 import LineFollowingScoring from '../components/LineFollowingScoring'
@@ -82,7 +83,7 @@ export default function AdminScoringPage({ userPrivilege }) {
           </div>
         </div>
       )}
-      {tieCheckMessage && <div className={`alert alert-${tieCheckMessage.type}`} role="status">{tieCheckMessage.text}</div>}
+      <FloatingFeedback message={tieCheckMessage} onClose={() => setTieCheckMessage(null)} />
 
       {canAccessActiveCompetition && activeCompetition?.tieBreakerCompetitionId && (
         <TieBreakerManager

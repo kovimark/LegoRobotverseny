@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { getPrivilegeLabel, privilegeOptions } from '../config/privilegeConfig'
 import ConfirmModal from '../components/ConfirmModal'
+import FloatingFeedback from '../components/FloatingFeedback'
 
 const API_URL = 'https://legocompetition.runasp.net/api/Privilege'
 
@@ -119,7 +120,7 @@ export default function PrivilegeManagementPage() {
         </div>
       </div>
 
-      {message && <div className={`alert alert-${message.type}`} role="status">{message.text}</div>}
+      <FloatingFeedback message={message} onClose={() => setMessage(null)} />
 
       <section className="team-info-box mb-4">
         <h3 className="h5 mb-3">Új e-mail-cím hozzáadása</h3>

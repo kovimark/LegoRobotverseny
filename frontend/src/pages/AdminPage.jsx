@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import FloatingFeedback from '../components/FloatingFeedback'
 
 const editableTeamFields = [
   'teamName',
@@ -232,11 +233,7 @@ export default function AdminPage() {
 
       {loading && <div className="alert alert-info">Csapatok betöltése...</div>}
       {error && <div className="alert alert-danger">{error}</div>}
-      {actionMessage && (
-        <div className={`small ${actionMessage.type === 'success' ? 'text-success' : 'text-danger'}`} role="status">
-          {actionMessage.text}
-        </div>
-      )}
+      <FloatingFeedback message={actionMessage} onClose={() => setActionMessage(null)} />
 
       {!loading && !error && teams.length === 0 && (
         <div className="alert alert-secondary">Nincsenek csapatok.</div>
