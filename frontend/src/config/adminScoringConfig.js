@@ -1,8 +1,8 @@
 export const competitionTypes = [
-  { slug: 'hegymaszas', label: 'Hegymászás', apiPath: 'HillClimbing' },
-  { slug: 'vonalkovetes', label: 'Vonalkövetés', apiPath: 'LineFollowing' },
-  { slug: 'kosarra-dobas', label: 'Kosárra dobás', apiPath: 'Basketball' },
-  { slug: 'szumo', label: 'Szumó', apiPath: 'Sumo' },
+  { slug: 'hegymaszas', label: 'Hegymászás', apiPath: 'HillClimbing', tieBreakerCompetitionId: 3, tieBreakerMode: 'weight' },
+  { slug: 'vonalkovetes', label: 'Vonalkövetés', apiPath: 'LineFollowing', tieBreakerCompetitionId: 2, tieBreakerMode: 'ranking' },
+  { slug: 'kosarra-dobas', label: 'Kosárra dobás', apiPath: 'Basketball', tieBreakerCompetitionId: 4, tieBreakerMode: 'ranking' },
+  { slug: 'szumo', label: 'Szumó', apiPath: 'Sumo', tieBreakerCompetitionId: 1, tieBreakerMode: 'weight' },
   { slug: 'osszesitett', label: 'Összesített ponttáblázat' }
 ]
 

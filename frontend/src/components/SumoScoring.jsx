@@ -3,6 +3,7 @@ import { getCompetitionConfig } from '../config/adminScoringConfig'
 import { loadSumoScheduleConfig, SUMO_CONFIG_CHANGED_EVENT } from '../services/sumoScheduleConfigApi'
 
 const competitionConfig = getCompetitionConfig('szumo')
+const CLOSED_ROUNDS_STORAGE_KEY = 'sumoClosedRounds'
 const GROUP_STAGE = 'GS'
 const KNOCKOUT_WIN_POINTS = 6
 const KNOCKOUT_STAGES = ['RO16', 'QF', 'SF', 'BM', 'F']
@@ -366,6 +367,13 @@ export default function SumoScoring() {
   const [openMatches, setOpenMatches] = useState({})
   const [actionMessage, setActionMessage] = useState(null)
   const [matchToDelete, setMatchToDelete] = useState(null)
+  const [closedRounds, setClosedRounds] = useState(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem(CLOSED_ROUNDS_STORAGE_KEY) || '{}')
+    } catch (error) {
+      return {}
+    }
+  })
 
   useEffect(() => {
     const applyConfiguration = (configuration) => {
@@ -467,6 +475,8 @@ export default function SumoScoring() {
   )
 
   const groupRoundCount = useMemo(() => buildRoundGroups(groupStageMatches).length, [groupStageMatches])
+  const latestGroupRoundNumber = useMemo(() => groupStageMatches.reduce((latest, match) => Math.max(latest, Number(match.table) || 0), 0), [groupStageMatches])
+  const latestGroupRoundClosed = latestGroupRoundNumber === 0 || Boolean(closedRounds[`${GROUP_STAGE}:${latestGroupRoundNumber}`])
   const hasReachedMinimumRounds = groupRoundCount >= minimumRounds
   const primaryActionLabel = getPrimaryGenerationLabel(stageMode, selectedStage)
 
@@ -696,6 +706,30 @@ export default function SumoScoring() {
       return
     }
 
+    if (!startKnockout && stageMode === 'group' && !latestGroupRoundClosed) {
+      setActionMessage({ type: 'danger', text: 'A következő forduló csak az aktuális forduló lezárása után hozható létre.' })
+      return
+    }
+
+    if (startKnockout && !latestGroupRoundClosed) {
+      setActionMessage({ type: 'danger', text: 'Az egyenes kiesés indítása előtt zárd le az aktuális alapszakaszfordulót.' })
+      return
+    }
+
+    if (startKnockout) {
+      try {
+        const tieResponse = await fetch('https://legocompetition.runasp.net/api/TieBreaker/check-all-ties', {
+          method: 'POST',
+          headers: { accept: '*/*' }
+        })
+        if (!tieResponse.ok) throw new Error('A döntetlenek ellenőrzése nem sikerült.')
+        window.dispatchEvent(new Event('tieBreakersChanged'))
+      } catch (tieError) {
+        setActionMessage({ type: 'danger', text: tieError.message })
+        return
+      }
+    }
+
     const shouldGenerateKnockout = startKnockout || stageMode === 'knockout' || isKnockoutStage(selectedStage)
     const pairings = shouldGenerateKnockout ? generateKnockoutPairings() : generateRoundMatches()
 
@@ -774,6 +808,27 @@ export default function SumoScoring() {
     } catch (err) {
       setActionMessage({ type: 'danger', text: err.message })
     }
+  }
+
+  const closeRound = (round) => {
+    const isComplete = round.matches.every((match) => (
+      getMatchStage(match) === GROUP_STAGE
+        ? match.team1Results.length > 0 && match.team2Results.length > 0
+        : Boolean(getKnockoutWinnerName(match))
+    ))
+
+    if (!isComplete) {
+      setActionMessage({ type: 'danger', text: 'A forduló csak akkor zárható le, ha minden meccs eredménye rögzítve van.' })
+      return
+    }
+
+    const roundKey = `${round.stage}:${round.table}`
+    setClosedRounds((current) => {
+      const updated = { ...current, [roundKey]: true }
+      window.localStorage.setItem(CLOSED_ROUNDS_STORAGE_KEY, JSON.stringify(updated))
+      return updated
+    })
+    setActionMessage({ type: 'success', text: `${round.table}. forduló lezárva. Most létrehozható a következő forduló.` })
   }
 
   const handleDeleteMatch = async () => {
@@ -1012,7 +1067,7 @@ export default function SumoScoring() {
                   type="button"
                   className="btn btn-primary px-4"
                   onClick={() => handleGenerateMatches(false)}
-                  disabled={!teams.length || Boolean(finalWinnerName) || isGroupGenerationLocked}
+                  disabled={!teams.length || Boolean(finalWinnerName) || isGroupGenerationLocked || (!isKnockoutView && !latestGroupRoundClosed)}
                 >
                   {primaryActionLabel}
                 </button>
@@ -1021,7 +1076,7 @@ export default function SumoScoring() {
                     type="button"
                     className="btn btn-success px-4"
                     onClick={() => handleGenerateMatches(true)}
-                    disabled={!teams.length || Boolean(finalWinnerName)}
+                    disabled={!teams.length || Boolean(finalWinnerName) || !latestGroupRoundClosed}
                   >
                     Egyenes kiesés indítása
                   </button>
@@ -1111,18 +1166,36 @@ export default function SumoScoring() {
 
       {roundGroups.length > 0 && (
         <div className="d-grid gap-3">
-          {roundGroups.map((round) => (
+          {roundGroups.map((round) => {
+            const roundKey = `${round.stage}:${round.table}`
+            const isRoundClosed = Boolean(closedRounds[roundKey])
+            const isRoundComplete = round.matches.every((match) => (
+              getMatchStage(match) === GROUP_STAGE
+                ? match.team1Results.length > 0 && match.team2Results.length > 0
+                : Boolean(getKnockoutWinnerName(match))
+            ))
+
+            return (
             <div className="card shadow-sm team-card no-hover-card" key={`round-${round.stage}-${round.table}`}>
               <div className="card-body border-bottom py-3 px-4 bg-light">
-                <div className="d-flex justify-content-between align-items-center gap-3">
+                <div className="d-flex flex-wrap justify-content-between align-items-center gap-3">
                   <h5 className="mb-0">
                     {shouldSplitRoundGroupsByStage ? `${getStageLabel(round.stage)} - ` : ''}{round.table}. forduló
                   </h5>
-                  <span className="text-muted">{round.matches.length} meccs</span>
+                  <div className="d-flex align-items-center gap-2">
+                    <span className="text-muted">{round.matches.length} meccs</span>
+                    {isRoundClosed ? (
+                      <span className="badge text-bg-success">Lezárva</span>
+                    ) : (
+                      <button type="button" className="btn btn-outline-success btn-sm" disabled={!isRoundComplete} onClick={() => closeRound(round)}>
+                        Forduló lezárása
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="card-body p-3 p-md-4">
+              <fieldset disabled={isRoundClosed} className="card-body p-3 p-md-4 border-0 m-0 w-100">
                 <div className="d-grid gap-3">
                   {round.matches.map((match) => {
                     const isOpen = openMatches[match.id] === true
@@ -1262,9 +1335,10 @@ export default function SumoScoring() {
                     )
                   })}
                 </div>
-              </div>
+              </fieldset>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
       {matchToDelete && (

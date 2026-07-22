@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import BasketThrowScoring from '../components/BasketThrowScoring'
 import LineFollowingScoring from '../components/LineFollowingScoring'
@@ -14,12 +14,37 @@ export default function AdminScoringPage({ userPrivilege }) {
   const { competitionType } = useParams()
   const allowedJudgeCompetition = judgeCompetitionByPrivilege[Number(userPrivilege)] || null
   const isAdmin = Number(userPrivilege) === 1
+  const [checkingTies, setCheckingTies] = useState(false)
+  const [tieReloadKey, setTieReloadKey] = useState(0)
+  const [tieCheckMessage, setTieCheckMessage] = useState(null)
   const visibleCompetitions = competitionTypes.filter((item) => (
     item.slug !== 'osszesitett' && (isAdmin || item.slug === allowedJudgeCompetition)
   ))
 
   const activeCompetition = competitionTypes.find((item) => item.slug === competitionType) || null
   const canAccessActiveCompetition = !activeCompetition || isAdmin || activeCompetition.slug === allowedJudgeCompetition || activeCompetition.slug === 'osszesitett'
+
+  const checkAllTies = async () => {
+    try {
+      setCheckingTies(true)
+      setTieCheckMessage(null)
+      const response = await fetch('https://legocompetition.runasp.net/api/TieBreaker/check-all-ties', {
+        method: 'POST',
+        headers: { accept: '*/*' }
+      })
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || 'A döntetlenek ellenőrzése nem sikerült.')
+      }
+      setTieReloadKey((current) => current + 1)
+      window.dispatchEvent(new Event('tieBreakersChanged'))
+      setTieCheckMessage({ type: 'success', text: 'A döntetlenek ellenőrzése megtörtént, a listák frissültek.' })
+    } catch (error) {
+      setTieCheckMessage({ type: 'danger', text: error.message })
+    } finally {
+      setCheckingTies(false)
+    }
+  }
 
   return (
     <div className="container py-4">
@@ -45,6 +70,30 @@ export default function AdminScoringPage({ userPrivilege }) {
         </div>
       </div>
 
+      {isAdmin && (
+        <div className="card shadow-sm team-card no-hover-card mb-4">
+          <div className="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+              <h3 className="h5 mb-1">Döntetlenek ellenőrzése</h3>
+              <p className="text-muted small mb-0">Bármikor újraellenőrizheted mind a négy versenyszám aktuális eredményeit.</p>
+            </div>
+            <button type="button" className="btn btn-primary" onClick={checkAllTies} disabled={checkingTies}>
+              {checkingTies ? 'Ellenőrzés...' : 'Döntetlenek ellenőrzése'}
+            </button>
+          </div>
+        </div>
+      )}
+      {tieCheckMessage && <div className={`alert alert-${tieCheckMessage.type}`} role="status">{tieCheckMessage.text}</div>}
+
+      {canAccessActiveCompetition && activeCompetition?.tieBreakerCompetitionId && (
+        <TieBreakerManager
+          competitionId={activeCompetition.tieBreakerCompetitionId}
+          competitionLabel={activeCompetition.label}
+          mode={activeCompetition.tieBreakerMode}
+          reloadKey={tieReloadKey}
+        />
+      )}
+
       {!canAccessActiveCompetition ? (
         <div className="alert alert-danger">Ehhez a versenyszámhoz nincs pontozási jogosultságod.</div>
       ) : !activeCompetition ? (
@@ -59,10 +108,7 @@ export default function AdminScoringPage({ userPrivilege }) {
           <SumoScoring />
         </>
       ) : activeCompetition.slug === 'hegymaszas' ? (
-        <>
-          <TieBreakerManager competitionId={3} />
-          <HillClimbingScoring />
-        </>
+        <HillClimbingScoring />
       ) : activeCompetition.slug === 'osszesitett' ? (
         <OverallStandings />
       ) : (

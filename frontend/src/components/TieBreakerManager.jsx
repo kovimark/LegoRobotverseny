@@ -4,12 +4,13 @@ const API_URL = 'https://legocompetition.runasp.net/api/TieBreaker'
 
 const parseTeams = (value) => String(value || '').split(',').map((team) => team.trim()).filter(Boolean)
 
-export default function TieBreakerManager({ competitionId = 3 }) {
+export default function TieBreakerManager({ competitionId, competitionLabel = 'Versenyszám', mode = 'ranking', reloadKey = 0 }) {
   const [tieBreakers, setTieBreakers] = useState([])
   const [weights, setWeights] = useState({})
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState(null)
   const [message, setMessage] = useState(null)
+  const [manualRankings, setManualRankings] = useState({})
 
   const loadTieBreakers = useCallback(async () => {
     try {
@@ -20,6 +21,12 @@ export default function TieBreakerManager({ competitionId = 3 }) {
       setTieBreakers((Array.isArray(data) ? data : []).filter((item) => (
         Number(item.competitionId) === Number(competitionId)
       )).sort((a, b) => b.id - a.id))
+      setManualRankings((current) => (Array.isArray(data) ? data : []).reduce((result, item) => {
+        if (Number(item.competitionId) === Number(competitionId)) {
+          result[item.id] = current[item.id] || parseTeams(item.teams)
+        }
+        return result
+      }, {}))
     } catch (error) {
       setMessage({ type: 'danger', text: error.message })
     } finally {
@@ -29,7 +36,20 @@ export default function TieBreakerManager({ competitionId = 3 }) {
 
   useEffect(() => {
     loadTieBreakers()
-  }, [loadTieBreakers])
+    const handleTieBreakerRefresh = () => loadTieBreakers()
+    window.addEventListener('tieBreakersChanged', handleTieBreakerRefresh)
+    return () => window.removeEventListener('tieBreakersChanged', handleTieBreakerRefresh)
+  }, [loadTieBreakers, reloadKey])
+
+  const moveTeam = (tieBreakerId, index, direction) => {
+    setManualRankings((current) => {
+      const ranking = [...(current[tieBreakerId] || [])]
+      const targetIndex = index + direction
+      if (targetIndex < 0 || targetIndex >= ranking.length) return current
+      ;[ranking[index], ranking[targetIndex]] = [ranking[targetIndex], ranking[index]]
+      return { ...current, [tieBreakerId]: ranking }
+    })
+  }
 
   const setTeamWeight = (tieBreakerId, teamName, value) => {
     setWeights((current) => ({
@@ -45,6 +65,11 @@ export default function TieBreakerManager({ competitionId = 3 }) {
 
   const resolveTieBreaker = async (tieBreaker) => {
     const teams = parseTeams(tieBreaker.teams)
+    if (mode !== 'weight') {
+      const rankedTeamNames = manualRankings[tieBreaker.id] || teams
+      await submitResolution(tieBreaker.id, rankedTeamNames)
+      return
+    }
     const enteredWeights = teams.map((teamName) => weights[tieBreaker.id]?.[teamName])
     const numericWeights = enteredWeights.map(Number)
 
@@ -60,18 +85,22 @@ export default function TieBreakerManager({ competitionId = 3 }) {
 
     const rankedTeamNames = getRankedTeams(tieBreaker).map((item) => item.teamName)
 
+    await submitResolution(tieBreaker.id, rankedTeamNames)
+  }
+
+  const submitResolution = async (tieBreakerId, rankedTeamNames) => {
     try {
-      setSavingId(tieBreaker.id)
+      setSavingId(tieBreakerId)
       const response = await fetch(`${API_URL}/resolve`, {
         method: 'POST',
         headers: { accept: '*/*', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tieBreakerId: tieBreaker.id, rankedTeamNames })
+        body: JSON.stringify({ tieBreakerId, rankedTeamNames })
       })
       if (!response.ok) {
         const errorText = await response.text()
         throw new Error(errorText || 'A sorrend mentése nem sikerült.')
       }
-      setMessage({ type: 'success', text: 'A növekvő súlysorrend mentése sikerült.' })
+      setMessage({ type: 'success', text: mode === 'weight' ? 'A növekvő súlysorrend mentése sikerült.' : 'A végleges sorrend mentése sikerült.' })
       await loadTieBreakers()
     } catch (error) {
       setMessage({ type: 'danger', text: error.message })
@@ -92,21 +121,26 @@ export default function TieBreakerManager({ competitionId = 3 }) {
       <div className="card-body p-3 p-md-4">
         <div className="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
           <div>
-            <h3 className="h4 mb-1">Hegymászás – döntetlenek súly alapján</h3>
-            <p className="text-muted mb-0">Írd be a csapatok súlyát. A kisebb súly automatikusan előrébb kerül.</p>
+            <h3 className="h4 mb-1">{competitionLabel} – döntetlenek</h3>
+            <p className="text-muted mb-0">
+              {mode === 'weight'
+                ? 'Írd be a csapatok súlyát. A kisebb súly automatikusan előrébb kerül.'
+                : 'Állítsd be a végleges sorrendet: az első helyre kerüljön a döntetlen győztese.'}
+            </p>
           </div>
           <button type="button" className="btn btn-outline-secondary btn-sm" onClick={loadTieBreakers} disabled={loading}>Frissítés</button>
         </div>
 
         {message && <div className={`alert alert-${message.type}`} role="status">{message.text}</div>}
         {loading && <div className="alert alert-info">Döntetlenek betöltése...</div>}
-        {!loading && pendingTieBreakers.length === 0 && <div className="alert alert-success">Nincs eldöntésre váró hegymászás-döntetlen.</div>}
+        {!loading && pendingTieBreakers.length === 0 && <div className="alert alert-success">Nincs eldöntésre váró döntetlen ennél a versenyszámnál.</div>}
 
         <div className="d-flex flex-column gap-3">
           {pendingTieBreakers.map((tieBreaker) => {
             const teams = parseTeams(tieBreaker.teams)
             const hasAllWeights = teams.every((teamName) => weights[tieBreaker.id]?.[teamName] !== '' && weights[tieBreaker.id]?.[teamName] !== undefined)
             const rankedTeams = hasAllWeights ? getRankedTeams(tieBreaker) : []
+            const manualRanking = manualRankings[tieBreaker.id] || teams
 
             return (
               <div className="team-info-box" key={tieBreaker.id}>
@@ -114,7 +148,7 @@ export default function TieBreakerManager({ competitionId = 3 }) {
                   <h4 className="h5 mb-0">Döntetlen #{tieBreaker.id}</h4>
                   <span className="badge text-bg-warning">{teams.length} csapat</span>
                 </div>
-                <div className="row g-3">
+                {mode === 'weight' ? <div className="row g-3">
                   {teams.map((teamName) => (
                     <div className="col-md-6 col-xl-4" key={teamName}>
                       <label className="form-label fw-semibold" htmlFor={`weight-${tieBreaker.id}-${teamName}`}>{teamName} súlya</label>
@@ -133,9 +167,21 @@ export default function TieBreakerManager({ competitionId = 3 }) {
                       </div>
                     </div>
                   ))}
-                </div>
+                </div> : (
+                  <ol className="list-group list-group-numbered">
+                    {manualRanking.map((teamName, index) => (
+                      <li className="list-group-item d-flex justify-content-between align-items-center gap-2" key={teamName}>
+                        <span className="ms-2 fw-semibold flex-grow-1">{teamName}</span>
+                        <div className="btn-group btn-group-sm">
+                          <button type="button" className="btn btn-outline-secondary" disabled={index === 0} onClick={() => moveTeam(tieBreaker.id, index, -1)}>↑</button>
+                          <button type="button" className="btn btn-outline-secondary" disabled={index === manualRanking.length - 1} onClick={() => moveTeam(tieBreaker.id, index, 1)}>↓</button>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                )}
 
-                {rankedTeams.length > 0 && (
+                {mode === 'weight' && rankedTeams.length > 0 && (
                   <div className="mt-4">
                     <h5 className="h6">Automatikus növekvő sorrend</h5>
                     <ol className="list-group list-group-numbered">
@@ -151,7 +197,7 @@ export default function TieBreakerManager({ competitionId = 3 }) {
 
                 <div className="d-flex justify-content-end mt-3">
                   <button type="button" className="btn btn-primary" onClick={() => resolveTieBreaker(tieBreaker)} disabled={savingId === tieBreaker.id}>
-                    {savingId === tieBreaker.id ? 'Mentés...' : 'Növekvő sorrend mentése'}
+                    {savingId === tieBreaker.id ? 'Mentés...' : mode === 'weight' ? 'Növekvő sorrend mentése' : 'Végleges sorrend mentése'}
                   </button>
                 </div>
               </div>

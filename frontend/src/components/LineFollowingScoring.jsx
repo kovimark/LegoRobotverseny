@@ -533,7 +533,7 @@ export default function LineFollowingScoring() {
     const time = Number(result.time)
     const stage = Number(result.stage)
 
-    if (!result.teamName || !Number.isFinite(time) || !Number.isInteger(time) || !Number.isFinite(stage)) {
+    if (!result.teamName || !Number.isFinite(time) || time <= 0 || !Number.isFinite(stage)) {
       setActionMessage({ type: 'danger', text: 'Az eredmény törléséhez hiányos vagy hibás adat tartozik.' })
       setResultToDelete(null)
       return
@@ -745,7 +745,7 @@ export default function LineFollowingScoring() {
                   id="line-result-time"
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="0.001"
                   inputMode="decimal"
                   className="form-control"
                   value={resultTime}
@@ -863,7 +863,7 @@ export default function LineFollowingScoring() {
                                 <input
                                   type="number"
                                   min="0"
-                                  step="0.01"
+                                  step="0.001"
                                   inputMode="decimal"
                                   className="form-control form-control-sm scoring-number-input"
                                   value={entry.firstTime}
@@ -877,7 +877,7 @@ export default function LineFollowingScoring() {
                                 <input
                                   type="number"
                                   min="0"
-                                  step="0.01"
+                                  step="0.001"
                                   inputMode="decimal"
                                   className="form-control form-control-sm scoring-number-input"
                                   value={entry.secondTime}
