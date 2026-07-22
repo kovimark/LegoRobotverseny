@@ -191,6 +191,8 @@ export default function HillClimbingScoring() {
                       <label className="form-label mb-1">Elért szint</label>
                       <input
                         type="number"
+                        min="0"
+                        step="1"
                         className="form-control form-control-sm scoring-number-input"
                         value={completedLevel}
                         onFocus={(event) => event.target.select()}
@@ -202,6 +204,9 @@ export default function HillClimbingScoring() {
                       <label className="form-label mb-1">Eltöltött idő</label>
                       <input
                         type="number"
+                        min="0"
+                        step="0.001"
+                        inputMode="decimal"
                         className="form-control form-control-sm scoring-number-input"
                         value={timeSpent}
                         onFocus={(event) => event.target.select()}

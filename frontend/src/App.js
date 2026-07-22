@@ -13,6 +13,10 @@ import Navbar from './components/Navbar';
 import LoginPage from './pages/LoginPage';
 import PrivilegeManagementPage from './pages/PrivilegeManagementPage';
 import MyTeamsPage from './pages/MyTeamsPage';
+import MessageManagementPage from './pages/MessageManagementPage';
+import SettingsManagementPage from './pages/SettingsManagementPage';
+import NewsPage from './pages/NewsPage';
+import NewsDetailsPage from './pages/NewsDetailsPage';
 import { auth, googleProvider } from './firebase';
 import { isJudgePrivilege } from './config/privilegeConfig';
 
@@ -130,11 +134,15 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/versenyjelentkezes" element={<CompetitionRegistration user={user} />} />
         <Route path="/szabalyzat" element={<RulesPage />} />
+        <Route path="/hirek" element={<NewsPage />} />
+        <Route path="/hirek/:messageId" element={<NewsDetailsPage />} />
         <Route path="/allasok" element={<StandingsPage />} />
         <Route path="/csapat/:teamName" element={<TeamDetailsPage />} />
         <Route path="/sajat-csapataim" element={user ? <MyTeamsPage user={user} /> : <LoginPage user={user} authLoading={authLoading} authError={authError} onGoogleSignIn={handleGoogleSignIn} onSignOut={handleSignOut} />} />
         <Route path="/admin" element={userRole === 'admin' ? <AdminPage /> : <HomePage />} />
         <Route path="/admin/jogosultsagok" element={userRole === 'admin' ? <PrivilegeManagementPage /> : <HomePage />} />
+        <Route path="/admin/uzenetek" element={userRole === 'admin' ? <MessageManagementPage /> : <HomePage />} />
+        <Route path="/admin/beallitasok" element={userRole === 'admin' ? <SettingsManagementPage /> : <HomePage />} />
         <Route path="/admin/pontozas" element={userRole === 'admin' || userRole === 'judge' ? <AdminScoringPage userPrivilege={userPrivilege} /> : <HomePage />} />
         <Route path="/admin/pontozas/:competitionType" element={userRole === 'admin' || userRole === 'judge' ? <AdminScoringPage userPrivilege={userPrivilege} /> : <HomePage />} />
         <Route

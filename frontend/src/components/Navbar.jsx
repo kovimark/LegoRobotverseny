@@ -105,6 +105,12 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                                     <Link className="btn btn-outline-primary w-100" to="/admin/jogosultsagok" onClick={() => setIsProfileOpen(false)}>
                                         E-mailek és jogosultságok kezelése
                                     </Link>
+                                    <Link className="btn btn-outline-primary w-100" to="/admin/uzenetek" onClick={() => setIsProfileOpen(false)}>
+                                        Üzenetek kezelése
+                                    </Link>
+                                    <Link className="btn btn-outline-primary w-100" to="/admin/beallitasok" onClick={() => setIsProfileOpen(false)}>
+                                        Versenybeállítások
+                                    </Link>
                                 </div>
                             ) : userRole === 'judge' ? (
                                 <Link className="btn btn-outline-primary w-100" to="/admin/pontozas" onClick={() => setIsProfileOpen(false)}>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { getPrivilegeLabel, privilegeOptions } from '../config/privilegeConfig'
+import ConfirmModal from '../components/ConfirmModal'
 
 const API_URL = 'https://legocompetition.runasp.net/api/Privilege'
 
@@ -11,6 +12,7 @@ export default function PrivilegeManagementPage() {
   const [newRole, setNewRole] = useState(0)
   const [savingId, setSavingId] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   const normalizedSearch = searchTerm.trim().toLowerCase()
   const filteredPrivileges = privileges.filter((privilege) => (
@@ -41,6 +43,7 @@ export default function PrivilegeManagementPage() {
 
   const savePrivilege = async (privilege) => {
     const role = Number(privilege.privilege1)
+    const isNewPrivilege = !Number(privilege.id)
     const payload = {
       id: Number(privilege.id) || 0,
       emailAddress: privilege.emailAddress.trim().toLowerCase(),
@@ -56,7 +59,7 @@ export default function PrivilegeManagementPage() {
     try {
       setSavingId(privilege.id || 'new')
       const response = await fetch(API_URL, {
-        method: 'PUT',
+        method: isNewPrivilege ? 'POST' : 'PUT',
         headers: { accept: '*/*', 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
@@ -64,7 +67,12 @@ export default function PrivilegeManagementPage() {
         const errorText = await response.text()
         throw new Error(errorText || 'A jogosultság mentése nem sikerült.')
       }
-      setMessage({ type: 'success', text: `${payload.emailAddress} jogosultsága mentve: ${getPrivilegeLabel(role)}.` })
+      setMessage({
+        type: 'success',
+        text: isNewPrivilege
+          ? `${payload.emailAddress} sikeresen hozzáadva: ${getPrivilegeLabel(role)}.`
+          : `${payload.emailAddress} jogosultsága mentve: ${getPrivilegeLabel(role)}.`
+      })
       setNewEmail('')
       setNewRole(0)
       await loadPrivileges()
@@ -76,16 +84,18 @@ export default function PrivilegeManagementPage() {
   }
 
   const deletePrivilege = async (privilege) => {
-    if (!window.confirm(`Biztosan törlöd ezt az e-mail-címet?\n${privilege.emailAddress}`)) return
-
     try {
       setSavingId(privilege.id)
-      const response = await fetch(`${API_URL}/${privilege.id}`, { method: 'DELETE', headers: { accept: '*/*' } })
+      const response = await fetch(`${API_URL}/${encodeURIComponent(privilege.emailAddress)}`, {
+        method: 'DELETE',
+        headers: { accept: '*/*' }
+      })
       if (!response.ok) {
         const errorText = await response.text()
         throw new Error(errorText || 'A jogosultság törlése nem sikerült.')
       }
       setPrivileges((current) => current.filter((item) => item.id !== privilege.id))
+      setDeleteTarget(null)
       setMessage({ type: 'success', text: 'Az e-mail-cím törölve lett.' })
     } catch (error) {
       setMessage({ type: 'danger', text: error.message })
@@ -159,7 +169,7 @@ export default function PrivilegeManagementPage() {
                 </select>
                 <div className="d-flex gap-2 mt-auto">
                   <button type="button" className="btn btn-primary flex-grow-1" disabled={savingId === privilege.id} onClick={() => savePrivilege(privilege)}>Mentés</button>
-                  <button type="button" className="btn btn-outline-danger" disabled={savingId === privilege.id} onClick={() => deletePrivilege(privilege)}>Törlés</button>
+                  <button type="button" className="btn btn-outline-danger" disabled={savingId === privilege.id} onClick={() => setDeleteTarget(privilege)}>Törlés</button>
                 </div>
               </section>
             </div>
@@ -171,6 +181,17 @@ export default function PrivilegeManagementPage() {
           )}
         </div>
       )}
+      <ConfirmModal
+        open={Boolean(deleteTarget)}
+        title="Jogosultság törlése"
+        confirmLabel="E-mail-cím törlése"
+        busy={Boolean(deleteTarget && savingId === deleteTarget.id)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => deletePrivilege(deleteTarget)}
+      >
+        <p className="mb-2">Biztosan törlöd ezt az e-mail-címet és a hozzá tartozó jogosultságot?</p>
+        <strong>{deleteTarget?.emailAddress}</strong>
+      </ConfirmModal>
     </div>
   )
 }

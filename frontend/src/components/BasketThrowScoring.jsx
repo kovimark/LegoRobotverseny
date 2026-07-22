@@ -313,7 +313,7 @@ export default function BasketThrowScoring() {
                     id="basket-result-time"
                     type="number"
                     min="0"
-                    step="0.01"
+                    step="0.001"
                     inputMode="decimal"
                     className="form-control"
                     value={draft.time}

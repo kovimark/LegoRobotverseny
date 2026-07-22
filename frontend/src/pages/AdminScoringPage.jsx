@@ -6,7 +6,6 @@ import SumoScoring from '../components/SumoScoring'
 import HillClimbingScoring from '../components/HillClimbingScoring'
 import OverallStandings from '../components/OverallStandings'
 import TieBreakerManager from '../components/TieBreakerManager'
-import SumoScheduleSettings from '../components/SumoScheduleSettings'
 import { competitionTypes } from '../config/adminScoringConfig'
 import { judgeCompetitionByPrivilege } from '../config/privilegeConfig'
 
@@ -103,10 +102,7 @@ export default function AdminScoringPage({ userPrivilege }) {
       ) : activeCompetition.slug === 'vonalkovetes' ? (
         <LineFollowingScoring />
       ) : activeCompetition.slug === 'szumo' ? (
-        <>
-          <SumoScheduleSettings />
-          <SumoScoring />
-        </>
+        <SumoScoring />
       ) : activeCompetition.slug === 'hegymaszas' ? (
         <HillClimbingScoring />
       ) : activeCompetition.slug === 'osszesitett' ? (
