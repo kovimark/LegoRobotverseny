@@ -15,6 +15,7 @@ import {
   saveMessage,
   toLocalDateTimeInput
 } from '../services/messageBoardApi'
+import { getNotificationTeams, sendNotificationToTeam } from '../services/notificationApi'
 
 const emptyDraft = { title: '', text: '', type: '', start: '', end: '', links: '' }
 
@@ -39,6 +40,10 @@ export default function MessageManagementPage() {
   const [managedLinkError, setManagedLinkError] = useState('')
   const [linkDeleteIndex, setLinkDeleteIndex] = useState(null)
   const [confirmAction, setConfirmAction] = useState(null)
+  const [notificationTeams, setNotificationTeams] = useState([])
+  const [notificationMode, setNotificationMode] = useState('none')
+  const [notificationTeamIds, setNotificationTeamIds] = useState([])
+  const [notificationTeamSearch, setNotificationTeamSearch] = useState('')
   const messageTextRef = useRef(null)
   const messageFormRef = useRef(null)
 
@@ -52,9 +57,10 @@ export default function MessageManagementPage() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [messageData, typeData] = await Promise.all([getMessages(), getMessageTypes()])
+      const [messageData, typeData, teamData] = await Promise.all([getMessages(), getMessageTypes(), getNotificationTeams()])
       setMessages(messageData)
       setTypes(typeData)
+      setNotificationTeams(teamData)
       setDraft((current) => ({ ...current, type: current.type || typeData[0]?.name || '' }))
     } catch (error) {
       setStatus({ type: 'danger', text: error.message })
@@ -66,6 +72,10 @@ export default function MessageManagementPage() {
   useEffect(() => { loadData() }, [])
   const updateDraft = (name, value) => setDraft((current) => ({ ...current, [name]: value }))
   const draftLinkLines = getMessageLinkLines(draft.links)
+  const filteredNotificationTeams = notificationTeams.filter((team) => {
+    const term = notificationTeamSearch.trim().toLocaleLowerCase('hu-HU')
+    return !term || `${team.teamName || ''} ${team.schoolName || ''}`.toLocaleLowerCase('hu-HU').includes(term)
+  })
 
   const openLinkTool = () => {
     const input = messageTextRef.current
@@ -145,11 +155,41 @@ export default function MessageManagementPage() {
       setManagedLinkError(`Hibás link: ${invalidLink}`)
       return
     }
+    if (!draft.id && notificationMode === 'selected' && notificationTeamIds.length === 0) {
+      setStatus({ type: 'danger', text: 'Válassz ki legalább egy csapatot az értesítéshez.' })
+      return
+    }
     try {
       setSaving(true)
+      const isNewMessage = !draft.id
       await saveMessage(draft)
-      setStatus({ type: 'success', text: draft.id ? 'Az üzenet módosítva.' : 'Az üzenet létrehozva.' })
+      let notificationText = ''
+      if (isNewMessage && notificationMode !== 'none') {
+        const recipientIds = notificationMode === 'all'
+          ? notificationTeams.map((team) => team.id)
+          : notificationTeamIds
+        const plainMessage = draft.text
+          .replace(/\[([^\]]+)]\(link:\d+\)/g, '$1')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 500)
+        const failedTeams = []
+        for (const teamId of recipientIds) {
+          try {
+            await sendNotificationToTeam(teamId, { title: draft.title.trim(), message: plainMessage })
+          } catch {
+            failedTeams.push(teamId)
+          }
+        }
+        notificationText = failedTeams.length > 0
+          ? ` Az értesítés ${recipientIds.length - failedTeams.length} csapatnak elküldve, ${failedTeams.length} csapatnál sikertelen.`
+          : ` Az értesítés ${recipientIds.length} csapatnak elküldve.`
+      }
+      setStatus({ type: 'success', text: `${draft.id ? 'Az üzenet módosítva.' : 'Az üzenet létrehozva.'}${notificationText}` })
       setDraft({ ...emptyDraft, type: types[0]?.name || '' })
+      setNotificationMode('none')
+      setNotificationTeamIds([])
+      setNotificationTeamSearch('')
       await loadData()
     } catch (error) {
       setStatus({ type: 'danger', text: error.message })
@@ -281,6 +321,24 @@ export default function MessageManagementPage() {
             </div>
             <div className="col-md-6"><label className="form-label" htmlFor="message-start">Kezdés (magyar idő, opcionális)</label><input id="message-start" type="datetime-local" className="form-control" value={draft.start} onChange={(event) => updateDraft('start', event.target.value)} /><div className="form-text">Üresen hagyva a mentés aktuális időpontja lesz.</div></div>
             <div className="col-md-6"><label className="form-label" htmlFor="message-end">Befejezés (magyar idő, opcionális)</label><input id="message-end" type="datetime-local" className="form-control" value={draft.end} onChange={(event) => updateDraft('end', event.target.value)} /></div>
+            {!draft.id && <div className="col-12">
+              <section className="message-notification-options">
+                <h4 className="h6 mb-2">Push értesítés a közzétételről</h4>
+                <div className="d-flex flex-wrap gap-3">
+                  <label className="form-check"><input className="form-check-input" type="radio" name="notification-mode" value="none" checked={notificationMode === 'none'} onChange={(event) => setNotificationMode(event.target.value)} /><span className="form-check-label">Ne küldjön értesítést</span></label>
+                  <label className="form-check"><input className="form-check-input" type="radio" name="notification-mode" value="all" checked={notificationMode === 'all'} onChange={(event) => setNotificationMode(event.target.value)} /><span className="form-check-label">Minden csapatnak</span></label>
+                  <label className="form-check"><input className="form-check-input" type="radio" name="notification-mode" value="selected" checked={notificationMode === 'selected'} onChange={(event) => setNotificationMode(event.target.value)} /><span className="form-check-label">Kiválasztott csapatoknak</span></label>
+                </div>
+                {notificationMode === 'selected' && <div className="mt-3">
+                  <input type="search" className="form-control mb-2" placeholder="Csapat vagy iskola keresése…" value={notificationTeamSearch} onChange={(event) => setNotificationTeamSearch(event.target.value)} />
+                  <div className="notification-team-grid">
+                    {filteredNotificationTeams.map((team) => <label className={`notification-team-option ${notificationTeamIds.includes(team.id) ? 'selected' : ''}`} key={team.id}><input type="checkbox" checked={notificationTeamIds.includes(team.id)} onChange={() => setNotificationTeamIds((current) => current.includes(team.id) ? current.filter((id) => id !== team.id) : [...current, team.id])} /><span><strong>{team.teamName || `Csapat #${team.id}`}</strong><small>{team.schoolName || 'Nincs megadott iskola'}</small></span></label>)}
+                  </div>
+                  <div className="form-text">{notificationTeamIds.length} csapat kijelölve.</div>
+                </div>}
+                {notificationMode !== 'none' && <div className="form-text mt-2">Az értesítés a mentéskor azonnal kimegy. Címe a hír címe, tartalma a hír szövege lesz.</div>}
+              </section>
+            </div>}
             <div className="col-12 text-end"><button className="btn btn-primary" disabled={saving || types.length === 0}>{saving ? 'Mentés...' : 'Üzenet mentése'}</button></div>
           </div>
         </div>

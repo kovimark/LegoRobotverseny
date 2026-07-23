@@ -1475,6 +1475,38 @@ form {
 .competition-status-loading, .competition-status-error { margin-bottom: 1.5rem; padding: 1rem; font-weight: 700; }
 .competition-status-error { background: #ffd8dc; }
 
+.notification-team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: .75rem;
+}
+
+.notification-team-option {
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  border: 2px solid #adb5bd;
+  border-radius: .55rem;
+  padding: .9rem;
+  background: var(--white);
+  cursor: pointer;
+  transition: transform .15s ease, background .15s ease, border-color .15s ease;
+}
+
+.notification-team-option:hover { transform: translateY(-2px); border-color: var(--black); }
+.notification-team-option.selected { border-color: var(--black); background: rgba(253, 231, 76, .3); }
+.notification-team-option input { margin-top: .25rem; }
+.notification-team-option span { min-width: 0; }
+.notification-team-option strong, .notification-team-option small { display: block; overflow-wrap: anywhere; }
+.notification-team-option small { margin-top: .2rem; color: #6c757d; }
+
+.message-notification-options {
+  border: 2px solid var(--black);
+  border-radius: .55rem;
+  background: rgba(91, 192, 235, .1);
+  padding: 1rem;
+}
+
 @media (max-width: 767.98px) {
   .competition-status-main { align-items: stretch; flex-direction: column; }
   .competition-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1597,6 +1629,21 @@ form {
   transform: translateX(110%);
   transition: transform 0.25s ease;
   text-align: left;
+  overflow-y: auto;
+}
+
+.profile-notification-status {
+  display: grid;
+  gap: .75rem;
+  border: 2px solid var(--black);
+  border-radius: .45rem;
+  background: rgba(255, 255, 255, .9);
+  padding: .85rem;
+}
+
+.profile-notification-status small {
+  color: #6c757d;
+  font-weight: 600;
 }
 
 .profile-drawer.open {

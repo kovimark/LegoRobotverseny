@@ -17,8 +17,10 @@ import MessageManagementPage from './pages/MessageManagementPage';
 import SettingsManagementPage from './pages/SettingsManagementPage';
 import NewsPage from './pages/NewsPage';
 import NewsDetailsPage from './pages/NewsDetailsPage';
+import NotificationManagementPage from './pages/NotificationManagementPage';
 import { auth, googleProvider } from './firebase';
 import { isJudgePrivilege } from './config/privilegeConfig';
+import { subscribeTeamsToPush } from './services/notificationApi';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -79,6 +81,35 @@ function App() {
 
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (!user?.email || userRole !== 'competitor') return undefined;
+
+    const controller = new AbortController();
+    const subscribeCurrentCompetitor = async () => {
+      try {
+        if (window.localStorage.getItem('robotverseny_push_disabled') === 'true') return;
+        if ('Notification' in window && Notification.permission === 'denied') return;
+        const response = await fetch(
+          `https://legocompetition.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`,
+          { headers: { accept: '*/*' }, signal: controller.signal }
+        );
+        if (!response.ok) return;
+        const teams = await response.json();
+        const teamIds = Array.isArray(teams)
+          ? [...new Set(teams.map((team) => team.id).filter((id) => id !== null && id !== undefined))]
+          : [];
+        if (!controller.signal.aborted && teamIds.length > 0) await subscribeTeamsToPush(teamIds);
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.warn('Az automatikus értesítés-feliratkozás nem sikerült:', error.message);
+        }
+      }
+    };
+
+    subscribeCurrentCompetitor();
+    return () => controller.abort();
+  }, [user?.email, userRole]);
 
   const handleGoogleSignIn = async () => {
     setAuthError('');
@@ -142,6 +173,7 @@ function App() {
         <Route path="/admin" element={userRole === 'admin' ? <AdminPage /> : <HomePage />} />
         <Route path="/admin/jogosultsagok" element={userRole === 'admin' ? <PrivilegeManagementPage /> : <HomePage />} />
         <Route path="/admin/uzenetek" element={userRole === 'admin' ? <MessageManagementPage /> : <HomePage />} />
+        <Route path="/admin/ertesitesek" element={userRole === 'admin' ? <NotificationManagementPage /> : <HomePage />} />
         <Route path="/admin/beallitasok" element={userRole === 'admin' || userRole === 'judge' ? <SettingsManagementPage groupOnly={userRole === 'judge'} /> : <HomePage />} />
         <Route path="/admin/pontozas" element={userRole === 'admin' || userRole === 'judge' ? <AdminScoringPage userPrivilege={userPrivilege} /> : <HomePage />} />
         <Route path="/admin/pontozas/:competitionType" element={userRole === 'admin' || userRole === 'judge' ? <AdminScoringPage userPrivilege={userPrivilege} /> : <HomePage />} />

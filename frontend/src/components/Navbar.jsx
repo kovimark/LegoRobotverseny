@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import './Navbar.css'
 import React, { useState } from 'react'
+import ProfileNotificationStatus from './ProfileNotificationStatus'
 
 export default function Navbar({ user, userRole, userPrivilege, authLoading, authError, onGoogleSignIn, onSignOut }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -94,6 +95,7 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                         </div>
                         <div className="profile-drawer-content">
                             <p>Google fiókkal bejelentkezve.</p>
+                            <ProfileNotificationStatus user={user} />
                             {userRole === 'admin' || Number(userPrivilege) === 1 ? (
                                 <div className="d-grid gap-2">
                                     <Link className="btn btn-outline-primary w-100" to="/admin" onClick={() => setIsProfileOpen(false)}>
@@ -107,6 +109,9 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                                     </Link>
                                     <Link className="btn btn-outline-primary w-100" to="/admin/uzenetek" onClick={() => setIsProfileOpen(false)}>
                                         Üzenetek kezelése
+                                    </Link>
+                                    <Link className="btn btn-outline-primary w-100" to="/admin/ertesitesek" onClick={() => setIsProfileOpen(false)}>
+                                        Értesítések küldése
                                     </Link>
                                     <Link className="btn btn-outline-primary w-100" to="/admin/beallitasok" onClick={() => setIsProfileOpen(false)}>
                                         Versenybeállítások

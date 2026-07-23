@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import CompetitionStatusPanel from '../components/CompetitionStatusPanel'
+import FloatingFeedback from '../components/FloatingFeedback'
+import { getCurrentPushSubscription, subscribeTeamsToPush } from '../services/notificationApi'
 
 export default function MyTeamsPage({ user }) {
   const [teams, setTeams] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushLoading, setPushLoading] = useState(false)
+  const [pushFeedback, setPushFeedback] = useState(null)
 
   useEffect(() => {
     if (!user?.email) {
@@ -55,14 +60,55 @@ export default function MyTeamsPage({ user }) {
     return () => controller.abort()
   }, [user?.email])
 
+  useEffect(() => {
+    getCurrentPushSubscription()
+      .then((subscription) => setPushEnabled(Boolean(subscription)))
+      .catch(() => setPushEnabled(false))
+  }, [])
+
+  const enableNotifications = async () => {
+    if (teams.length === 0) {
+      setPushFeedback({ type: 'danger', text: 'Az értesítéshez előbb be kell tölteni a csapatodat.' })
+      return
+    }
+    try {
+      setPushLoading(true)
+      await subscribeTeamsToPush(teams.map((team) => team.id))
+      window.localStorage.removeItem('robotverseny_push_disabled')
+      setPushEnabled(true)
+      setPushFeedback({ type: 'success', text: 'Az értesítések sikeresen bekapcsolva ezen az eszközön.' })
+    } catch (pushError) {
+      setPushFeedback({ type: 'danger', text: pushError.message })
+    } finally {
+      setPushLoading(false)
+    }
+  }
+
   return (
     <div className="container py-4">
       <div className="mb-4">
         <h2 className="mb-1">Saját csapatom</h2>
         <p className="text-muted mb-0">A(z) {user?.email} e-mail-címhez tartozó csapatadatok és eredmények.</p>
       </div>
+      <FloatingFeedback message={pushFeedback} onClose={() => setPushFeedback(null)} />
 
       <CompetitionStatusPanel />
+
+      {!loading && teams.length > 0 && (
+        <section className="card shadow-sm team-card no-hover-card mb-4">
+          <div className="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+              <h3 className="h5 mb-1">Csapatértesítések</h3>
+              <p className="text-muted mb-0">
+                {pushEnabled ? 'Az értesítések engedélyezve vannak ezen az eszközön.' : 'Kapj értesítést a csapatodnak küldött fontos információkról.'}
+              </p>
+            </div>
+            <button type="button" className={`btn ${pushEnabled ? 'btn-success' : 'btn-primary'}`} disabled={pushLoading || pushEnabled} onClick={enableNotifications}>
+              {pushLoading ? 'Bekapcsolás…' : pushEnabled ? 'Értesítések bekapcsolva' : 'Értesítések bekapcsolása'}
+            </button>
+          </div>
+        </section>
+      )}
 
       {loading && <div className="alert alert-info">Csapatok betöltése...</div>}
       {error && <div className="alert alert-danger">{error}</div>}
