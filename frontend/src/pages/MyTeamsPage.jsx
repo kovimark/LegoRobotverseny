@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import CompetitionStatusPanel from '../components/CompetitionStatusPanel'
 
 export default function MyTeamsPage({ user }) {
   const [teams, setTeams] = useState([])
@@ -60,6 +61,8 @@ export default function MyTeamsPage({ user }) {
         <h2 className="mb-1">Saját csapatom</h2>
         <p className="text-muted mb-0">A(z) {user?.email} e-mail-címhez tartozó csapatadatok és eredmények.</p>
       </div>
+
+      <CompetitionStatusPanel />
 
       {loading && <div className="alert alert-info">Csapatok betöltése...</div>}
       {error && <div className="alert alert-danger">{error}</div>}

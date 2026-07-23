@@ -56,7 +56,39 @@ const phasePayload = (phase) => ({
 })
 
 export const addCompetitionPhase = async (phase) => request('/addCompetitionPhase', { method: 'POST', body: JSON.stringify(phasePayload(phase)) })
-export const modifyCompetitionPhase = async (oldPhaseName, phase) => request(`/modifyPhase/${encodeURIComponent(oldPhaseName)}`, { method: 'PUT', body: JSON.stringify(phasePayload(phase)) })
+const putCompetitionPhase = async (oldPhaseName, phase) =>
+  request(`/modifyPhase/${encodeURIComponent(oldPhaseName)}`, {
+    method: 'PUT',
+    body: JSON.stringify(phasePayload(phase))
+  })
+
+export const modifyCompetitionPhase = async (oldPhaseName, phase) => {
+  try {
+    return await putCompetitionPhase(oldPhaseName, phase)
+  } catch (error) {
+    const unchangedName = oldPhaseName.trim().toLocaleLowerCase('hu-HU')
+      === phase.phaseName.trim().toLocaleLowerCase('hu-HU')
+    const duplicateNameError = /már létezik|already exists/i.test(error.message)
+    if (!unchangedName || !duplicateNameError) throw error
+
+    // A backend jelenleg a módosított rekord saját, változatlan nevét is
+    // névütközésnek veszi. Egy rövid, egyedi átnevezéssel elkerüljük ezt,
+    // majd ugyanabban a műveletben visszaállítjuk az eredeti nevet.
+    const temporaryName = `__phase_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+    await putCompetitionPhase(oldPhaseName, { ...phase, phaseName: temporaryName })
+    try {
+      return await putCompetitionPhase(temporaryName, phase)
+    } catch (restoreError) {
+      try {
+        await putCompetitionPhase(temporaryName, { ...phase, phaseName: oldPhaseName })
+      } catch {
+        // Az eredeti helyreállítási hibát adjuk tovább.
+      }
+      throw restoreError
+    }
+  }
+}
+export const deleteCompetitionPhase = async (phaseId) => request(`/deletePhase/${encodeURIComponent(phaseId)}`, { method: 'DELETE' })
 export const resetSettings = async () => request('/resetSettings', { method: 'DELETE' })
 export const resetEveryScore = async () => request('/resetEveryScore', { method: 'DELETE' })
 
