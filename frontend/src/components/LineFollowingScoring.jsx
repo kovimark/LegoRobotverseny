@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import FloatingFeedback from './FloatingFeedback'
+import CategorizedResultsStandings from './CategorizedResultsStandings'
 import { getCompetitionConfig } from '../config/adminScoringConfig'
 
 const competitionConfig = getCompetitionConfig('vonalkovetes')
@@ -191,6 +192,8 @@ export default function LineFollowingScoring() {
   const [displaySearchTerm, setDisplaySearchTerm] = useState('')
   const resultSearchInputRef = useRef(null)
   const [resultDropdownStyle, setResultDropdownStyle] = useState({})
+  const [allTeams, setAllTeams] = useState([])
+  const [ageGroupBreakdown, setAgeGroupBreakdown] = useState(false)
 
   useEffect(() => {
     const loadTeams = async () => {
@@ -198,16 +201,20 @@ export default function LineFollowingScoring() {
       setError('')
 
       try {
-        const [response, lineFollowingTeamNamesResponse, teamNamesResponse] = await Promise.all([
+        const [response, lineFollowingTeamNamesResponse, teamNamesResponse, allTeamsResponse, settingsResponse] = await Promise.all([
           fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`),
           fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/teamnames`),
-          fetch('https://legocompetition.runasp.net/api/Teams/teamnames')
+          fetch('https://legocompetition.runasp.net/api/Teams/teamnames'),
+          fetch('https://legocompetition.runasp.net/api/Teams'),
+          fetch('https://legocompetition.runasp.net/api/Settings/getAllSettings')
         ])
         if (!response.ok) throw new Error('Nem sikerült betölteni a csapatokat.')
 
         const data = await response.json()
         const lineFollowingTeamNamesData = lineFollowingTeamNamesResponse.ok ? await lineFollowingTeamNamesResponse.json() : []
         const teamNamesData = teamNamesResponse.ok ? await teamNamesResponse.json() : []
+        const allTeamsData = allTeamsResponse.ok ? await allTeamsResponse.json() : []
+        const settingsData = settingsResponse.ok ? await settingsResponse.json() : []
         const normalizedResults = Array.isArray(data)
           ? data.map(normalizeLineFollowingResult).filter(Boolean)
           : []
@@ -242,6 +249,9 @@ export default function LineFollowingScoring() {
         setRoundDrafts({})
         setRoundResults(createRoundResultsFromLineFollowingResults(normalizedResults))
         setOpenEntries({})
+        setAllTeams(Array.isArray(allTeamsData) ? allTeamsData : [])
+        const currentSettings = Array.isArray(settingsData) ? settingsData[0] : settingsData
+        setAgeGroupBreakdown(Number(currentSettings?.ageGroupBreakdown) === 1)
       } catch (err) {
         setError(err.message)
       } finally {
@@ -615,11 +625,32 @@ export default function LineFollowingScoring() {
     }
   })
 
+  const groupStageRound = rounds.find((round) => round.id === 'round-1')
+  const categoryByTeamName = new Map(allTeams.map((team) => [team.teamName || team.team_name, Number(team.category) === 1 ? 1 : 0]))
+  const rankedGroupEntries = groupStageRound
+    ? getUniqueAdvancingEntries(getRoundEntries(groupStageRound), Number.MAX_SAFE_INTEGER)
+    : []
+  const qualifierNames = new Set(ageGroupBreakdown
+    ? [0, 1].flatMap((category) => rankedGroupEntries.filter((entry) => categoryByTeamName.get(entry.team.team_name) === category).slice(0, 8).map((entry) => entry.team.team_name))
+    : rankedGroupEntries.slice(0, 16).map((entry) => entry.team.team_name))
+  const lineStandings = rankedGroupEntries.map((entry) => ({
+    teamName: entry.team.team_name,
+    time: entry.bestTime,
+    category: categoryByTeamName.get(entry.team.team_name) ?? 0,
+    isQualifier: qualifierNames.has(entry.team.team_name)
+  }))
+
   const createNextRound = async (round) => {
     const roundEntries = getRoundEntries(round)
     const uniqueTeamCount = new Set(round.teams.map((team) => team.team_name)).size
     const advancingCount = Math.min(uniqueTeamCount, Math.max(MIN_FINAL_TEAMS, round.advancingCount || getAdvancingCount(uniqueTeamCount)))
-    const advancingEntries = getUniqueAdvancingEntries(roundEntries, advancingCount)
+    const isGroupStage = getStageValueFromRoundId(round.id) === 1
+    const rankedEntries = getUniqueAdvancingEntries(roundEntries, Number.MAX_SAFE_INTEGER)
+    const advancingEntries = isGroupStage
+      ? ageGroupBreakdown
+        ? [0, 1].flatMap((category) => rankedEntries.filter((entry) => categoryByTeamName.get(entry.team.team_name) === category).slice(0, 8))
+        : rankedEntries.slice(0, 16)
+      : getUniqueAdvancingEntries(roundEntries, advancingCount)
     const advancingTeamNames = advancingEntries.map((entry) => entry.team.team_name)
 
     if (advancingTeamNames.length < MIN_FINAL_TEAMS) {
@@ -763,6 +794,8 @@ export default function LineFollowingScoring() {
           </div>
           </div>
 
+          <CategorizedResultsStandings title={`Vonalkövetés csoportköri tabellája – ${ageGroupBreakdown ? 'korosztályonként top 8 jut tovább' : 'top 16 jut tovább'}`} rows={lineStandings} getKey={(result) => result.teamName} columns={[{ key: 'team', label: 'Csapat', render: (result) => result.teamName }, { key: 'category', label: 'Korosztály', render: (result) => result.category === 1 ? 'Középiskolás' : 'Általános iskolás' }, { key: 'time', label: 'Legjobb idő', align: 'end', render: (result) => `${result.time} s` }, { key: 'qualifier', label: 'Továbbjutás', render: (result) => result.isQualifier ? <span className="badge text-bg-success">Továbbjutó</span> : '-' }]} />
+
           <div className="mb-3">
             <label className="form-label" htmlFor="line-display-search">Eredmények keresése</label>
             <input
@@ -807,7 +840,13 @@ export default function LineFollowingScoring() {
           const uniqueRoundTeamNames = Array.from(new Set(round.teams.map((team) => team.team_name)))
           const uniqueRoundTeamCount = uniqueRoundTeamNames.length
           const advancingCount = Math.min(uniqueRoundTeamCount, Math.max(MIN_FINAL_TEAMS, round.advancingCount || getAdvancingCount(uniqueRoundTeamCount)))
-          const advancingTeams = getUniqueAdvancingEntries(roundEntries, advancingCount)
+          const isGroupStageRound = getStageValueFromRoundId(round.id) === 1
+          const rankedRoundEntries = getUniqueAdvancingEntries(roundEntries, Number.MAX_SAFE_INTEGER)
+          const advancingTeams = isGroupStageRound
+            ? ageGroupBreakdown
+              ? [0, 1].flatMap((category) => rankedRoundEntries.filter((entry) => categoryByTeamName.get(entry.team.team_name) === category).slice(0, 8))
+              : rankedRoundEntries.slice(0, 16)
+            : getUniqueAdvancingEntries(roundEntries, advancingCount)
           const roundComplete = uniqueRoundTeamNames.every((teamName) => roundEntries.some((entry) => entry.team.team_name === teamName && entry.bestTime !== ''))
           const isFinalRound = uniqueRoundTeamCount <= MIN_FINAL_TEAMS
           const isRoundClosed = closedRoundIds.includes(round.id)
@@ -952,10 +991,9 @@ export default function LineFollowingScoring() {
 
                   {canAdvance && (
                     <div className="d-flex flex-column align-items-start align-items-md-end gap-2">
-                      <label className="form-label mb-0 fw-semibold" htmlFor={`advancing-count-${round.id}`}>
+                      {isGroupStageRound ? <><div className="fw-semibold">{ageGroupBreakdown ? 'Korosztályonként a legjobb 8 jut tovább' : 'Az összesített legjobb 16 jut tovább'}</div><div className="text-muted small">A létszám a versenybeállítás alapján automatikus.</div></> : <><label className="form-label mb-0 fw-semibold" htmlFor={`advancing-count-${round.id}`}>
                         Hány csapat jut tovább
-                      </label>
-                      <input
+                      </label><input
                         id={`advancing-count-${round.id}`}
                         type="number"
                         min={MIN_FINAL_TEAMS}
@@ -966,8 +1004,7 @@ export default function LineFollowingScoring() {
                         onFocus={(event) => event.target.select()}
                         onClick={(event) => event.target.select()}
                         onChange={(event) => handleAdvancingCountChange(round.id, event.target.value, uniqueRoundTeamCount)}
-                      />
-                      <div className="text-muted small">A következő körbe ennyi legjobb csapat megy tovább.</div>
+                      /><div className="text-muted small">A következő körbe ennyi legjobb csapat megy tovább.</div></>}
                       <button type="button" className="btn btn-outline-primary" onClick={() => createNextRound(round)} disabled={!roundComplete}>
                         Következő kör létrehozása
                       </button>

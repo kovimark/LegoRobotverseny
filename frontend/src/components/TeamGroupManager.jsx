@@ -37,7 +37,10 @@ export default function TeamGroupManager() {
       const data = await response.json()
       const list = Array.isArray(data) ? data : []
       setTeams(list)
-      setDraftGroups(Object.fromEntries(list.map((team) => [team.id, String(team.group || '').toUpperCase()])))
+      setDraftGroups(Object.fromEntries(list.map((team) => {
+        const group = String(team.group || '').trim().toUpperCase()
+        return [team.id, GROUP_OPTIONS.includes(group) ? group : '']
+      })))
     } catch (error) { setFeedback({ type: 'danger', text: error.message }) }
     finally { setLoading(false) }
   }

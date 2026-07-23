@@ -193,7 +193,7 @@ export default function AdminPage() {
       return result
     }, {
       category: getCategory(teamToEdit.teamMember1Class, teamToEdit.teamMember2Class),
-      group: teamToEdit.group || null
+      group: teamToEdit.group || '-'
     })
 
     payload.teamMember1Class = Number(teamToEdit.teamMember1Class)

@@ -989,6 +989,88 @@ form {
   width: min(100%, 360px);
 }
 
+.competition-schedule {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.competition-schedule-item {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1.25rem;
+  min-height: 78px;
+  padding: 1rem 1.15rem;
+  border: 1px solid #c7c7c7;
+  border-left: 5px solid var(--black);
+  border-radius: 0.55rem;
+  background: var(--white);
+  box-shadow: 0 0.15rem 0.5rem rgba(0, 0, 0, 0.08);
+}
+
+.competition-schedule-item.active {
+  border-left-color: #177245;
+  background: #eefaf3;
+}
+
+.competition-schedule-time {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: #444;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.competition-schedule-content {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.competition-schedule-content h4 {
+  overflow-wrap: anywhere;
+}
+
+.competition-schedule-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.schedule-shift-panel {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid #d6b656;
+  border-radius: 0.6rem;
+  background: #fff9e6;
+}
+
+.schedule-shift-control {
+  width: min(100%, 330px);
+}
+
+@media (max-width: 767.98px) {
+  .competition-schedule-item {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .competition-schedule-actions {
+    justify-content: flex-start;
+  }
+
+  .schedule-shift-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 .message-link-number {
   min-width: 1.6rem;
   font-weight: 800;

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import FloatingFeedback from './FloatingFeedback'
+import CategorizedResultsStandings from './CategorizedResultsStandings'
 import { getCompetitionConfig } from '../config/adminScoringConfig'
 
 const competitionConfig = getCompetitionConfig('kosarra-dobas')
@@ -50,6 +51,7 @@ export default function BasketThrowScoring() {
   const [resultToDelete, setResultToDelete] = useState(null)
   const [openTeamName, setOpenTeamName] = useState(null)
   const [sortBy, setSortBy] = useState('name')
+  const [allTeams, setAllTeams] = useState([])
 
   const refreshResults = async () => {
     const response = await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`)
@@ -69,9 +71,10 @@ export default function BasketThrowScoring() {
       setError('')
 
       try {
-        const [resultsResponse, teamNamesResponse] = await Promise.all([
+        const [resultsResponse, teamNamesResponse, allTeamsResponse] = await Promise.all([
           fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`),
-          fetch('https://legocompetition.runasp.net/api/Teams/teamnames')
+          fetch('https://legocompetition.runasp.net/api/Teams/teamnames'),
+          fetch('https://legocompetition.runasp.net/api/Teams')
         ])
 
         if (!resultsResponse.ok) {
@@ -84,6 +87,7 @@ export default function BasketThrowScoring() {
 
         const resultsData = await resultsResponse.json()
         const teamNamesData = await teamNamesResponse.json()
+        const allTeamsData = allTeamsResponse.ok ? await allTeamsResponse.json() : []
         const normalizedResults = Array.isArray(resultsData)
           ? resultsData.map(normalizeResult).filter((result) => result.team_name)
           : []
@@ -93,6 +97,7 @@ export default function BasketThrowScoring() {
 
         setResults(normalizedResults)
         setTeamNames(Array.from(new Set(normalizedTeamNames)))
+        setAllTeams(Array.isArray(allTeamsData) ? allTeamsData : [])
       } catch (err) {
         setError(err.message)
       } finally {
@@ -351,6 +356,8 @@ export default function BasketThrowScoring() {
               </div>
             </div>
           </div>
+
+          <CategorizedResultsStandings title="Kosárra dobás eredménytáblája" rows={[...results].sort((left, right) => right.points - left.points || Number(left.time ?? Infinity) - Number(right.time ?? Infinity) || left.team_name.localeCompare(right.team_name)).map((result) => ({ ...result, category: Number(allTeams.find((team) => (team.teamName || team.team_name) === result.team_name)?.category) === 1 ? 1 : 0 }))} getKey={(result) => result.id} columns={[{ key: 'team', label: 'Csapat', render: (result) => result.team_name }, { key: 'points', label: 'Pont', align: 'end' }, { key: 'time', label: 'Idő', align: 'end', render: (result) => result.time == null ? '-' : `${result.time} s` }, ...HOOPS.map((hoop) => ({ key: `hoop${hoop}`, label: `${hoop}. kosár`, align: 'end' }))]} />
 
           <div className="d-flex justify-content-end mb-3">
             <div className="btn-group" role="group" aria-label="Rendezés">

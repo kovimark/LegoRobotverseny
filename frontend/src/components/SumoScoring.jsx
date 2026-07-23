@@ -364,6 +364,9 @@ export default function SumoScoring() {
   const [stageMode, setStageMode] = useState('group')
   const [selectedStage, setSelectedStage] = useState(ALL_STAGE_VALUE)
   const [minimumRounds, setMinimumRounds] = useState(4)
+  const [ageGroupBreakdown, setAgeGroupBreakdown] = useState(false)
+  const [competitionPhase, setCompetitionPhase] = useState('')
+  const [showCategoryStandings, setShowCategoryStandings] = useState(false)
   const [matchDrafts, setMatchDrafts] = useState({})
   const [openMatches, setOpenMatches] = useState({})
   const [actionMessage, setActionMessage] = useState(null)
@@ -380,6 +383,17 @@ export default function SumoScoring() {
     const applyConfiguration = (configuration) => {
       const value = Number(configuration?.minimumRounds)
       setMinimumRounds(Number.isInteger(value) && value > 0 ? value : 4)
+      setAgeGroupBreakdown(Number(configuration?.ageGroupBreakdown) === 1)
+      const phase = configuration?.competitionPhase || ''
+      setCompetitionPhase(phase)
+      const normalizedPhase = phase.toLocaleLowerCase('hu-HU')
+      if (normalizedPhase.includes('kies')) {
+        setStageMode('knockout')
+        setSelectedStage(KNOCKOUT_STAGES[0])
+      } else if (normalizedPhase.includes('csoport') || normalizedPhase.includes('alap') || normalizedPhase.includes('teszt')) {
+        setStageMode('group')
+        setSelectedStage(GROUP_STAGE)
+      }
     }
 
     loadSumoScheduleConfig().then(applyConfiguration).catch(() => applyConfiguration(null))
@@ -484,15 +498,38 @@ export default function SumoScoring() {
   const shouldSplitRoundGroupsByStage = selectedStage === ALL_STAGE_VALUE || stageMode === 'knockout'
   const roundGroups = useMemo(() => buildRoundGroups(stageMatches, shouldSplitRoundGroupsByStage), [stageMatches, shouldSplitRoundGroupsByStage])
   const standingsByName = useMemo(() => new Map(groupStandings.map((item) => [item.team_name, item])), [groupStandings])
+  const standingsSections = useMemo(() => {
+    if (!showCategoryStandings) return [{ key: 'all', label: '', standings: groupStandings }]
+    const categoryByTeamName = new Map(teams.map((team) => [team.name, team.category]))
+    return [
+      { key: 'primary', label: 'Általános iskolás', standings: groupStandings.filter((standing) => categoryByTeamName.get(standing.team_name) === 0) },
+      { key: 'secondary', label: 'Középiskolás', standings: groupStandings.filter((standing) => categoryByTeamName.get(standing.team_name) === 1) }
+    ]
+  }, [groupStandings, showCategoryStandings, teams])
   const isKnockoutView = stageMode === 'knockout' || isKnockoutStage(selectedStage)
   const hasKnockoutStarted = useMemo(
     () => matches.some((match) => isKnockoutStage(getMatchStage(match))),
     [matches]
   )
-  const finalWinnerName = useMemo(() => {
-    const finalMatch = matches.find((match) => getMatchStage(match) === 'F')
-    return finalMatch ? getKnockoutWinnerName(finalMatch) : null
-  }, [matches])
+  const finalWinnerNames = useMemo(() => {
+    const finalMatches = matches.filter((match) => getMatchStage(match) === 'F')
+    if (!ageGroupBreakdown) return finalMatches.map(getKnockoutWinnerName).filter(Boolean).slice(-1)
+    const activeCategories = [0, 1].filter((category) => teams.some((team) => team.category === category))
+    if (activeCategories.length <= 1) return finalMatches.map(getKnockoutWinnerName).filter(Boolean).slice(-1)
+    const crossCategoryFinal = finalMatches.find((match) => {
+      const team1 = teams.find((team) => team.name === match.team1Name)
+      const team2 = teams.find((team) => team.name === match.team2Name)
+      return team1 && team2 && team1.category !== team2.category
+    })
+    return crossCategoryFinal ? [getKnockoutWinnerName(crossCategoryFinal)].filter(Boolean) : []
+  }, [ageGroupBreakdown, matches, teams])
+  const isKnockoutComplete = useMemo(() => {
+    if (!hasKnockoutStarted) return false
+    if (!ageGroupBreakdown) return finalWinnerNames.length > 0
+    const activeCategories = [0, 1].filter((category) => teams.some((team) => team.category === category))
+    if (activeCategories.length > 1) return finalWinnerNames.length > 0
+    return matches.some((match) => getMatchStage(match) === 'F' && Boolean(getKnockoutWinnerName(match)))
+  }, [ageGroupBreakdown, finalWinnerNames, hasKnockoutStarted, matches, teams])
   const isGroupGenerationLocked = hasKnockoutStarted && (stageMode === 'group' || selectedStage === GROUP_STAGE)
 
   const nextRoundNumber = roundGroups.length > 0 ? Math.max(...roundGroups.map((round) => round.table)) + 1 : 1
@@ -566,94 +603,102 @@ export default function SumoScoring() {
   const generateKnockoutPairings = () => {
     const teamByName = new Map(teams.map((team) => [team.name, team]))
     const knockoutMatches = matches.filter((match) => isKnockoutStage(getMatchStage(match)))
-    const existingStages = KNOCKOUT_STAGES.filter((stage) => knockoutMatches.some((match) => getMatchStage(match) === stage))
+    const standingsByTeamName = new Map(groupStandings.map((item) => [item.team_name, item]))
+    const sortedTeams = teams.map((team) => ({
+      ...team,
+      points: standingsByTeamName.get(team.name)?.point ?? 0,
+      matchesPlayed: standingsByTeamName.get(team.name)?.rounds ?? 0
+    })).sort((left, right) => {
+      if (right.points !== left.points) return right.points - left.points
+      if (left.matchesPlayed !== right.matchesPlayed) return left.matchesPlayed - right.matchesPlayed
+      return left.name.localeCompare(right.name)
+    })
+    const pools = ageGroupBreakdown
+      ? [0, 1].map((category) => ({ category, teams: sortedTeams.filter((team) => team.category === category) }))
+      : [{ category: null, teams: sortedTeams }]
+    const generatedPairings = []
+    const poolRepresentatives = []
+    let unfinishedStage = false
+    let hasActivePool = false
 
-    if (existingStages.length === 0) {
-      const groupStandingsByName = new Map(groupStandings.map((item) => [item.team_name, item]))
-      const sortedTeams = teams
-        .map((team) => ({
-          ...team,
-          points: groupStandingsByName.get(team.name)?.point ?? 0,
-          matchesPlayed: groupStandingsByName.get(team.name)?.rounds ?? 0
-        }))
-        .sort((left, right) => {
-          if (right.points !== left.points) return right.points - left.points
-          if (left.matchesPlayed !== right.matchesPlayed) return left.matchesPlayed - right.matchesPlayed
-          return left.name.localeCompare(right.name)
+    for (const pool of pools) {
+      if (pool.teams.length === 1) {
+        poolRepresentatives.push(pool.teams[0])
+        hasActivePool = true
+        continue
+      }
+      if (pool.teams.length < 2) continue
+      hasActivePool = true
+      const poolTeamNames = new Set(pool.teams.map((team) => team.name))
+      const poolMatches = knockoutMatches.filter((match) => poolTeamNames.has(match.team1Name) && poolTeamNames.has(match.team2Name))
+      const existingStages = KNOCKOUT_STAGES.filter((stage) => poolMatches.some((match) => getMatchStage(match) === stage))
+
+      if (existingStages.length === 0) {
+        const stage = getKnockoutStage(pool.teams.length)
+        const bracketSize = stage === 'RO16' ? 16 : stage === 'QF' ? 8 : stage === 'SF' ? 4 : 2
+        const bracketTeams = pool.teams.slice(0, Math.min(pool.teams.length, bracketSize))
+        const half = Math.floor(bracketTeams.length / 2)
+        for (let index = 0; index < half; index += 1) {
+          const team1 = bracketTeams[index]
+          const team2 = bracketTeams[bracketTeams.length - 1 - index]
+          if (team1 && team2) generatedPairings.push({ team1, team2, table: 1, stage })
+        }
+        continue
+      }
+
+      const currentStage = existingStages[existingStages.length - 1]
+      const currentStageMatches = poolMatches.filter((match) => getMatchStage(match) === currentStage)
+      const winners = []
+      const losers = []
+      for (const match of currentStageMatches) {
+        const winnerName = getKnockoutWinnerName(match)
+        if (!winnerName) { unfinishedStage = true; break }
+        const loserName = winnerName === match.team1Name ? match.team2Name : match.team1Name
+        winners.push(teamByName.get(winnerName) || { id: winnerName, name: winnerName, category: pool.category })
+        losers.push(teamByName.get(loserName) || { id: loserName, name: loserName, category: pool.category })
+      }
+      if (unfinishedStage) break
+      if (currentStage === 'F') {
+        if (winners[0]) poolRepresentatives.push(winners[0])
+        continue
+      }
+      if (currentStage === 'BM') continue
+
+      if (currentStage === 'SF') {
+        if (!poolMatches.some((match) => getMatchStage(match) === 'F') && winners.length >= 2) generatedPairings.push({ team1: winners[0], team2: winners[1], table: 1, stage: 'F' })
+        if (!poolMatches.some((match) => getMatchStage(match) === 'BM') && losers.length >= 2) generatedPairings.push({ team1: losers[0], team2: losers[1], table: 1, stage: 'BM' })
+        continue
+      }
+
+      const nextStage = getNextKnockoutStage(currentStage)
+      if (!nextStage || poolMatches.some((match) => getMatchStage(match) === nextStage)) continue
+      for (let index = 0; index < winners.length; index += 2) {
+        if (winners[index] && winners[index + 1]) generatedPairings.push({ team1: winners[index], team2: winners[index + 1], table: 1, stage: nextStage })
+      }
+    }
+
+    if (unfinishedStage) {
+      setActionMessage({ type: 'info', text: 'A következő kieséses kör csak akkor generálható, ha mindkét korosztály aktuális meccsein megvan a 6 pontos győztes.' })
+      return []
+    }
+    if (ageGroupBreakdown && generatedPairings.length === 0) {
+      const activePools = pools.filter((pool) => pool.teams.length > 0)
+      if (activePools.length > 1 && poolRepresentatives.length === activePools.length) {
+        const crossCategoryFinal = knockoutMatches.find((match) => {
+          if (getMatchStage(match) !== 'F') return false
+          const team1 = teamByName.get(match.team1Name)
+          const team2 = teamByName.get(match.team2Name)
+          return team1 && team2 && team1.category !== team2.category
         })
-      const stage = getKnockoutStage(sortedTeams.length)
-      const bracketSize = stage === 'RO16' ? 16 : stage === 'QF' ? 8 : stage === 'SF' ? 4 : 2
-      const bracketTeams = sortedTeams.slice(0, Math.min(sortedTeams.length, bracketSize))
-      const half = Math.floor(bracketTeams.length / 2)
-      const pairings = []
-
-      for (let index = 0; index < half; index += 1) {
-        const team1 = bracketTeams[index]
-        const team2 = bracketTeams[bracketTeams.length - 1 - index]
-
-        if (team1 && team2) {
-          pairings.push({ team1, team2, table: 1, stage })
+        if (!crossCategoryFinal) generatedPairings.push({ team1: poolRepresentatives[0], team2: poolRepresentatives[1], table: 2, stage: 'F' })
+        else if (!getKnockoutWinnerName(crossCategoryFinal)) {
+          setActionMessage({ type: 'info', text: 'A korosztályok győztesei közötti döntő még nincs befejezve.' })
+          return []
         }
       }
-
-      return pairings
     }
-
-    const currentStage = existingStages[existingStages.length - 1]
-    const currentStageMatches = knockoutMatches.filter((match) => getMatchStage(match) === currentStage)
-    const winners = []
-    const losers = []
-
-    for (const match of currentStageMatches) {
-      const winnerName = getKnockoutWinnerName(match)
-
-      if (!winnerName) {
-        setActionMessage({
-          type: 'info',
-          text: 'A következő kieséses kör csak akkor generálható, ha az aktuális szakasz minden meccsén van 6 pontos győztes.'
-        })
-        return []
-      }
-
-      const loserName = winnerName === match.team1Name ? match.team2Name : match.team1Name
-      winners.push(teamByName.get(winnerName) || { id: winnerName, name: winnerName })
-      losers.push(teamByName.get(loserName) || { id: loserName, name: loserName })
-    }
-
-    if (currentStage === 'F') {
-      setActionMessage({ type: 'success', text: 'A döntőnek már van győztese, nincs több generálható szakasz.' })
-      return []
-    }
-
-    if (currentStage === 'SF') {
-      const nextPairings = []
-
-      if (!matches.some((match) => getMatchStage(match) === 'F') && winners.length >= 2) {
-        nextPairings.push({ team1: winners[0], team2: winners[1], table: 1, stage: 'F' })
-      }
-
-      if (!matches.some((match) => getMatchStage(match) === 'BM') && losers.length >= 2) {
-        nextPairings.push({ team1: losers[0], team2: losers[1], table: 1, stage: 'BM' })
-      }
-
-      return nextPairings
-    }
-
-    const nextStage = getNextKnockoutStage(currentStage)
-
-    if (!nextStage || matches.some((match) => getMatchStage(match) === nextStage)) {
-      return []
-    }
-
-    const pairings = []
-
-    for (let index = 0; index < winners.length; index += 2) {
-      if (winners[index] && winners[index + 1]) {
-        pairings.push({ team1: winners[index], team2: winners[index + 1], table: 1, stage: nextStage })
-      }
-    }
-
-    return pairings
+    if (hasActivePool && generatedPairings.length === 0) setActionMessage({ type: 'success', text: 'Minden érintett kieséses ág befejeződött vagy már létrejött.' })
+    return generatedPairings
   }
 
   const generateRoundMatches = () => {
@@ -662,8 +707,11 @@ export default function SumoScoring() {
     const pairings = []
     const byeTeams = []
 
-    for (const category of [0, 1]) {
-      const categoryTeams = sortedTeams.filter((team) => team.category === category)
+    const teamPools = ageGroupBreakdown
+      ? [0, 1].map((category) => sortedTeams.filter((team) => team.category === category))
+      : [sortedTeams]
+
+    for (const categoryTeams of teamPools) {
       if (categoryTeams.length < 2) continue
 
       const result = getRoundPairings(categoryTeams, usedPairKeys)
@@ -692,8 +740,8 @@ export default function SumoScoring() {
       return
     }
 
-    if (finalWinnerName) {
-      setActionMessage({ type: 'success', text: `A szumó döntő győztese: ${finalWinnerName}. Nem lehet több meccset generálni.` })
+    if (isKnockoutComplete) {
+      setActionMessage({ type: 'success', text: `A szumó kieséses szakasza befejeződött. Győztes${finalWinnerNames.length > 1 ? 'ek' : ''}: ${finalWinnerNames.join(', ')}.` })
       return
     }
 
@@ -736,13 +784,10 @@ export default function SumoScoring() {
 
     if (!pairings || pairings.length === 0) {
       if (shouldGenerateKnockout) {
-        const finalMatch = matches.find((match) => getMatchStage(match) === 'F')
-        const finalWinnerName = finalMatch ? getKnockoutWinnerName(finalMatch) : null
-
         setActionMessage({
-          type: finalWinnerName ? 'success' : 'info',
-          text: finalWinnerName
-            ? `A szumó döntő győztese: ${finalWinnerName}.`
+          type: isKnockoutComplete ? 'success' : 'info',
+          text: isKnockoutComplete
+            ? `A szumó kieséses szakasza befejeződött. Győztes${finalWinnerNames.length > 1 ? 'ek' : ''}: ${finalWinnerNames.join(', ')}.`
             : 'A következő kieséses kör még nem generálható. Az aktuális szakasz minden meccsén 6 pontos győztes kell.'
         })
         return
@@ -1039,7 +1084,8 @@ export default function SumoScoring() {
   return (
     <div>
       <div className="alert alert-info mb-3">
-        Kiválasztott versenyszám: <strong>{competitionConfig?.label || 'Szumó'}</strong>
+        <div>Kiválasztott versenyszám: <strong>{competitionConfig?.label || 'Szumó'}</strong></div>
+        <div className="small mt-1">Aktuális versenyszakasz: <strong>{competitionPhase || 'Nincs beállítva'}</strong> · Korosztálybontás: <strong>{ageGroupBreakdown ? 'bekapcsolva' : 'kikapcsolva'}</strong></div>
       </div>
 
       <FloatingFeedback message={actionMessage} onClose={() => setActionMessage(null)} />
@@ -1057,14 +1103,14 @@ export default function SumoScoring() {
                   <div className="home-kicker">Szumó {getStageLabel(selectedStage)}</div>
                   <h3 className="mb-2">Meccsek, fordulók és eredmények</h3>
                   <p className="text-muted mb-0">
-                    A generálás a jelenlegi állás alapján történik, visszavágó nélkül. A pontos eredményeket a meccskártyákon lehet rögzíteni.
+                    A generálás a jelenlegi állás alapján történik, visszavágó nélkül. {ageGroupBreakdown ? 'A két korosztály külön sorsolást és külön kieséses ágat kap.' : 'A két korosztály közös mezőnyben szerepel.'}
                   </p>
                 </div>
                 <button
                   type="button"
                   className="btn btn-primary px-4"
                   onClick={() => handleGenerateMatches(false)}
-                  disabled={!teams.length || Boolean(finalWinnerName) || isGroupGenerationLocked || (!isKnockoutView && !latestGroupRoundClosed)}
+                  disabled={!teams.length || isKnockoutComplete || isGroupGenerationLocked || (!isKnockoutView && !latestGroupRoundClosed)}
                 >
                   {primaryActionLabel}
                 </button>
@@ -1073,7 +1119,7 @@ export default function SumoScoring() {
                     type="button"
                     className="btn btn-success px-4"
                     onClick={() => handleGenerateMatches(true)}
-                    disabled={!teams.length || Boolean(finalWinnerName) || !latestGroupRoundClosed}
+                    disabled={!teams.length || isKnockoutComplete || !latestGroupRoundClosed}
                   >
                     Egyenes kiesés indítása
                   </button>
@@ -1121,9 +1167,9 @@ export default function SumoScoring() {
 
           <div className="card shadow-sm team-card mb-4">
             <div className="card-body p-4">
-              <h5 className="mb-3">Aktuális sorrend</h5>
+              <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3"><h5 className="mb-0">Aktuális sorrend</h5><div className="form-check form-switch"><input id="sumo-category-standings" className="form-check-input" type="checkbox" role="switch" checked={showCategoryStandings} onChange={(event) => setShowCategoryStandings(event.target.checked)} /><label className="form-check-label" htmlFor="sumo-category-standings">Csoportbontásos eredmények megtekintése</label></div></div>
               {groupStandings.length > 0 ? (
-                <div className="table-responsive">
+                <div className="d-grid gap-4">{standingsSections.map((section) => <section key={section.key}>{section.label && <h6 className="mb-2">{section.label}</h6>}{section.standings.length > 0 ? <div className="table-responsive">
                   <table className="table table-sm align-middle mb-0">
                     <thead>
                       <tr>
@@ -1136,7 +1182,7 @@ export default function SumoScoring() {
                       </tr>
                     </thead>
                     <tbody>
-                      {groupStandings.map((team) => (
+                      {section.standings.map((team) => (
                         <tr key={team.id}>
                           <td>{team.team_name}</td>
                           <td className="text-end">{team.point}</td>
@@ -1148,7 +1194,7 @@ export default function SumoScoring() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </div> : <div className="small text-muted">Ebben a korosztályban még nincs eredmény.</div>}</section>)}</div>
               ) : (
                 <div className="alert alert-secondary mb-0">Még nincs rögzített eredmény ebben a szakaszban.</div>
               )}

@@ -14,7 +14,8 @@ export default function CompetitionRegistration({ user }) {
     teamCoach1: '',
     teamCoach1Email: '',
     schoolName: '',
-    category: 0
+    category: 0,
+    group: '-'
   })
   const [errors, setErrors] = useState({})
   const [submitMessage, setSubmitMessage] = useState(null)
@@ -142,10 +143,18 @@ export default function CompetitionRegistration({ user }) {
 
     try {
       const payload = {
-        ...formData,
+        teamName: formData.teamName.trim(),
+        teamMember1Name: formData.teamMember1Name.trim(),
         teamMember1Class: Number(formData.teamMember1Class),
+        teamMember1Email: formData.teamMember1Email.trim().toLowerCase(),
+        teamMember2Name: formData.teamMember2Name.trim(),
         teamMember2Class: Number(formData.teamMember2Class),
-        category
+        teamMember2Email: formData.teamMember2Email.trim().toLowerCase(),
+        teamCoach1: formData.teamCoach1.trim(),
+        teamCoach1Email: formData.teamCoach1Email.trim().toLowerCase(),
+        schoolName: formData.schoolName.trim(),
+        category,
+        group: formData.group || '-'
       }
 
       const response = await fetch('https://legocompetition.runasp.net/api/Teams/registerteam', {
@@ -159,7 +168,14 @@ export default function CompetitionRegistration({ user }) {
 
       if (!response.ok) {
         const errorText = await response.text()
-        throw new Error(errorText || 'A szerver nem fut vagy nem tudom')
+        let readableError = errorText
+        try {
+          const errorData = JSON.parse(errorText)
+          readableError = Object.values(errorData.errors || {}).flat().join(' ') || errorData.title || errorText
+        } catch {
+          // A backend nem JSON hibát küldött, ezért az eredeti szöveget mutatjuk.
+        }
+        throw new Error(readableError || 'A jelentkezés mentése nem sikerült.')
       }
 
       setFormData({
@@ -174,7 +190,8 @@ export default function CompetitionRegistration({ user }) {
         teamCoach1: '',
         teamCoach1Email: '',
         schoolName: '',
-        category: 0
+        category: 0,
+        group: '-'
       })
       setErrors({})
       setSubmitMessage({

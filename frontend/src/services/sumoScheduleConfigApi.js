@@ -8,7 +8,14 @@ const request = async (path, options = {}) => {
   })
   if (!response.ok) {
     const errorText = await response.text()
-    throw new Error(errorText || `Szerverhiba (${response.status})`)
+    let readableError = errorText
+    try {
+      const errorData = JSON.parse(errorText)
+      readableError = Object.values(errorData.errors || {}).flat().join(' ') || errorData.title || errorText
+    } catch {
+      // Nem JSON formátumú backendhiba esetén az eredeti választ használjuk.
+    }
+    throw new Error(readableError || `Szerverhiba (${response.status})`)
   }
   if (response.status === 204) return null
   const contentType = response.headers.get('content-type') || ''
@@ -26,11 +33,16 @@ export const getAllCompetitionPhases = async () => {
 }
 
 export const modifySettings = async (settings) => {
+  const toNullableInteger = (value) => {
+    if (value === '' || value === null || value === undefined) return null
+    const number = Number(value)
+    return Number.isFinite(number) ? Math.round(number) : null
+  }
   const payload = {
     ageGroupBreakdown: Number(settings.ageGroupBreakdown) === 1 ? 1 : 0,
     competitionPhase: settings.competitionPhase || '',
-    minSumoRoundTime: settings.minSumoRoundTime === '' || settings.minSumoRoundTime === null ? null : Number(settings.minSumoRoundTime),
-    maxSumoRoundTime: settings.maxSumoRoundTime === '' || settings.maxSumoRoundTime === null ? null : Number(settings.maxSumoRoundTime)
+    minSumoRoundTime: toNullableInteger(settings.minSumoRoundTime),
+    maxSumoRoundTime: toNullableInteger(settings.maxSumoRoundTime)
   }
   const result = await request('/modifySettings', { method: 'PUT', body: JSON.stringify(payload) })
   window.dispatchEvent(new CustomEvent(SUMO_CONFIG_CHANGED_EVENT, { detail: payload }))
@@ -52,6 +64,8 @@ export const loadSumoScheduleConfig = async () => {
   const settings = await getAllSettings()
   return {
     minimumRounds: 4,
+    ageGroupBreakdown: Number(settings?.ageGroupBreakdown) === 1 ? 1 : 0,
+    competitionPhase: typeof settings?.competitionPhase === 'string' ? settings.competitionPhase : (settings?.competitionPhase?.phaseName || ''),
     minSumoRoundTime: settings?.minSumoRoundTime ?? null,
     maxSumoRoundTime: settings?.maxSumoRoundTime ?? null
   }

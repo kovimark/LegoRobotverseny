@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import FloatingFeedback from './FloatingFeedback'
+import CategorizedResultsStandings from './CategorizedResultsStandings'
 import { getCompetitionConfig } from '../config/adminScoringConfig'
 
 const competitionConfig = getCompetitionConfig('hegymaszas')
@@ -12,6 +13,7 @@ export default function HillClimbingScoring() {
   const [pendingUpdates, setPendingUpdates] = useState({})
   const [actionMessage, setActionMessage] = useState(null)
   const [sortBy, setSortBy] = useState('name')
+  const [allTeams, setAllTeams] = useState([])
 
   useEffect(() => {
     const loadTeams = async () => {
@@ -20,10 +22,12 @@ export default function HillClimbingScoring() {
       setOpenTeamName(null)
 
       try {
-        const response = await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`)
+        const [response, teamsResponse] = await Promise.all([fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`), fetch('https://legocompetition.runasp.net/api/Teams')])
         if (!response.ok) throw new Error('Nem sikerült betölteni a csapatokat.')
         const data = await response.json()
+        const teamsData = teamsResponse.ok ? await teamsResponse.json() : []
         setTeams(Array.isArray(data) ? data : [])
+        setAllTeams(Array.isArray(teamsData) ? teamsData : [])
       } catch (err) {
         setError(err.message)
       } finally {
@@ -62,6 +66,9 @@ export default function HillClimbingScoring() {
 
     return sorted
   }
+
+  const categoryByTeamName = new Map(allTeams.map((team) => [team.teamName || team.team_name, Number(team.category) === 1 ? 1 : 0]))
+  const standings = [...teams].sort((left, right) => Number(right.completed_level || 0) - Number(left.completed_level || 0) || Number(left.time_spent_on_level || 0) - Number(right.time_spent_on_level || 0) || String(left.team_name).localeCompare(String(right.team_name))).map((team) => ({ ...team, category: categoryByTeamName.get(team.team_name) ?? 0 }))
 
   const handleFieldChange = (teamName, field, value) => {
     setPendingUpdates((prev) => ({
@@ -147,7 +154,7 @@ export default function HillClimbingScoring() {
       {!loading && !error && teams.length === 0 && <div className="alert alert-secondary">Ebben a versenyszámban még nincs csapat.</div>}
 
       {!loading && !error && teams.length > 0 && (
-        <div className="d-flex justify-content-end mb-3">
+        <><CategorizedResultsStandings title="Hegymászás eredménytáblája" rows={standings} getKey={(team) => team.team_name} columns={[{ key: 'team', label: 'Csapat', render: (team) => team.team_name }, { key: 'level', label: 'Elért szint', align: 'end', render: (team) => Number(team.completed_level || 0) }, { key: 'time', label: 'Idő', align: 'end', render: (team) => `${Number(team.time_spent_on_level || 0)} s` }, { key: 'status', label: 'Állapot', render: (team) => Number(team.eliminated) === 1 ? 'Kiesett' : 'Versenyben' }]} /><div className="d-flex justify-content-end mb-3">
           <div className="btn-group" role="group" aria-label="Rendezés">
             <button type="button" className={`btn btn-sm ${sortBy === 'name' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setSortBy('name')}>
               Név szerint
@@ -156,7 +163,7 @@ export default function HillClimbingScoring() {
               Pont szerint
             </button>
           </div>
-        </div>
+        </div></>
       )}
 
       <div className="d-flex flex-column gap-3">

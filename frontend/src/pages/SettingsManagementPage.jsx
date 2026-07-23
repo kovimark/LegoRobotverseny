@@ -12,7 +12,7 @@ import {
   resetSettings
 } from '../services/sumoScheduleConfigApi'
 const emptyPhase = { phaseName: '', phaseStartTime: '', phaseEndTime: '' }
-const phaseNameOf = (phase) => phase.phaseName || phase.name || ''
+const phaseNameOf = (phase) => phase.phaseName || phase.competitionPhaseName || phase.name || ''
 const phaseStartOf = (phase) => phase.phaseStartTime ?? phase.startTime ?? phase.start ?? null
 const phaseEndOf = (phase) => phase.phaseEndTime ?? phase.endTime ?? phase.end ?? null
 const toTimeInput = (value) => {
@@ -30,17 +30,20 @@ export default function SettingsManagementPage({ groupOnly = false }) {
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState(null)
   const [dangerAction, setDangerAction] = useState(null)
+  const [shiftMinutes, setShiftMinutes] = useState('')
+  const [confirmScheduleShift, setConfirmScheduleShift] = useState(false)
 
   const loadData = async () => {
     try {
       setLoading(true)
       const [settingsData, phaseData] = await Promise.all([getAllSettings(), getAllCompetitionPhases()])
       setPhases(phaseData)
+      const selectedPhase = typeof settingsData?.competitionPhase === 'string'
+        ? settingsData.competitionPhase
+        : phaseNameOf(settingsData?.competitionPhase || {}) || phaseNameOf(phaseData.find((phase) => Number(phase.id) === Number(settingsData?.competitionPhaseId)) || {})
       setSettings({
         ageGroupBreakdown: Number(settingsData?.ageGroupBreakdown) === 1 ? 1 : 0,
-        competitionPhase: typeof settingsData?.competitionPhase === 'string'
-          ? settingsData.competitionPhase
-          : phaseNameOf(settingsData?.competitionPhase || {}),
+        competitionPhase: selectedPhase,
         minSumoRoundTime: settingsData?.minSumoRoundTime ?? '',
         maxSumoRoundTime: settingsData?.maxSumoRoundTime ?? ''
       })
@@ -57,8 +60,8 @@ export default function SettingsManagementPage({ groupOnly = false }) {
     event.preventDefault()
     const min = settings.minSumoRoundTime === '' ? null : Number(settings.minSumoRoundTime)
     const max = settings.maxSumoRoundTime === '' ? null : Number(settings.maxSumoRoundTime)
-    if ((min !== null && (!Number.isFinite(min) || min < 0)) || (max !== null && (!Number.isFinite(max) || max < 0))) {
-      setStatus({ type: 'danger', text: 'A szumóforduló minimum és maximum ideje 0 vagy annál nagyobb szám legyen.' })
+    if ((min !== null && (!Number.isInteger(min) || min < 0)) || (max !== null && (!Number.isInteger(max) || max < 0))) {
+      setStatus({ type: 'danger', text: 'A szumóforduló minimum és maximum ideje 0 vagy annál nagyobb egész perc legyen.' })
       return
     }
     if (min !== null && max !== null && min > max) {
@@ -100,6 +103,78 @@ export default function SettingsManagementPage({ groupOnly = false }) {
     setPhaseDraft({ phaseName: name, phaseStartTime: toTimeInput(phaseStartOf(phase)), phaseEndTime: toTimeInput(phaseEndOf(phase)) })
   }
 
+  const createDefaultPhases = async () => {
+    const existingNames = new Set(phases.map(phaseNameOf).map((name) => name.toLocaleLowerCase('hu-HU')))
+    const defaults = ['Teszt', 'Csoportkör', 'Szünet', 'Egyenes kiesés'].filter((name) => !existingNames.has(name.toLocaleLowerCase('hu-HU')))
+    if (defaults.length === 0) {
+      setStatus({ type: 'info', text: 'Az alapértelmezett versenyszakaszok már léteznek.' })
+      return
+    }
+    try {
+      setSaving(true)
+      for (const phaseName of defaults) await addCompetitionPhase({ phaseName, phaseStartTime: '', phaseEndTime: '' })
+      setStatus({ type: 'success', text: 'Az alapértelmezett versenyszakaszok létrejöttek.' })
+      await loadData()
+    } catch (error) { setStatus({ type: 'danger', text: error.message }) }
+    finally { setSaving(false) }
+  }
+
+  const activatePhase = async (phaseName) => {
+    try {
+      setSaving(true)
+      await modifySettings({ ...settings, competitionPhase: phaseName })
+      setSettings((current) => ({ ...current, competitionPhase: phaseName }))
+      setStatus({ type: 'success', text: `Az aktuális versenyszakasz: ${phaseName}.` })
+    } catch (error) { setStatus({ type: 'danger', text: error.message }) }
+    finally { setSaving(false) }
+  }
+
+  const scheduledPhases = [...phases].sort((left, right) => {
+    const leftTime = toTimeInput(phaseStartOf(left)) || '99:99'
+    const rightTime = toTimeInput(phaseStartOf(right)) || '99:99'
+    return leftTime.localeCompare(rightTime) || phaseNameOf(left).localeCompare(phaseNameOf(right), 'hu')
+  })
+
+  const shiftTimeByMinutes = (value, minutes) => {
+    const time = toTimeInput(value)
+    if (!time) return ''
+    const [hours, currentMinutes] = time.split(':').map(Number)
+    const shifted = hours * 60 + currentMinutes + minutes
+    if (shifted < 0 || shifted >= 24 * 60) throw new Error('A csúsztatás valamelyik időpontot másik napra vinné.')
+    return `${String(Math.floor(shifted / 60)).padStart(2, '0')}:${String(shifted % 60).padStart(2, '0')}`
+  }
+
+  const applyScheduleShift = async () => {
+    const minutes = Number(shiftMinutes)
+    if (!Number.isInteger(minutes) || minutes <= 0) {
+      setConfirmScheduleShift(false)
+      setStatus({ type: 'danger', text: 'A csúszás pozitív egész perc legyen.' })
+      return
+    }
+    const activeIndex = scheduledPhases.findIndex((phase) => phaseNameOf(phase) === settings.competitionPhase)
+    const firstAffectedIndex = activeIndex >= 0 ? activeIndex : 0
+    try {
+      setSaving(true)
+      const updates = scheduledPhases.slice(firstAffectedIndex).map((phase, relativeIndex) => {
+        const isCurrentPhase = activeIndex >= 0 && relativeIndex === 0
+        return {
+          originalName: phaseNameOf(phase),
+          phaseName: phaseNameOf(phase),
+          phaseStartTime: isCurrentPhase ? toTimeInput(phaseStartOf(phase)) : shiftTimeByMinutes(phaseStartOf(phase), minutes),
+          phaseEndTime: shiftTimeByMinutes(phaseEndOf(phase), minutes)
+        }
+      })
+      for (const update of updates) await modifyCompetitionPhase(update.originalName, update)
+      setConfirmScheduleShift(false)
+      setShiftMinutes('')
+      setStatus({ type: 'success', text: `A menetrend érintett időpontjai ${minutes} perccel későbbre kerültek.` })
+      await loadData()
+    } catch (error) {
+      setConfirmScheduleShift(false)
+      setStatus({ type: 'danger', text: error.message })
+    } finally { setSaving(false) }
+  }
+
   const handleResetSettings = async () => {
     try { setSaving(true); await resetSettings(); setDangerAction(null); setStatus({ type: 'success', text: 'A beállítások alaphelyzetbe álltak.' }); await loadData() }
     catch (error) { setStatus({ type: 'danger', text: error.message }) }
@@ -124,22 +199,24 @@ export default function SettingsManagementPage({ groupOnly = false }) {
           <div className="card-body p-4"><h3 className="h5 mb-3">Aktuális beállítások</h3><div className="row g-3">
             <div className="col-md-6"><label className="form-label" htmlFor="age-breakdown">Korosztálybontás</label><select id="age-breakdown" className="form-select" value={settings.ageGroupBreakdown} onChange={(event) => updateSettings('ageGroupBreakdown', Number(event.target.value))}><option value="0">Nincs korosztálybontás</option><option value="1">Van korosztálybontás</option></select></div>
             <div className="col-md-6"><label className="form-label" htmlFor="competition-phase">Aktuális versenyszakasz</label><select id="competition-phase" className="form-select" value={settings.competitionPhase} onChange={(event) => updateSettings('competitionPhase', event.target.value)}><option value="">Nincs kiválasztva</option>{phases.map((phase) => { const name = phaseNameOf(phase); return <option value={name} key={phase.id ?? name}>{name}</option> })}</select></div>
-            <div className="col-md-6"><label className="form-label" htmlFor="min-sumo-time">Egy teljes szumóforduló minimum ideje</label><div className="input-group"><input id="min-sumo-time" type="number" min="0" step="0.1" className="form-control" value={settings.minSumoRoundTime} onChange={(event) => updateSettings('minSumoRoundTime', event.target.value)} /><span className="input-group-text">perc</span></div><div className="form-text">Az adott forduló összes mérkőzésének lejátszására szánt minimum idő.</div></div>
-            <div className="col-md-6"><label className="form-label" htmlFor="max-sumo-time">Egy teljes szumóforduló maximum ideje</label><div className="input-group"><input id="max-sumo-time" type="number" min="0" step="0.1" className="form-control" value={settings.maxSumoRoundTime} onChange={(event) => updateSettings('maxSumoRoundTime', event.target.value)} /><span className="input-group-text">perc</span></div><div className="form-text">Az adott forduló összes mérkőzésének lejátszására szánt maximum idő.</div></div>
+            <div className="col-md-6"><label className="form-label" htmlFor="min-sumo-time">Egy teljes szumóforduló minimum ideje</label><div className="input-group"><input id="min-sumo-time" type="number" min="0" step="1" className="form-control" value={settings.minSumoRoundTime} onChange={(event) => updateSettings('minSumoRoundTime', event.target.value)} /><span className="input-group-text">perc</span></div><div className="form-text">Az adott forduló összes mérkőzésének lejátszására szánt minimum idő, egész percben.</div></div>
+            <div className="col-md-6"><label className="form-label" htmlFor="max-sumo-time">Egy teljes szumóforduló maximum ideje</label><div className="input-group"><input id="max-sumo-time" type="number" min="0" step="1" className="form-control" value={settings.maxSumoRoundTime} onChange={(event) => updateSettings('maxSumoRoundTime', event.target.value)} /><span className="input-group-text">perc</span></div><div className="form-text">Az adott forduló összes mérkőzésének lejátszására szánt maximum idő, egész percben.</div></div>
             <div className="col-12 text-end"><button className="btn btn-primary" disabled={saving}>Beállítások mentése</button></div>
           </div></div>
         </form>
 
+        <section className="card shadow-sm team-card no-hover-card mb-4"><div className="card-body p-4"><div className="d-flex flex-wrap justify-content-between align-items-center gap-3"><div><h3 className="h5 mb-1">Versenymenetrend</h3><p className="text-muted mb-0">A menetrend menet közben is bővíthető és módosítható. Bármilyen szakasz megadható.</p></div><button type="button" className="btn btn-outline-primary" disabled={saving} onClick={createDefaultPhases}>Alap menetrend létrehozása</button></div><div className="mt-3"><span className="me-2">Most zajlik:</span><span className={`badge ${settings.competitionPhase ? 'text-bg-success' : 'text-bg-secondary'}`}>{settings.competitionPhase || 'Nincs kiválasztva'}</span></div><div className="schedule-shift-panel mt-4"><div><div className="fw-semibold">Menetrend csúsztatása</div><div className="small text-muted">Az aktuális szakasz befejezését és minden későbbi időpontot egyszerre tolja el.</div></div><div className="input-group schedule-shift-control"><input type="number" min="1" step="1" className="form-control" aria-label="Csúszás percekben" placeholder="pl. 15" value={shiftMinutes} onChange={(event) => setShiftMinutes(event.target.value)} /><span className="input-group-text">perc</span><button type="button" className="btn btn-warning" disabled={saving || !shiftMinutes} onClick={() => setConfirmScheduleShift(true)}>Hozzáadás</button></div></div></div></section>
+
         <form className="card shadow-sm team-card no-hover-card mb-4" onSubmit={savePhase}>
-          <div className="card-body p-4"><div className="d-flex justify-content-between mb-3"><h3 className="h5 mb-0">{editingPhaseName ? 'Versenyszakasz módosítása' : 'Új versenyszakasz'}</h3>{editingPhaseName && <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => { setEditingPhaseName(null); setPhaseDraft(emptyPhase) }}>Mégse</button>}</div><div className="row g-3">
-            <div className="col-md-4"><label className="form-label" htmlFor="phase-name">Szakasz neve</label><input id="phase-name" className="form-control" placeholder="pl. Teszt, Alapszakasz, Kiesés" value={phaseDraft.phaseName} onChange={(event) => updatePhase('phaseName', event.target.value)} /></div>
+          <div className="card-body p-4"><div className="d-flex justify-content-between mb-3"><h3 className="h5 mb-0">{editingPhaseName ? 'Menetrendi elem módosítása' : 'Új menetrendi elem'}</h3>{editingPhaseName && <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => { setEditingPhaseName(null); setPhaseDraft(emptyPhase) }}>Mégse</button>}</div><div className="row g-3">
+            <div className="col-md-4"><label className="form-label" htmlFor="phase-name">Megnevezés</label><input id="phase-name" className="form-control" placeholder="pl. Teszt, Csoportkör, Ebédszünet" value={phaseDraft.phaseName} onChange={(event) => updatePhase('phaseName', event.target.value)} /></div>
             <div className="col-md-3"><label className="form-label" htmlFor="phase-start">Kezdés</label><input id="phase-start" type="time" step="60" className="form-control" value={phaseDraft.phaseStartTime} onChange={(event) => updatePhase('phaseStartTime', event.target.value)} /></div>
             <div className="col-md-3"><label className="form-label" htmlFor="phase-end">Befejezés</label><input id="phase-end" type="time" step="60" className="form-control" value={phaseDraft.phaseEndTime} onChange={(event) => updatePhase('phaseEndTime', event.target.value)} /></div>
             <div className="col-md-2 d-flex align-items-end"><button className="btn btn-primary w-100" disabled={saving}>{editingPhaseName ? 'Módosítás' : 'Hozzáadás'}</button></div>
           </div><div className="form-text mt-2">Csak az óra és perc kerül mentésre, dátum nélkül.</div></div>
         </form>
 
-        <div className="row g-3 mb-4">{phases.map((phase) => { const name = phaseNameOf(phase); return <div className="col-md-6 col-xl-4" key={phase.id ?? name}><article className="team-info-box h-100"><h4 className="h5">{name}</h4><div className="small text-muted">{toTimeInput(phaseStartOf(phase)) || 'Nincs kezdés'} – {toTimeInput(phaseEndOf(phase)) || 'Nincs befejezés'}</div><button type="button" className="btn btn-outline-primary btn-sm mt-3" onClick={() => editPhase(phase)}>Módosítás</button></article></div> })}</div>
+        {scheduledPhases.length > 0 ? <section className="competition-schedule mb-4">{scheduledPhases.map((phase) => { const name = phaseNameOf(phase); const active = settings.competitionPhase === name; const start = toTimeInput(phaseStartOf(phase)); const end = toTimeInput(phaseEndOf(phase)); return <article className={`competition-schedule-item ${active ? 'active' : ''}`} key={phase.id ?? name}><div className="competition-schedule-time"><i className="bi bi-clock" /><span>{start || 'Nincs kezdés'}{(start || end) && ' – '}{end || (start ? 'nincs befejezés' : '')}</span></div><div className="competition-schedule-content"><h4 className="h5 mb-0">{name}</h4>{active && <span className="badge text-bg-success">Most zajlik</span>}</div><div className="competition-schedule-actions"><button type="button" className="btn btn-outline-primary btn-sm" onClick={() => editPhase(phase)}>Módosítás</button>{!active && <button type="button" className="btn btn-success btn-sm" disabled={saving} onClick={() => activatePhase(name)}>Aktiválás</button>}</div></article> })}</section> : <div className="alert alert-warning mb-4">Még nincs menetrendi elem. Hozd létre az alap menetrendet, vagy adj hozzá egyedi elemet.</div>}
 
         <TeamGroupManager />
         <section className="card border-danger mb-4"><div className="card-body"><h3 className="h5 text-danger">Veszélyes műveletek</h3><div className="d-flex flex-wrap gap-2"><button type="button" className="btn btn-outline-danger" onClick={() => setDangerAction('settings')}>Beállítások alaphelyzetbe állítása</button><button type="button" className="btn btn-danger" onClick={() => setDangerAction('scores')}>Minden pont törlése</button></div></div></section>
@@ -156,6 +233,10 @@ export default function SettingsManagementPage({ groupOnly = false }) {
         {dangerAction === 'scores'
           ? <p className="mb-0">Ez minden rögzített pontot és eredményt törölhet, és nem vonható vissza.</p>
           : <p className="mb-0">Biztosan alaphelyzetbe állítod az összes versenybeállítást?</p>}
+      </ConfirmModal>
+      <ConfirmModal open={confirmScheduleShift} title="Menetrend csúsztatása" confirmLabel="Időpontok eltolása" confirmVariant="warning" busy={saving} onClose={() => setConfirmScheduleShift(false)} onConfirm={applyScheduleShift}>
+        <p>Biztosan hozzáadsz <strong>{shiftMinutes || 0} percet</strong> az aktuális szakasz befejezéséhez és minden utána következő időponthoz?</p>
+        <p className="small text-muted mb-0">A korábban befejezett szakaszok és az aktuális szakasz kezdési ideje nem változik.</p>
       </ConfirmModal>
     </div>
   )
