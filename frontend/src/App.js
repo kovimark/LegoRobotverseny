@@ -167,6 +167,7 @@ function App() {
         <Route path="/szabalyzat" element={<RulesPage />} />
         <Route path="/hirek" element={<NewsPage />} />
         <Route path="/hirek/:messageId" element={<NewsDetailsPage />} />
+        <Route path="/hirek/cim/:messageTitle" element={<NewsDetailsPage />} />
         <Route path="/allasok" element={<StandingsPage />} />
         <Route path="/csapat/:teamName" element={<TeamDetailsPage />} />
         <Route path="/sajat-csapataim" element={user ? <MyTeamsPage user={user} /> : <LoginPage user={user} authLoading={authLoading} authError={authError} onGoogleSignIn={handleGoogleSignIn} onSignOut={handleSignOut} />} />

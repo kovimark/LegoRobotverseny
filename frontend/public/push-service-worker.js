@@ -6,11 +6,12 @@ self.addEventListener('push', (event) => {
     payload = { body: event.data ? event.data.text() : '' }
   }
   const title = payload.title || 'Robotverseny'
+  const newsUrl = title ? `/hirek/cim/${encodeURIComponent(title)}` : '/hirek'
   const options = {
     body: payload.body || payload.message || 'Új értesítés érkezett.',
     icon: payload.icon || '/logo192.png',
     badge: payload.badge || '/favicon.ico',
-    data: { url: payload.url || payload.link || '/sajat-csapataim' },
+    data: { url: payload.url || payload.link || newsUrl },
     tag: payload.tag || `robotverseny-${Date.now()}`,
     renotify: true
   }

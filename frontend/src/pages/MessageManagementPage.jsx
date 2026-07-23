@@ -155,16 +155,15 @@ export default function MessageManagementPage() {
       setManagedLinkError(`Hibás link: ${invalidLink}`)
       return
     }
-    if (!draft.id && notificationMode === 'selected' && notificationTeamIds.length === 0) {
+    if (notificationMode === 'selected' && notificationTeamIds.length === 0) {
       setStatus({ type: 'danger', text: 'Válassz ki legalább egy csapatot az értesítéshez.' })
       return
     }
     try {
       setSaving(true)
-      const isNewMessage = !draft.id
       await saveMessage(draft)
       let notificationText = ''
-      if (isNewMessage && notificationMode !== 'none') {
+      if (notificationMode !== 'none') {
         const recipientIds = notificationMode === 'all'
           ? notificationTeams.map((team) => team.id)
           : notificationTeamIds
@@ -207,6 +206,9 @@ export default function MessageManagementPage() {
     setLinkSelection(null)
     setLinkToolError('')
     setManagedLinkError('')
+    setNotificationMode('none')
+    setNotificationTeamIds([])
+    setNotificationTeamSearch('')
     requestAnimationFrame(() => messageFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
@@ -321,7 +323,7 @@ export default function MessageManagementPage() {
             </div>
             <div className="col-md-6"><label className="form-label" htmlFor="message-start">Kezdés (magyar idő, opcionális)</label><input id="message-start" type="datetime-local" className="form-control" value={draft.start} onChange={(event) => updateDraft('start', event.target.value)} /><div className="form-text">Üresen hagyva a mentés aktuális időpontja lesz.</div></div>
             <div className="col-md-6"><label className="form-label" htmlFor="message-end">Befejezés (magyar idő, opcionális)</label><input id="message-end" type="datetime-local" className="form-control" value={draft.end} onChange={(event) => updateDraft('end', event.target.value)} /></div>
-            {!draft.id && <div className="col-12">
+            <div className="col-12">
               <section className="message-notification-options">
                 <h4 className="h6 mb-2">Push értesítés a közzétételről</h4>
                 <div className="d-flex flex-wrap gap-3">
@@ -338,7 +340,7 @@ export default function MessageManagementPage() {
                 </div>}
                 {notificationMode !== 'none' && <div className="form-text mt-2">Az értesítés a mentéskor azonnal kimegy. Címe a hír címe, tartalma a hír szövege lesz.</div>}
               </section>
-            </div>}
+            </div>
             <div className="col-12 text-end"><button className="btn btn-primary" disabled={saving || types.length === 0}>{saving ? 'Mentés...' : 'Üzenet mentése'}</button></div>
           </div>
         </div>

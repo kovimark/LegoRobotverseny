@@ -1,22 +1,25 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getActiveMessages } from '../services/messageBoardApi'
+import { getActiveMessages, getMessageByTitle } from '../services/messageBoardApi'
 import MessageLinks from '../components/MessageLinks'
 import MessageText from '../components/MessageText'
 import { getCategoryBadgeStyle } from '../utils/categoryColor'
 
 export default function NewsDetailsPage() {
-  const { messageId } = useParams()
+  const { messageId, messageTitle } = useParams()
   const [message, setMessage] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    getActiveMessages()
-      .then((items) => setMessage(items.find((item) => String(item.id) === String(messageId)) || null))
+    const request = messageTitle
+      ? getMessageByTitle(messageTitle)
+      : getActiveMessages().then((items) => items.find((item) => String(item.id) === String(messageId)) || null)
+    request
+      .then(setMessage)
       .catch((loadError) => setError(loadError.message))
       .finally(() => setLoading(false))
-  }, [messageId])
+  }, [messageId, messageTitle])
 
   if (loading) return <main className="container py-5"><div className="alert alert-info">Hír betöltése...</div></main>
   if (error) return <main className="container py-5"><div className="alert alert-danger">{error}</div><Link to="/hirek" className="btn btn-outline-dark">Vissza a hírekhez</Link></main>
