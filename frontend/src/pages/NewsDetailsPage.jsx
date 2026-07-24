@@ -13,7 +13,14 @@ export default function NewsDetailsPage() {
 
   useEffect(() => {
     const request = messageTitle
-      ? getMessageByTitle(messageTitle)
+      ? getMessageByTitle(messageTitle).then(async (foundMessage) => {
+        if (foundMessage?.title) return foundMessage
+        const messages = await getActiveMessages()
+        return messages.find((item) => item.title.trim().toLocaleLowerCase('hu-HU') === messageTitle.trim().toLocaleLowerCase('hu-HU')) || null
+      }).catch(async () => {
+        const messages = await getActiveMessages()
+        return messages.find((item) => item.title.trim().toLocaleLowerCase('hu-HU') === messageTitle.trim().toLocaleLowerCase('hu-HU')) || null
+      })
       : getActiveMessages().then((items) => items.find((item) => String(item.id) === String(messageId)) || null)
     request
       .then(setMessage)

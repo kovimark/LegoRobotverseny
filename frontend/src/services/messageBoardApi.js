@@ -95,7 +95,8 @@ export const getActiveMessages = async () => {
 
 export const getMessageByTitle = async (messageTitle) => {
   const data = await request(`/getMessageByTitle/${encodeURIComponent(messageTitle)}`)
-  return data ? normalizeMessage(data) : null
+  const message = Array.isArray(data) ? data[0] : data
+  return message ? normalizeMessage(message) : null
 }
 
 export const toLocalDateTimeInput = (utcValue) => {

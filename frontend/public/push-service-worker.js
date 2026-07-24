@@ -5,14 +5,15 @@ self.addEventListener('push', (event) => {
   } catch {
     payload = { body: event.data ? event.data.text() : '' }
   }
-  const title = payload.title || 'Robotverseny'
+  const notificationData = payload.notification || payload.data || payload
+  const title = notificationData.title || notificationData.Title || payload.title || payload.Title || 'Robotverseny'
   const newsUrl = title ? `/hirek/cim/${encodeURIComponent(title)}` : '/hirek'
   const options = {
-    body: payload.body || payload.message || 'Új értesítés érkezett.',
-    icon: payload.icon || '/logo192.png',
-    badge: payload.badge || '/favicon.ico',
-    data: { url: payload.url || payload.link || newsUrl },
-    tag: payload.tag || `robotverseny-${Date.now()}`,
+    body: notificationData.body || notificationData.Body || notificationData.message || notificationData.Message || 'Új értesítés érkezett.',
+    icon: notificationData.icon || '/logo192.png',
+    badge: notificationData.badge || '/favicon.ico',
+    data: { url: notificationData.url || notificationData.Url || notificationData.link || notificationData.Link || newsUrl },
+    tag: notificationData.tag || `robotverseny-${Date.now()}`,
     renotify: true
   }
   event.waitUntil(self.registration.showNotification(title, options))
