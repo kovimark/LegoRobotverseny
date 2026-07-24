@@ -18,6 +18,7 @@ import SettingsManagementPage from './pages/SettingsManagementPage';
 import NewsPage from './pages/NewsPage';
 import NewsDetailsPage from './pages/NewsDetailsPage';
 import NotificationManagementPage from './pages/NotificationManagementPage';
+import EmailManagementPage from './pages/EmailManagementPage';
 import { auth, authPersistenceReady, googleProvider } from './firebase';
 import { isJudgePrivilege } from './config/privilegeConfig';
 import { subscribeTeamsToPush } from './services/notificationApi';
@@ -178,6 +179,7 @@ function App() {
         <Route path="/admin/jogosultsagok" element={userRole === 'admin' ? <PrivilegeManagementPage /> : <HomePage />} />
         <Route path="/admin/uzenetek" element={userRole === 'admin' ? <MessageManagementPage /> : <HomePage />} />
         <Route path="/admin/ertesitesek" element={userRole === 'admin' ? <NotificationManagementPage /> : <HomePage />} />
+        <Route path="/admin/emailek" element={userRole === 'admin' ? <EmailManagementPage /> : <HomePage />} />
         <Route path="/admin/beallitasok" element={userRole === 'admin' || userRole === 'judge' ? <SettingsManagementPage groupOnly={userRole === 'judge'} /> : <HomePage />} />
         <Route path="/admin/pontozas" element={userRole === 'admin' || userRole === 'judge' ? <AdminScoringPage userPrivilege={userPrivilege} /> : <HomePage />} />
         <Route path="/admin/pontozas/:competitionType" element={userRole === 'admin' || userRole === 'judge' ? <AdminScoringPage userPrivilege={userPrivilege} /> : <HomePage />} />

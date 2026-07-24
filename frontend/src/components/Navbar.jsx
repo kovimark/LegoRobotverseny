@@ -113,6 +113,9 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                                     <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/ertesitesek" onClick={() => setIsProfileOpen(false)}>
                                         <i className="bi bi-send-fill" aria-hidden="true" /><span>Értesítések küldése</span>
                                     </Link>
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/emailek" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-envelope-fill" aria-hidden="true" /><span>E-mailek küldése</span>
+                                    </Link>
                                     <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/beallitasok" onClick={() => setIsProfileOpen(false)}>
                                         <i className="bi bi-gear-fill" aria-hidden="true" /><span>Versenybeállítások</span>
                                     </Link>

@@ -1518,15 +1518,17 @@ form {
 .sumo-bracket-wrap { display: grid; gap: 1.25rem; }
 .sumo-bracket-section { overflow: hidden; border: 2px solid var(--black); border-radius: .65rem; background: var(--white); box-shadow: .35rem .35rem 0 var(--black); }
 .sumo-bracket-section > h5 { margin: 0; padding: .9rem 1rem; border-bottom: 2px solid var(--black); background: rgba(253, 231, 76, .35); }
-.sumo-bracket { display: flex; align-items: stretch; gap: 1rem; overflow-x: auto; padding: 1rem; }
-.sumo-bracket-round { display: flex; flex: 1 0 13.5rem; flex-direction: column; justify-content: space-around; gap: .8rem; }
+.sumo-bracket { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr)); align-items: start; gap: 1rem; padding: 1rem; }
+.sumo-bracket-round { display: flex; min-width: 0; flex-direction: column; gap: .8rem; }
 .sumo-bracket-round > h6 { text-align: center; text-transform: capitalize; }
 .sumo-bracket-match { position: relative; border: 2px solid var(--black); border-radius: .4rem; background: #fff; }
-.sumo-bracket-match::after { position: absolute; top: 50%; right: -1.1rem; width: 1rem; border-top: 2px solid var(--black); content: ''; }
-.sumo-bracket-round:last-child .sumo-bracket-match::after { display: none; }
 .sumo-bracket-match > div { display: flex; justify-content: space-between; gap: .5rem; padding: .5rem .65rem; }
 .sumo-bracket-match > div + div { border-top: 1px solid #adb5bd; }
 .sumo-bracket-match .winner { background: #c8f7d0; font-weight: 800; }
+.sumo-bracket-match .sumo-bracket-match-status { display: block; background: #f8f9fa; color: #6c757d; font-size: .75rem; text-align: center; }
+.sumo-grand-final { border-color: #b8860b; }
+.sumo-grand-final > h5 { background: linear-gradient(90deg, rgba(253, 231, 76, .75), rgba(250, 121, 33, .3)); }
+.sumo-grand-final-match { width: min(30rem, 100%); margin-inline: auto; }
 
 .search-results-scroll {
   max-height: min(18rem, 45vh);
