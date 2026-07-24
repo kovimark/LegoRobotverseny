@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import FloatingFeedback from './FloatingFeedback'
 import CategorizedResultsStandings from './CategorizedResultsStandings'
+import AgeGroupBadge from './AgeGroupBadge'
 import { getCompetitionConfig } from '../config/adminScoringConfig'
 
 const competitionConfig = getCompetitionConfig('hegymaszas')
@@ -14,6 +15,7 @@ export default function HillClimbingScoring() {
   const [actionMessage, setActionMessage] = useState(null)
   const [sortBy, setSortBy] = useState('name')
   const [allTeams, setAllTeams] = useState([])
+  const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
     const loadTeams = async () => {
@@ -69,6 +71,7 @@ export default function HillClimbingScoring() {
 
   const categoryByTeamName = new Map(allTeams.map((team) => [team.teamName || team.team_name, Number(team.category) === 1 ? 1 : 0]))
   const standings = [...teams].sort((left, right) => Number(right.completed_level || 0) - Number(left.completed_level || 0) || Number(left.time_spent_on_level || 0) - Number(right.time_spent_on_level || 0) || String(left.team_name).localeCompare(String(right.team_name))).map((team) => ({ ...team, category: categoryByTeamName.get(team.team_name) ?? 0 }))
+  const filteredTeams = getSortedTeams(teams).filter((team) => String(team.team_name || '').toLocaleLowerCase('hu-HU').includes(searchTerm.trim().toLocaleLowerCase('hu-HU')))
 
   const handleFieldChange = (teamName, field, value) => {
     setPendingUpdates((prev) => ({
@@ -166,8 +169,10 @@ export default function HillClimbingScoring() {
         </div></>
       )}
 
-      <div className="d-flex flex-column gap-3">
-        {getSortedTeams(teams).map((team) => {
+      {!loading && !error && teams.length > 0 && <div className="mb-3"><label className="form-label" htmlFor="hill-team-search">Csapat keresése</label><div className="input-group"><span className="input-group-text"><i className="bi bi-search" /></span><input id="hill-team-search" type="search" className="form-control" placeholder="Kezdj el gépelni…" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} /></div></div>}
+
+      <div className="d-flex flex-column gap-3 scoring-search-scroll">
+        {filteredTeams.map((team) => {
           const isOpen = openTeamName === team.team_name
           const draft = pendingUpdates[team.team_name] || {}
           const completedLevel = draft.completed_level ?? team.completed_level ?? 0
@@ -181,7 +186,7 @@ export default function HillClimbingScoring() {
             <div key={team.team_name} className="card shadow-sm team-card">
               <button type="button" className="btn btn-outline-secondary w-100 text-start rounded-0 border-0 py-3 px-3 team-toggle" onClick={() => toggleTeam(team.team_name)} aria-expanded={isOpen}>
                 <div className="d-flex justify-content-between align-items-center gap-3">
-                  <span className="fw-semibold">{team.team_name || 'Ismeretlen csapat'}</span>
+                  <span className="fw-semibold"><AgeGroupBadge category={categoryByTeamName.get(team.team_name)} className="me-2" />{team.team_name || 'Ismeretlen csapat'}</span>
                   <div className="d-flex align-items-center gap-2 flex-wrap">
                     <span className={`badge rounded-pill ${isEliminated ? 'bg-danger text-white' : 'bg-success text-white'}`}>
                       {isEliminated ? 'Kiesett' : 'Versenyben'}
@@ -244,6 +249,7 @@ export default function HillClimbingScoring() {
             </div>
           )
         })}
+        {!loading && teams.length > 0 && filteredTeams.length === 0 && <div className="alert alert-secondary mb-0">Nincs a keresésnek megfelelő csapat.</div>}
       </div>
     </div>
   )

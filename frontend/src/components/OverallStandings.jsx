@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import AgeGroupBadge from './AgeGroupBadge'
 
 const sortableColumns = [
+  { key: 'overallPosition', label: 'Összesített helyezés' },
   { key: 'teamName', label: 'Csapat' },
   { key: 'lineFollowPoint', label: 'Vonalkövetés' },
   { key: 'hillClimbPoint', label: 'Hegymászás' },
@@ -16,16 +18,26 @@ export default function OverallStandings() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [sortConfig, setSortConfig] = useState({ key: 'allPoint', direction: 'desc' })
+  const [showByCategory, setShowByCategory] = useState(false)
 
   useEffect(() => {
     const loadStandings = async () => {
       try {
         setLoading(true)
         setError('')
-        const response = await fetch('https://legocompetition.runasp.net/api/Points')
+        const [response, teamsResponse] = await Promise.all([
+          fetch('https://legocompetition.runasp.net/api/Points'),
+          fetch('https://legocompetition.runasp.net/api/Teams')
+        ])
         if (!response.ok) throw new Error('Nem sikerült betölteni az összesített ponttáblázatot.')
         const data = await response.json()
-        setStandings(Array.isArray(data) ? data : [])
+        const teams = teamsResponse.ok ? await teamsResponse.json() : []
+        const categoryByName = new Map((Array.isArray(teams) ? teams : []).map((team) => [team.teamName, Number(team.category) === 1 ? 1 : 0]))
+        const ranked = (Array.isArray(data) ? data : [])
+          .map((team) => ({ ...team, category: categoryByName.get(team.teamName) ?? 0 }))
+          .sort((left, right) => Number(right.allPoint || 0) - Number(left.allPoint || 0) || left.teamName.localeCompare(right.teamName, 'hu'))
+          .map((team, index) => ({ ...team, overallPosition: index + 1 }))
+        setStandings(ranked)
       } catch (err) {
         setError(err.message)
       } finally {
@@ -58,6 +70,12 @@ export default function OverallStandings() {
     const bText = String(bValue ?? '').toLowerCase()
     return aText.localeCompare(bText) * direction
   })
+  const sections = showByCategory
+    ? [
+      { key: 0, label: 'Általános iskolások', rows: sortedStandings.filter((team) => team.category === 0) },
+      { key: 1, label: 'Középiskolások', rows: sortedStandings.filter((team) => team.category === 1) }
+    ]
+    : [{ key: 'all', label: '', rows: sortedStandings }]
 
   return (
     <div>
@@ -73,7 +91,14 @@ export default function OverallStandings() {
                 <h4 className="mb-1">Összesített eredmények</h4>
                 <p className="text-muted mb-0 small">Kattints egy csapat nevére a részletes adatok megnyitásához.</p>
               </div>
+              <div className="form-check form-switch">
+                <input id="overall-category-view" className="form-check-input" type="checkbox" role="switch" checked={showByCategory} onChange={(event) => setShowByCategory(event.target.checked)} />
+                <label className="form-check-label" htmlFor="overall-category-view">Korosztály szerinti bontás</label>
+              </div>
             </div>
+            <div className="d-grid gap-4">
+            {sections.map((section) => <section key={section.key}>
+              {section.label && <h5 className="mb-2">{section.label}</h5>}
             <div className="table-responsive standings-table-wrapper">
               <table className="table align-middle mb-0">
                 <thead>
@@ -97,13 +122,14 @@ export default function OverallStandings() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedStandings.map((team) => (
+                  {section.rows.map((team) => (
                     <tr
                       key={team.teamName}
                       onClick={() => navigate(`/csapat/${encodeURIComponent(team.teamName)}`)}
                       style={{ cursor: 'pointer' }}
                     >
-                      <td className="fw-semibold">{team.teamName}</td>
+                      <td className="fw-bold">{team.overallPosition}.</td>
+                      <td className="fw-semibold"><AgeGroupBadge category={team.category} className="me-2" />{team.teamName}</td>
                       <td>{team.lineFollowPoint} <small className="text-muted">({team.lineFollowPosition}. hely)</small></td>
                       <td>{team.hillClimbPoint} <small className="text-muted">({team.hillClimbPosition}. hely)</small></td>
                       <td>{team.sumoPoint} <small className="text-muted">({team.sumoPosition}. hely)</small></td>
@@ -113,6 +139,8 @@ export default function OverallStandings() {
                   ))}
                 </tbody>
               </table>
+            </div>
+            </section>)}
             </div>
           </div>
         </div>

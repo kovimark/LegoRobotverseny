@@ -45,7 +45,12 @@ export default function TeamGroupManager() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { loadTeams() }, [])
+  useEffect(() => {
+    loadTeams()
+    const handleGroupsChanged = () => loadTeams()
+    window.addEventListener('teamGroupsChanged', handleGroupsChanged)
+    return () => window.removeEventListener('teamGroupsChanged', handleGroupsChanged)
+  }, [])
 
   const filteredTeams = useMemo(() => {
     const term = search.trim().toLocaleLowerCase('hu-HU')

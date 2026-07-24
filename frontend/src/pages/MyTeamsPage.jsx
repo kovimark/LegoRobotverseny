@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import CompetitionStatusPanel from '../components/CompetitionStatusPanel'
 import FloatingFeedback from '../components/FloatingFeedback'
 import { getCurrentPushSubscription, subscribeTeamsToPush } from '../services/notificationApi'
+import AgeGroupBadge from '../components/AgeGroupBadge'
 
 export default function MyTeamsPage({ user }) {
   const [teams, setTeams] = useState([])
@@ -121,7 +122,7 @@ export default function MyTeamsPage({ user }) {
           <article className="card shadow-sm team-card overflow-hidden" key={team.id}>
             <header className="team-card-header p-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
               <div>
-                <h3 className="h4 mb-1">{team.teamName || `Csapat #${team.id}`}</h3>
+                <h3 className="h4 mb-1"><AgeGroupBadge category={team.category} className="me-2" />{team.teamName || `Csapat #${team.id}`}</h3>
                 <div className="text-muted">{team.schoolName || 'Nincs megadott iskola'}</div>
               </div>
               <span className="badge text-bg-dark fs-6">#{team.id}</span>

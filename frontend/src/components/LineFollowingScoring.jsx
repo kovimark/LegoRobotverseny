@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import FloatingFeedback from './FloatingFeedback'
 import CategorizedResultsStandings from './CategorizedResultsStandings'
+import AgeGroupBadge from './AgeGroupBadge'
 import { getCompetitionConfig } from '../config/adminScoringConfig'
+import { loadSumoScheduleConfig, SUMO_CONFIG_CHANGED_EVENT } from '../services/sumoScheduleConfigApi'
 
 const competitionConfig = getCompetitionConfig('vonalkovetes')
 const MIN_FINAL_TEAMS = 3
@@ -193,7 +195,8 @@ export default function LineFollowingScoring() {
   const resultSearchInputRef = useRef(null)
   const [resultDropdownStyle, setResultDropdownStyle] = useState({})
   const [allTeams, setAllTeams] = useState([])
-  const [ageGroupBreakdown, setAgeGroupBreakdown] = useState(false)
+  const [collapsedRoundIds, setCollapsedRoundIds] = useState([])
+  const [groupAdvance, setGroupAdvance] = useState({ ageGroupBreakdown: 0, psGroupAdvance: 0, hsGroupAdvance: 0, allGroupAdvance: 0 })
 
   useEffect(() => {
     const loadTeams = async () => {
@@ -201,12 +204,11 @@ export default function LineFollowingScoring() {
       setError('')
 
       try {
-        const [response, lineFollowingTeamNamesResponse, teamNamesResponse, allTeamsResponse, settingsResponse] = await Promise.all([
+        const [response, lineFollowingTeamNamesResponse, teamNamesResponse, allTeamsResponse] = await Promise.all([
           fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`),
           fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/teamnames`),
           fetch('https://legocompetition.runasp.net/api/Teams/teamnames'),
-          fetch('https://legocompetition.runasp.net/api/Teams'),
-          fetch('https://legocompetition.runasp.net/api/Settings/getAllSettings')
+          fetch('https://legocompetition.runasp.net/api/Teams')
         ])
         if (!response.ok) throw new Error('Nem sikerült betölteni a csapatokat.')
 
@@ -214,7 +216,6 @@ export default function LineFollowingScoring() {
         const lineFollowingTeamNamesData = lineFollowingTeamNamesResponse.ok ? await lineFollowingTeamNamesResponse.json() : []
         const teamNamesData = teamNamesResponse.ok ? await teamNamesResponse.json() : []
         const allTeamsData = allTeamsResponse.ok ? await allTeamsResponse.json() : []
-        const settingsData = settingsResponse.ok ? await settingsResponse.json() : []
         const normalizedResults = Array.isArray(data)
           ? data.map(normalizeLineFollowingResult).filter(Boolean)
           : []
@@ -250,8 +251,6 @@ export default function LineFollowingScoring() {
         setRoundResults(createRoundResultsFromLineFollowingResults(normalizedResults))
         setOpenEntries({})
         setAllTeams(Array.isArray(allTeamsData) ? allTeamsData : [])
-        const currentSettings = Array.isArray(settingsData) ? settingsData[0] : settingsData
-        setAgeGroupBreakdown(Number(currentSettings?.ageGroupBreakdown) === 1)
       } catch (err) {
         setError(err.message)
       } finally {
@@ -260,6 +259,15 @@ export default function LineFollowingScoring() {
     }
 
     loadTeams()
+  }, [])
+
+  useEffect(() => {
+    const refreshAdvancement = async () => {
+      try { setGroupAdvance(await loadSumoScheduleConfig()) } catch { /* A csapatlista ettől még használható marad. */ }
+    }
+    refreshAdvancement()
+    window.addEventListener(SUMO_CONFIG_CHANGED_EVENT, refreshAdvancement)
+    return () => window.removeEventListener(SUMO_CONFIG_CHANGED_EVENT, refreshAdvancement)
   }, [])
 
   useEffect(() => {
@@ -284,19 +292,6 @@ export default function LineFollowingScoring() {
       ...prev,
       [`${roundId}:${teamName}`]: !prev[`${roundId}:${teamName}`]
     }))
-  }
-
-  const handleAdvancingCountChange = (roundId, value, teamCount) => {
-    const parsedValue = Number.parseInt(value, 10)
-    const safeValue = Number.isNaN(parsedValue)
-      ? getAdvancingCount(teamCount)
-      : Math.min(teamCount, Math.max(MIN_FINAL_TEAMS, parsedValue))
-
-    setRounds((prev) => prev.map((round) => (
-      round.id === roundId
-        ? { ...round, advancingCount: safeValue }
-        : round
-    )))
   }
 
   const getSortedTeams = (items, roundId = null) => {
@@ -630,9 +625,12 @@ export default function LineFollowingScoring() {
   const rankedGroupEntries = groupStageRound
     ? getUniqueAdvancingEntries(getRoundEntries(groupStageRound), Number.MAX_SAFE_INTEGER)
     : []
-  const qualifierNames = new Set(ageGroupBreakdown
-    ? [0, 1].flatMap((category) => rankedGroupEntries.filter((entry) => categoryByTeamName.get(entry.team.team_name) === category).slice(0, 8).map((entry) => entry.team.team_name))
-    : rankedGroupEntries.slice(0, 16).map((entry) => entry.team.team_name))
+  const qualifierNames = new Set(Number(groupAdvance.ageGroupBreakdown) === 1
+    ? [0, 1].flatMap((category) => rankedGroupEntries
+      .filter((entry) => categoryByTeamName.get(entry.team.team_name) === category)
+      .slice(0, category === 0 ? groupAdvance.psGroupAdvance : groupAdvance.hsGroupAdvance)
+      .map((entry) => entry.team.team_name))
+    : rankedGroupEntries.slice(0, groupAdvance.allGroupAdvance).map((entry) => entry.team.team_name))
   const lineStandings = rankedGroupEntries.map((entry) => ({
     teamName: entry.team.team_name,
     time: entry.bestTime,
@@ -642,15 +640,15 @@ export default function LineFollowingScoring() {
 
   const createNextRound = async (round) => {
     const roundEntries = getRoundEntries(round)
-    const uniqueTeamCount = new Set(round.teams.map((team) => team.team_name)).size
-    const advancingCount = Math.min(uniqueTeamCount, Math.max(MIN_FINAL_TEAMS, round.advancingCount || getAdvancingCount(uniqueTeamCount)))
-    const isGroupStage = getStageValueFromRoundId(round.id) === 1
     const rankedEntries = getUniqueAdvancingEntries(roundEntries, Number.MAX_SAFE_INTEGER)
+    const isGroupStage = getStageValueFromRoundId(round.id) === 1
     const advancingEntries = isGroupStage
-      ? ageGroupBreakdown
-        ? [0, 1].flatMap((category) => rankedEntries.filter((entry) => categoryByTeamName.get(entry.team.team_name) === category).slice(0, 8))
-        : rankedEntries.slice(0, 16)
-      : getUniqueAdvancingEntries(roundEntries, advancingCount)
+      ? Number(groupAdvance.ageGroupBreakdown) === 1
+        ? [0, 1].flatMap((category) => rankedEntries
+          .filter((entry) => categoryByTeamName.get(entry.team.team_name) === category)
+          .slice(0, category === 0 ? groupAdvance.psGroupAdvance : groupAdvance.hsGroupAdvance))
+        : rankedEntries.slice(0, groupAdvance.allGroupAdvance)
+      : getUniqueAdvancingEntries(roundEntries, getAdvancingCount(new Set(round.teams.map((team) => team.team_name)).size))
     const advancingTeamNames = advancingEntries.map((entry) => entry.team.team_name)
 
     if (advancingTeamNames.length < MIN_FINAL_TEAMS) {
@@ -753,7 +751,7 @@ export default function LineFollowingScoring() {
                   }}
                 />
                 {!selectedResultTeam && resultSearchResults.length > 0 && (
-                    <div className="list-group shadow-lg bg-white border border-dark rounded overflow-hidden" style={resultDropdownStyle}>
+                    <div className="list-group search-results-scroll shadow-lg bg-white border border-dark rounded" style={resultDropdownStyle}>
       {resultSearchResults.map((teamName) => (
         <button
           key={`${currentResultStage}-${teamName}`}
@@ -764,7 +762,7 @@ export default function LineFollowingScoring() {
             setResultSearchTerm(teamName)
           }}
         >
-          {teamName}
+          <AgeGroupBadge category={categoryByTeamName.get(teamName)} className="me-2" />{teamName}
         </button>
       ))}
                   </div>
@@ -794,7 +792,7 @@ export default function LineFollowingScoring() {
           </div>
           </div>
 
-          <CategorizedResultsStandings title={`Vonalkövetés csoportköri tabellája – ${ageGroupBreakdown ? 'korosztályonként top 8 jut tovább' : 'top 16 jut tovább'}`} rows={lineStandings} getKey={(result) => result.teamName} columns={[{ key: 'team', label: 'Csapat', render: (result) => result.teamName }, { key: 'category', label: 'Korosztály', render: (result) => result.category === 1 ? 'Középiskolás' : 'Általános iskolás' }, { key: 'time', label: 'Legjobb idő', align: 'end', render: (result) => `${result.time} s` }, { key: 'qualifier', label: 'Továbbjutás', render: (result) => result.isQualifier ? <span className="badge text-bg-success">Továbbjutó</span> : '-' }]} />
+          <CategorizedResultsStandings title={`Vonalkövetés csoportköri tabellája – ${Number(groupAdvance.ageGroupBreakdown) === 1 ? `Á: top ${groupAdvance.psGroupAdvance}, K: top ${groupAdvance.hsGroupAdvance}` : `top ${groupAdvance.allGroupAdvance}`}`} rows={lineStandings} getKey={(result) => result.teamName} columns={[{ key: 'team', label: 'Csapat', render: (result) => result.teamName }, { key: 'category', label: 'Korosztály', render: (result) => result.category === 1 ? 'Középiskolás' : 'Általános iskolás' }, { key: 'time', label: 'Legjobb idő', align: 'end', render: (result) => `${result.time} s` }, { key: 'qualifier', label: 'Továbbjutás', render: (result) => result.isQualifier ? <span className="badge text-bg-success">Továbbjutó</span> : '-' }]} />
 
           <div className="mb-3">
             <label className="form-label" htmlFor="line-display-search">Eredmények keresése</label>
@@ -839,32 +837,49 @@ export default function LineFollowingScoring() {
             : roundEntries
           const uniqueRoundTeamNames = Array.from(new Set(round.teams.map((team) => team.team_name)))
           const uniqueRoundTeamCount = uniqueRoundTeamNames.length
-          const advancingCount = Math.min(uniqueRoundTeamCount, Math.max(MIN_FINAL_TEAMS, round.advancingCount || getAdvancingCount(uniqueRoundTeamCount)))
-          const isGroupStageRound = getStageValueFromRoundId(round.id) === 1
           const rankedRoundEntries = getUniqueAdvancingEntries(roundEntries, Number.MAX_SAFE_INTEGER)
+          const isGroupStageRound = getStageValueFromRoundId(round.id) === 1
+          const automaticAdvancingCount = getAdvancingCount(uniqueRoundTeamCount)
           const advancingTeams = isGroupStageRound
-            ? ageGroupBreakdown
-              ? [0, 1].flatMap((category) => rankedRoundEntries.filter((entry) => categoryByTeamName.get(entry.team.team_name) === category).slice(0, 8))
-              : rankedRoundEntries.slice(0, 16)
-            : getUniqueAdvancingEntries(roundEntries, advancingCount)
+            ? Number(groupAdvance.ageGroupBreakdown) === 1
+              ? [0, 1].flatMap((category) => rankedRoundEntries
+                .filter((entry) => categoryByTeamName.get(entry.team.team_name) === category)
+                .slice(0, category === 0 ? groupAdvance.psGroupAdvance : groupAdvance.hsGroupAdvance))
+              : rankedRoundEntries.slice(0, groupAdvance.allGroupAdvance)
+            : getUniqueAdvancingEntries(roundEntries, automaticAdvancingCount)
           const roundComplete = uniqueRoundTeamNames.every((teamName) => roundEntries.some((entry) => entry.team.team_name === teamName && entry.bestTime !== ''))
           const isFinalRound = uniqueRoundTeamCount <= MIN_FINAL_TEAMS
           const isRoundClosed = closedRoundIds.includes(round.id)
           const canAdvance = roundIndex === rounds.length - 1 && !isFinalRound && roundComplete && !isRoundClosed
+          const isRoundCollapsed = collapsedRoundIds.includes(round.id)
 
           return (
             <div key={round.id} className="card shadow-sm team-card no-hover-card">
-              <div className="card-body p-3 p-md-4 border-bottom">
+              <div
+                className="card-body p-3 p-md-4 border-bottom line-round-header"
+                role="button"
+                tabIndex="0"
+                aria-expanded={!isRoundCollapsed}
+                onClick={() => setCollapsedRoundIds((current) => current.includes(round.id) ? current.filter((id) => id !== round.id) : [...current, round.id])}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    setCollapsedRoundIds((current) => current.includes(round.id) ? current.filter((id) => id !== round.id) : [...current, round.id])
+                  }
+                }}
+              >
                 <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
                   <div>
                     <div className="home-kicker">Vonalkövetés</div>
                     <h4 className="mb-1">{round.label}</h4>
                     <p className="text-muted mb-0">Két időt adj meg másodpercben, a gyorsabb eredmény számít.</p>
                   </div>
-                  
+                  <span className="line-round-toggle-indicator"><span>{isRoundCollapsed ? 'Lenyitás' : 'Összecsukás'}</span><i className={`bi bi-chevron-up ${isRoundCollapsed ? 'collapsed' : ''}`} aria-hidden="true" /></span>
                 </div>
               </div>
 
+              <div className={`line-round-collapse ${isRoundCollapsed ? '' : 'open'}`}>
+              <div className="line-round-collapse-inner">
               <div className="card-body p-3 p-md-4">
                 <div className="d-grid gap-3">
                   {visibleRoundEntries.map((entry, entryIndex) => {
@@ -881,7 +896,7 @@ export default function LineFollowingScoring() {
                           aria-expanded={isOpen}
                         >
                           <div className="d-flex justify-content-between align-items-center gap-3">
-                            <span className="fw-semibold">{teamName}</span>
+                            <span className="fw-semibold"><AgeGroupBadge category={categoryByTeamName.get(teamName)} className="me-2" />{teamName}</span>
                             <div className="d-flex align-items-center gap-2 flex-wrap justify-content-end">
                               <span className="badge rounded-pill bg-light text-dark">{entry.bestTime === '' ? '-' : `${entry.bestTime} s`}</span>
                               <span className="small text-muted">{entry.saved ? 'Mentve' : 'Várakozik'}</span>
@@ -977,40 +992,29 @@ export default function LineFollowingScoring() {
                     <div className="alert alert-secondary mb-0">Ide kerülnek majd ennek a szakasznak az eredményei.</div>
                   )}
                 </div>                  
-                <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-4">
-                  <div>
+                <div className="d-flex flex-wrap justify-content-between align-items-end gap-3 mt-4">
+                  <div className="flex-grow-1">
                     <div className="fw-semibold mb-1">Továbbjutó</div>
                     <div className="d-flex flex-wrap gap-2">
                       {advancingTeams.map((entry, entryIndex) => (
                         <span key={`${round.id}-advance-${entry.team.id ?? entryIndex}-${entry.team.team_name}-${entryIndex}`} className="badge rounded-pill bg-light text-dark border border-dark">
-                          {entry.team.team_name} ({entry.bestTime === '' ? '-' : `${entry.bestTime} s`})
+                          <AgeGroupBadge category={categoryByTeamName.get(entry.team.team_name)} className="me-1" />{entry.team.team_name} ({entry.bestTime === '' ? '-' : `${entry.bestTime} s`})
                         </span>
                       ))}
                     </div>
                   </div>
 
                   {canAdvance && (
-                    <div className="d-flex flex-column align-items-start align-items-md-end gap-2">
-                      {isGroupStageRound ? <><div className="fw-semibold">{ageGroupBreakdown ? 'Korosztályonként a legjobb 8 jut tovább' : 'Az összesített legjobb 16 jut tovább'}</div><div className="text-muted small">A létszám a versenybeállítás alapján automatikus.</div></> : <><label className="form-label mb-0 fw-semibold" htmlFor={`advancing-count-${round.id}`}>
-                        Hány csapat jut tovább
-                      </label><input
-                        id={`advancing-count-${round.id}`}
-                        type="number"
-                        min={MIN_FINAL_TEAMS}
-                        max={uniqueRoundTeamCount}
-                        step="1"
-                        className="form-control form-control-sm scoring-number-input text-end"
-                        value={advancingCount}
-                        onFocus={(event) => event.target.select()}
-                        onClick={(event) => event.target.select()}
-                        onChange={(event) => handleAdvancingCountChange(round.id, event.target.value, uniqueRoundTeamCount)}
-                      /><div className="text-muted small">A következő körbe ennyi legjobb csapat megy tovább.</div></>}
+                    <div className="line-advancement-actions">
+                      <div className="text-end"><div className="fw-semibold">{isGroupStageRound ? Number(groupAdvance.ageGroupBreakdown) === 1 ? `Általános: ${groupAdvance.psGroupAdvance}, középiskolás: ${groupAdvance.hsGroupAdvance}` : `Továbbjutók: ${groupAdvance.allGroupAdvance}` : `Továbbjutók: ${automaticAdvancingCount}`}</div><div className="small text-muted">{isGroupStageRound ? 'A versenybeállításokban megadott létszám.' : 'A következő forduló automatikus létszáma.'}</div></div>
                       <button type="button" className="btn btn-outline-primary" onClick={() => createNextRound(round)} disabled={!roundComplete}>
                         Következő kör létrehozása
                       </button>
                     </div>
                   )}
                 </div>
+              </div>
+              </div>
               </div>
             </div>
           )

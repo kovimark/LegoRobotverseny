@@ -42,7 +42,10 @@ export const modifySettings = async (settings) => {
     ageGroupBreakdown: Number(settings.ageGroupBreakdown) === 1 ? 1 : 0,
     competitionPhase: settings.competitionPhase || '',
     minSumoRoundTime: toNullableInteger(settings.minSumoRoundTime),
-    maxSumoRoundTime: toNullableInteger(settings.maxSumoRoundTime)
+    maxSumoRoundTime: toNullableInteger(settings.maxSumoRoundTime),
+    psGroupAdvance: toNullableInteger(settings.psGroupAdvance) ?? 0,
+    hsGroupAdvance: toNullableInteger(settings.hsGroupAdvance) ?? 0,
+    allGroupAdvance: toNullableInteger(settings.allGroupAdvance) ?? 0
   }
   const result = await request('/modifySettings', { method: 'PUT', body: JSON.stringify(payload) })
   window.dispatchEvent(new CustomEvent(SUMO_CONFIG_CHANGED_EVENT, { detail: payload }))
@@ -99,6 +102,9 @@ export const loadSumoScheduleConfig = async () => {
     ageGroupBreakdown: Number(settings?.ageGroupBreakdown) === 1 ? 1 : 0,
     competitionPhase: typeof settings?.competitionPhase === 'string' ? settings.competitionPhase : (settings?.competitionPhase?.phaseName || ''),
     minSumoRoundTime: settings?.minSumoRoundTime ?? null,
-    maxSumoRoundTime: settings?.maxSumoRoundTime ?? null
+    maxSumoRoundTime: settings?.maxSumoRoundTime ?? null,
+    psGroupAdvance: Number(settings?.psGroupAdvance) || 0,
+    hsGroupAdvance: Number(settings?.hsGroupAdvance) || 0,
+    allGroupAdvance: Number(settings?.allGroupAdvance) || 0
   }
 }

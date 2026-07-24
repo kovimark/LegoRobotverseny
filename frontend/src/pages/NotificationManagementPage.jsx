@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
 import FloatingFeedback from '../components/FloatingFeedback'
 import { getNotificationTeams, sendNotificationToTeam } from '../services/notificationApi'
+import AgeGroupBadge from '../components/AgeGroupBadge'
 
 export default function NotificationManagementPage() {
   const [teams, setTeams] = useState([])
@@ -147,7 +148,7 @@ export default function NotificationManagementPage() {
                 <label className={`notification-team-option ${selectedIds.includes(team.id) ? 'selected' : ''}`} key={team.id}>
                   <input type="checkbox" checked={selectedIds.includes(team.id)} onChange={() => toggleTeam(team.id)} />
                   <span>
-                    <strong>{team.teamName || `Csapat #${team.id}`}</strong>
+                    <strong><AgeGroupBadge category={team.category} className="me-2" />{team.teamName || `Csapat #${team.id}`}</strong>
                     <small>{team.schoolName || 'Nincs megadott iskola'}</small>
                   </span>
                 </label>

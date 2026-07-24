@@ -94,46 +94,46 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                             </div>
                         </div>
                         <div className="profile-drawer-content">
-                            <p>Google fiókkal bejelentkezve.</p>
+                            <p><i className="bi bi-google me-2" aria-hidden="true" />Google fiókkal bejelentkezve.</p>
                             <ProfileNotificationStatus user={user} />
                             {userRole === 'admin' || Number(userPrivilege) === 1 ? (
                                 <div className="d-grid gap-2">
-                                    <Link className="btn btn-outline-primary w-100" to="/admin" onClick={() => setIsProfileOpen(false)}>
-                                        Csapatok
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-people-fill" aria-hidden="true" /><span>Csapatok</span>
                                     </Link>
-                                    <Link className="btn btn-outline-primary w-100" to="/admin/pontozas" onClick={() => setIsProfileOpen(false)}>
-                                        Pontozás kezelése
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/pontozas" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-trophy-fill" aria-hidden="true" /><span>Pontozás kezelése</span>
                                     </Link>
-                                    <Link className="btn btn-outline-primary w-100" to="/admin/jogosultsagok" onClick={() => setIsProfileOpen(false)}>
-                                        E-mailek és jogosultságok kezelése
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/jogosultsagok" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-person-lock" aria-hidden="true" /><span>E-mailek és jogosultságok kezelése</span>
                                     </Link>
-                                    <Link className="btn btn-outline-primary w-100" to="/admin/uzenetek" onClick={() => setIsProfileOpen(false)}>
-                                        Üzenetek kezelése
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/uzenetek" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-newspaper" aria-hidden="true" /><span>Üzenetek kezelése</span>
                                     </Link>
-                                    <Link className="btn btn-outline-primary w-100" to="/admin/ertesitesek" onClick={() => setIsProfileOpen(false)}>
-                                        Értesítések küldése
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/ertesitesek" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-send-fill" aria-hidden="true" /><span>Értesítések küldése</span>
                                     </Link>
-                                    <Link className="btn btn-outline-primary w-100" to="/admin/beallitasok" onClick={() => setIsProfileOpen(false)}>
-                                        Versenybeállítások
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/beallitasok" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-gear-fill" aria-hidden="true" /><span>Versenybeállítások</span>
                                     </Link>
                                 </div>
                             ) : userRole === 'judge' ? (
-                                <div className="d-grid gap-2"><Link className="btn btn-outline-primary w-100" to="/admin/pontozas" onClick={() => setIsProfileOpen(false)}>Saját versenyszám pontozása</Link><Link className="btn btn-outline-primary w-100" to="/admin/beallitasok" onClick={() => setIsProfileOpen(false)}>Csapatcsoportok</Link></div>
+                                <div className="d-grid gap-2"><Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/pontozas" onClick={() => setIsProfileOpen(false)}><i className="bi bi-trophy-fill" aria-hidden="true" /><span>Saját versenyszám pontozása</span></Link><Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/beallitasok" onClick={() => setIsProfileOpen(false)}><i className="bi bi-diagram-3-fill" aria-hidden="true" /><span>Csapatcsoportok</span></Link></div>
                             ) : (
                                 <div className="d-grid gap-2">
-                                    <Link className="btn btn-primary w-100" to="/sajat-csapataim" onClick={() => setIsProfileOpen(false)}>
-                                        Saját csapatom
+                                    <Link className="btn btn-primary w-100 profile-menu-link" to="/sajat-csapataim" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-people-fill" aria-hidden="true" /><span>Saját csapatom</span>
                                     </Link>
-                                    <Link className="btn btn-outline-primary w-100" to="/allasok" onClick={() => setIsProfileOpen(false)}>
-                                        Állások
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/allasok" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-bar-chart-fill" aria-hidden="true" /><span>Állások</span>
                                     </Link>
                                 </div>
                             )}
                             <hr />
                         </div>
                         {authError && <div className="alert alert-danger mt-3">{authError}</div>}
-                        <button className="btn btn-primary w-100 mt-3" type="button" onClick={handleSignOut}>
-                            Kijelentkezés
+                        <button className="btn btn-primary w-100 mt-3 profile-menu-link" type="button" onClick={handleSignOut}>
+                            <i className="bi bi-box-arrow-right" aria-hidden="true" /><span>Kijelentkezés</span>
                         </button>
                     </>
                 )}

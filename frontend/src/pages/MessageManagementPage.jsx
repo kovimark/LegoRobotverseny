@@ -3,6 +3,7 @@ import ConfirmModal from '../components/ConfirmModal'
 import MessageLinks from '../components/MessageLinks'
 import MessageText from '../components/MessageText'
 import FloatingFeedback from '../components/FloatingFeedback'
+import AgeGroupBadge from '../components/AgeGroupBadge'
 import { getMessageLinkLines } from '../utils/messageContent'
 import { getCategoryBadgeStyle, normalizeHexColor } from '../utils/categoryColor'
 import {
@@ -334,7 +335,7 @@ export default function MessageManagementPage() {
                 {notificationMode === 'selected' && <div className="mt-3">
                   <input type="search" className="form-control mb-2" placeholder="Csapat vagy iskola keresése…" value={notificationTeamSearch} onChange={(event) => setNotificationTeamSearch(event.target.value)} />
                   <div className="notification-team-grid">
-                    {filteredNotificationTeams.map((team) => <label className={`notification-team-option ${notificationTeamIds.includes(team.id) ? 'selected' : ''}`} key={team.id}><input type="checkbox" checked={notificationTeamIds.includes(team.id)} onChange={() => setNotificationTeamIds((current) => current.includes(team.id) ? current.filter((id) => id !== team.id) : [...current, team.id])} /><span><strong>{team.teamName || `Csapat #${team.id}`}</strong><small>{team.schoolName || 'Nincs megadott iskola'}</small></span></label>)}
+                    {filteredNotificationTeams.map((team) => <label className={`notification-team-option ${notificationTeamIds.includes(team.id) ? 'selected' : ''}`} key={team.id}><input type="checkbox" checked={notificationTeamIds.includes(team.id)} onChange={() => setNotificationTeamIds((current) => current.includes(team.id) ? current.filter((id) => id !== team.id) : [...current, team.id])} /><span><strong><AgeGroupBadge category={team.category} className="me-2" />{team.teamName || `Csapat #${team.id}`}</strong><small>{team.schoolName || 'Nincs megadott iskola'}</small></span></label>)}
                   </div>
                   <div className="form-text">{notificationTeamIds.length} csapat kijelölve.</div>
                 </div>}

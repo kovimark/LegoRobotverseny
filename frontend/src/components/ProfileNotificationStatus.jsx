@@ -87,18 +87,18 @@ export default function ProfileNotificationStatus({ user }) {
     <section className="profile-notification-status">
       <FloatingFeedback message={feedback} onClose={() => setFeedback(null)} />
       <div className="d-flex justify-content-between align-items-center gap-2">
-        <strong>Értesítések állapota</strong>
+        <strong><i className="bi bi-bell-fill me-2" aria-hidden="true" />Értesítések állapota</strong>
         <span className={`badge ${statusData[1]}`}>{statusData[0]}</span>
       </div>
       {status === 'denied' && <small>A webhely értesítéseit a böngésző beállításaiban tudod újra engedélyezni.</small>}
       {status === 'unsupported' && <small>Ez a böngésző vagy eszköz nem támogatja a webes push értesítéseket.</small>}
       {status === 'enabled' ? (
         <button type="button" className="btn btn-outline-danger btn-sm w-100" disabled={busy} onClick={disable}>
-          {busy ? 'Kikapcsolás…' : 'Értesítések kikapcsolása'}
+          <i className="bi bi-bell-slash-fill me-2" aria-hidden="true" />{busy ? 'Kikapcsolás…' : 'Értesítések kikapcsolása'}
         </button>
       ) : (
         <button type="button" className="btn btn-primary btn-sm w-100" disabled={busy || status === 'loading' || status === 'denied' || status === 'unsupported'} onClick={enable}>
-          {busy ? 'Bekapcsolás…' : 'Értesítések bekapcsolása'}
+          <i className="bi bi-bell-fill me-2" aria-hidden="true" />{busy ? 'Bekapcsolás…' : 'Értesítések bekapcsolása'}
         </button>
       )}
     </section>

@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import FloatingFeedback from './FloatingFeedback'
 import CategorizedResultsStandings from './CategorizedResultsStandings'
+import AgeGroupBadge from './AgeGroupBadge'
 import { getCompetitionConfig } from '../config/adminScoringConfig'
 
 const competitionConfig = getCompetitionConfig('kosarra-dobas')
 const HOOPS = [1, 2, 3, 4, 5]
 const MAX_THROWS = 5
+const MAX_ATTEMPTS = 10
 
 const createEmptyDraft = () => ({
   hoop1: 0,
@@ -13,7 +15,8 @@ const createEmptyDraft = () => ({
   hoop3: 0,
   hoop4: 0,
   hoop5: 0,
-  time: ''
+  time: '',
+  throwNumber: 1
 })
 
 const getTeamName = (team) => (
@@ -25,8 +28,13 @@ const calculateTotalThrows = (draft) => HOOPS.reduce(
   0
 )
 
+const normalizeAttemptInput = (value) => {
+  if (value === '') return ''
+  return Math.min(MAX_ATTEMPTS, Math.max(1, Number.parseInt(value, 10) || 1))
+}
+
 const normalizeResult = (result, index) => ({
-  id: result.id ?? result.team_name ?? `basketball-result-${index}`,
+  id: result.id ?? `${result.team_name || result.teamName || 'basketball-result'}-${result.throwNumber ?? result.throw_number ?? index}`,
   team_name: result.team_name || result.teamName || '',
   hoop1: Number(result.hoop1 ?? 0),
   hoop2: Number(result.hoop2 ?? 0),
@@ -34,7 +42,8 @@ const normalizeResult = (result, index) => ({
   hoop4: Number(result.hoop4 ?? 0),
   hoop5: Number(result.hoop5 ?? 0),
   points: Number(result.points ?? 0),
-  time: result.time == null ? null : Number(result.time)
+  time: result.time == null ? null : Number(result.time),
+  throwNumber: Number(result.throwNumber ?? result.throw_number ?? 1)
 })
 
 export default function BasketThrowScoring() {
@@ -47,11 +56,12 @@ export default function BasketThrowScoring() {
   const [selectedTeamName, setSelectedTeamName] = useState('')
   const [draft, setDraft] = useState(createEmptyDraft)
   const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [resultToDelete, setResultToDelete] = useState(null)
   const [openTeamName, setOpenTeamName] = useState(null)
   const [sortBy, setSortBy] = useState('name')
   const [allTeams, setAllTeams] = useState([])
+  const [editingResultId, setEditingResultId] = useState(null)
+  const [editDraft, setEditDraft] = useState(createEmptyDraft)
+  const [modifying, setModifying] = useState(false)
 
   const refreshResults = async () => {
     const response = await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`)
@@ -115,18 +125,8 @@ export default function BasketThrowScoring() {
     return () => window.clearTimeout(timeoutId)
   }, [actionMessage])
 
-  const scoredTeamNames = useMemo(
-    () => new Set(results.map((result) => result.team_name)),
-    [results]
-  )
-
-  const availableTeamNames = useMemo(
-    () => teamNames.filter((teamName) => !scoredTeamNames.has(teamName)),
-    [teamNames, scoredTeamNames]
-  )
-
   const searchResults = searchTerm.trim() && !selectedTeamName
-    ? availableTeamNames
+    ? teamNames
         .filter((teamName) => teamName.toLowerCase().includes(searchTerm.trim().toLowerCase()))
         .slice(0, 8)
     : []
@@ -155,14 +155,10 @@ export default function BasketThrowScoring() {
 
   const handleSave = async () => {
     const time = Number(draft.time)
+    const throwNumber = Number.parseInt(draft.throwNumber, 10)
 
     if (!selectedTeamName) {
       setActionMessage({ type: 'danger', text: 'Válassz ki egy csapatot.' })
-      return
-    }
-
-    if (scoredTeamNames.has(selectedTeamName)) {
-      setActionMessage({ type: 'danger', text: 'Ehhez a csapathoz már tartozik eredmény.' })
       return
     }
 
@@ -176,6 +172,11 @@ export default function BasketThrowScoring() {
       return
     }
 
+    if (!Number.isInteger(throwNumber) || throwNumber < 1 || throwNumber > MAX_ATTEMPTS) {
+      setActionMessage({ type: 'danger', text: 'A próbálkozás sorszáma 1 és 10 közötti egész szám lehet.' })
+      return
+    }
+
     const payload = {
       teamName: selectedTeamName,
       hoop1: Number(draft.hoop1),
@@ -183,14 +184,15 @@ export default function BasketThrowScoring() {
       hoop3: Number(draft.hoop3),
       hoop4: Number(draft.hoop4),
       hoop5: Number(draft.hoop5),
-      time
+      time,
+      throwNumber
     }
 
     setSaving(true)
 
     try {
       const response = await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`, {
-        method: 'POST',
+        method: 'PUT',
         headers: {
           accept: '*/*',
           'Content-Type': 'application/json'
@@ -215,44 +217,77 @@ export default function BasketThrowScoring() {
     }
   }
 
-  const handleDelete = async () => {
-    if (!resultToDelete) return
+  const startEditing = (result) => {
+    setEditingResultId(result.id)
+    setEditDraft({
+      hoop1: result.hoop1,
+      hoop2: result.hoop2,
+      hoop3: result.hoop3,
+      hoop4: result.hoop4,
+      hoop5: result.hoop5,
+      time: result.time ?? '',
+      throwNumber: result.throwNumber || 1
+    })
+  }
 
-    const pathParameters = [
-      resultToDelete.team_name,
-      resultToDelete.hoop1,
-      resultToDelete.hoop2,
-      resultToDelete.hoop3,
-      resultToDelete.hoop4,
-      resultToDelete.hoop5
-    ].map((value) => encodeURIComponent(value))
+  const handleEditHoopChange = (hoop, value) => {
+    const normalizedValue = value === '' ? 0 : Math.max(0, Number.parseInt(value, 10) || 0)
+    const nextDraft = { ...editDraft, [`hoop${hoop}`]: normalizedValue }
+    if (calculateTotalThrows(nextDraft) > MAX_THROWS) {
+      setActionMessage({ type: 'danger', text: 'Összesen legfeljebb 5 dobás adható meg.' })
+      return
+    }
+    setEditDraft(nextDraft)
+  }
 
-    setDeleting(true)
+  const handleModify = async (result) => {
+    const time = Number(editDraft.time)
+    const total = calculateTotalThrows(editDraft)
+    const throwNumber = Number.parseInt(editDraft.throwNumber, 10)
+    if (total <= 0 || total > MAX_THROWS) {
+      setActionMessage({ type: 'danger', text: 'Adj meg legalább 1, legfeljebb 5 dobást.' })
+      return
+    }
+    if (!Number.isFinite(time) || time <= 0) {
+      setActionMessage({ type: 'danger', text: 'Adj meg egy érvényes időt másodpercben.' })
+      return
+    }
 
+    if (!Number.isInteger(throwNumber) || throwNumber < 1 || throwNumber > MAX_ATTEMPTS) {
+      setActionMessage({ type: 'danger', text: 'A próbálkozás sorszáma 1 és 10 közötti egész szám lehet.' })
+      return
+    }
+
+    setModifying(true)
     try {
       const response = await fetch(
-        `https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/${pathParameters.join('/')}`,
+        `https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/modifyExistingAttempt`,
         {
-          method: 'DELETE',
-          headers: {
-            accept: '*/*'
-          }
+          method: 'PUT',
+          headers: { accept: '*/*', 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            teamName: result.team_name,
+            hoop1: Number(editDraft.hoop1),
+            hoop2: Number(editDraft.hoop2),
+            hoop3: Number(editDraft.hoop3),
+            hoop4: Number(editDraft.hoop4),
+            hoop5: Number(editDraft.hoop5),
+            time,
+            throwNumber
+          })
         }
       )
-
       if (!response.ok) {
         const errorText = await response.text()
-        throw new Error(errorText || 'Az eredmény törlése sikertelen volt.')
+        throw new Error(errorText || 'A próbálkozás módosítása sikertelen volt.')
       }
-
       await refreshResults()
-      setResultToDelete(null)
-      setOpenTeamName(null)
-      setActionMessage({ type: 'success', text: 'Az eredmény törölve lett.' })
+      setEditingResultId(null)
+      setActionMessage({ type: 'success', text: 'A próbálkozás módosítása sikeres volt.' })
     } catch (err) {
       setActionMessage({ type: 'danger', text: err.message })
     } finally {
-      setDeleting(false)
+      setModifying(false)
     }
   }
 
@@ -291,7 +326,7 @@ export default function BasketThrowScoring() {
                     }}
                   />
                   {searchResults.length > 0 && (
-                    <div className="list-group position-absolute start-0 end-0 mt-2 shadow-lg bg-white border border-dark rounded overflow-hidden" style={{ zIndex: 20 }}>
+                    <div className="list-group search-results-scroll position-absolute start-0 end-0 mt-2 shadow-lg bg-white border border-dark rounded" style={{ zIndex: 20 }}>
                       {searchResults.map((teamName) => (
                         <button
                           key={teamName}
@@ -302,14 +337,14 @@ export default function BasketThrowScoring() {
                             setSearchTerm(teamName)
                           }}
                         >
-                          {teamName}
+                          <AgeGroupBadge category={allTeams.find((team) => (team.teamName || team.team_name) === teamName)?.category} className="me-2" />{teamName}
                         </button>
                       ))}
                     </div>
                   )}
                 </div>
 
-                <div className="col-12 col-lg-3">
+                <div className="col-6 col-lg-2">
                   <label className="form-label" htmlFor="basket-result-time">Idő (s)</label>
                   <input
                     id="basket-result-time"
@@ -323,7 +358,21 @@ export default function BasketThrowScoring() {
                   />
                 </div>
 
-                <div className="col-12 col-lg-4">
+                <div className="col-6 col-lg-2">
+                  <label className="form-label" htmlFor="basket-throw-number">Próbálkozás</label>
+                  <input
+                    id="basket-throw-number"
+                    type="number"
+                    min="1"
+                    max={MAX_ATTEMPTS}
+                    step="1"
+                    className="form-control"
+                    value={draft.throwNumber}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, throwNumber: normalizeAttemptInput(event.target.value) }))}
+                  />
+                </div>
+
+                <div className="col-12 col-lg-3">
                   <div className="text-muted small mb-1">Dobások száma</div>
                   <div className="fw-semibold">{totalThrows} / {MAX_THROWS}</div>
                 </div>
@@ -357,7 +406,7 @@ export default function BasketThrowScoring() {
             </div>
           </div>
 
-          <CategorizedResultsStandings title="Kosárra dobás eredménytáblája" rows={[...results].sort((left, right) => right.points - left.points || Number(left.time ?? Infinity) - Number(right.time ?? Infinity) || left.team_name.localeCompare(right.team_name)).map((result) => ({ ...result, category: Number(allTeams.find((team) => (team.teamName || team.team_name) === result.team_name)?.category) === 1 ? 1 : 0 }))} getKey={(result) => result.id} columns={[{ key: 'team', label: 'Csapat', render: (result) => result.team_name }, { key: 'points', label: 'Pont', align: 'end' }, { key: 'time', label: 'Idő', align: 'end', render: (result) => result.time == null ? '-' : `${result.time} s` }, ...HOOPS.map((hoop) => ({ key: `hoop${hoop}`, label: `${hoop}. kosár`, align: 'end' }))]} />
+          <CategorizedResultsStandings title="Kosárra dobás eredménytáblája" rows={[...results].sort((left, right) => right.points - left.points || Number(left.time ?? Infinity) - Number(right.time ?? Infinity) || left.team_name.localeCompare(right.team_name)).map((result) => ({ ...result, category: Number(allTeams.find((team) => (team.teamName || team.team_name) === result.team_name)?.category) === 1 ? 1 : 0 }))} getKey={(result) => result.id} columns={[{ key: 'team', label: 'Csapat', render: (result) => result.team_name }, { key: 'throwNumber', label: 'Próbálkozás', align: 'end', render: (result) => `${result.throwNumber}.` }, { key: 'points', label: 'Pont', align: 'end' }, { key: 'time', label: 'Idő', align: 'end', render: (result) => result.time == null ? '-' : `${result.time} s` }, ...HOOPS.map((hoop) => ({ key: `hoop${hoop}`, label: `${hoop}. kosár`, align: 'end' }))]} />
 
           <div className="d-flex justify-content-end mb-3">
             <div className="btn-group" role="group" aria-label="Rendezés">
@@ -383,7 +432,7 @@ export default function BasketThrowScoring() {
                     aria-expanded={isOpen}
                   >
                     <div className="d-flex justify-content-between align-items-center gap-3">
-                      <span className="fw-semibold">{result.team_name}</span>
+                      <span className="fw-semibold"><AgeGroupBadge category={allTeams.find((team) => (team.teamName || team.team_name) === result.team_name)?.category} className="me-2" />{result.team_name}</span>
                       <div className="d-flex align-items-center gap-2">
                         <span className="badge rounded-pill bg-light text-dark">{result.points} pont</span>
                         <span>{isOpen ? '^' : 'v'}</span>
@@ -403,12 +452,69 @@ export default function BasketThrowScoring() {
                       <div className="mt-3">
                         <span className="text-muted small">Idő: </span>
                         <span className="fw-semibold">{result.time == null ? '-' : `${result.time} s`}</span>
+                        <span className="text-muted small ms-3">Próbálkozás: </span>
+                        <span className="fw-semibold">{result.throwNumber}.</span>
                       </div>
-                      <div className="d-flex justify-content-end mt-3">
-                        <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => setResultToDelete(result)}>
-                          Törlés
-                        </button>
-                      </div>
+
+                      {editingResultId === result.id ? (
+                        <div className="border rounded-3 bg-light p-3 mt-3">
+                          <div className="row g-3">
+                            {HOOPS.map((hoop) => (
+                              <div className="col-6 col-md" key={`${result.id}-edit-${hoop}`}>
+                                <label className="form-label small" htmlFor={`${result.id}-edit-hoop-${hoop}`}>{hoop}. kosár</label>
+                                <input
+                                  id={`${result.id}-edit-hoop-${hoop}`}
+                                  type="number"
+                                  min="0"
+                                  max={MAX_THROWS}
+                                  step="1"
+                                  className="form-control"
+                                  value={editDraft[`hoop${hoop}`]}
+                                  onFocus={(event) => event.target.select()}
+                                  onChange={(event) => handleEditHoopChange(hoop, event.target.value)}
+                                />
+                              </div>
+                            ))}
+                            <div className="col-6 col-md">
+                              <label className="form-label small" htmlFor={`${result.id}-edit-time`}>Idő (s)</label>
+                              <input
+                                id={`${result.id}-edit-time`}
+                                type="number"
+                                min="0"
+                                step="0.001"
+                                className="form-control"
+                                value={editDraft.time}
+                                onChange={(event) => setEditDraft((prev) => ({ ...prev, time: event.target.value }))}
+                              />
+                            </div>
+                            <div className="col-6 col-md">
+                              <label className="form-label small" htmlFor={`${result.id}-edit-throw`}>Próbálkozás</label>
+                              <input
+                                id={`${result.id}-edit-throw`}
+                                type="number"
+                                min="1"
+                                max={MAX_ATTEMPTS}
+                                step="1"
+                                className="form-control"
+                                value={editDraft.throwNumber}
+                                onChange={(event) => setEditDraft((prev) => ({ ...prev, throwNumber: normalizeAttemptInput(event.target.value) }))}
+                              />
+                            </div>
+                          </div>
+                          <div className="d-flex justify-content-end gap-2 mt-3">
+                            <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setEditingResultId(null)} disabled={modifying}>Mégse</button>
+                            <button type="button" className="btn btn-primary btn-sm" onClick={() => handleModify(result)} disabled={modifying}>
+                              {modifying ? 'Mentés...' : 'Módosítás mentése'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="d-flex justify-content-end mt-3">
+                          <button type="button" className="btn btn-outline-primary btn-sm" onClick={() => startEditing(result)}>
+                            Szerkesztés
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -419,36 +525,6 @@ export default function BasketThrowScoring() {
               <div className="alert alert-secondary">Még nincs rögzített eredmény.</div>
             )}
           </div>
-        </>
-      )}
-
-      {resultToDelete && (
-        <>
-          <div className="modal d-block" tabIndex="-1" role="dialog">
-            <div className="modal-dialog modal-dialog-centered" role="document">
-              <div className="modal-content border-0 shadow-lg">
-                <div className="modal-header">
-                  <h5 className="modal-title fw-bold text-dark">Kosárra dobás eredményének törlése</h5>
-                  <button type="button" className="btn-close" aria-label="Bezárás" onClick={() => setResultToDelete(null)} disabled={deleting}></button>
-                </div>
-                <div className="modal-body">
-                  <p className="mb-2 text-dark">Biztosan törlöd ezt az eredményt?</p>
-                  <p className="fw-semibold mb-1 text-dark">{resultToDelete.team_name}</p>
-                  <p className="small mb-0 text-dark">
-                    Találatok: {HOOPS.map((hoop) => resultToDelete[`hoop${hoop}`]).join(', ')}
-                  </p>
-                  <p className="small mb-0 text-dark">Idő: {resultToDelete.time == null ? '-' : `${resultToDelete.time} s`}</p>
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-outline-secondary" onClick={() => setResultToDelete(null)} disabled={deleting}>Mégse</button>
-                  <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={deleting}>
-                    {deleting ? 'Törlés...' : 'Törlés'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="modal-backdrop show"></div>
         </>
       )}
     </div>

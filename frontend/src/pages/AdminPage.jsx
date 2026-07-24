@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import FloatingFeedback from '../components/FloatingFeedback'
+import AgeGroupBadge from '../components/AgeGroupBadge'
 
 const editableTeamFields = [
   'teamName',
@@ -30,6 +31,10 @@ export default function AdminPage() {
   const [editErrors, setEditErrors] = useState({})
   const [editLoading, setEditLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [groupFilter, setGroupFilter] = useState('all')
+  const [schoolFilter, setSchoolFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('name-asc')
 
   const fetchTeams = async () => {
     try {
@@ -69,30 +74,59 @@ export default function AdminPage() {
     setOpenTeamId((prevId) => (prevId === teamId ? null : teamId))
   }
 
-  const filteredTeams = teams.filter((team) => {
-    const normalizedSearch = searchTerm.trim().toLowerCase()
+  const groupOptions = useMemo(() => Array.from(new Set(
+    teams.map((team) => String(team.group || '').trim().toUpperCase()).filter(Boolean)
+  )).sort((left, right) => left.localeCompare(right, 'hu')), [teams])
 
-    if (!normalizedSearch) {
-      return true
-    }
+  const schoolOptions = useMemo(() => Array.from(new Set(
+    teams.map((team) => String(team.schoolName || '').trim()).filter(Boolean)
+  )).sort((left, right) => left.localeCompare(right, 'hu')), [teams])
 
-    const searchableValues = [
-      team.teamName,
-      team.teamMember1Name,
-      team.teamMember1Email,
-      team.teamMember2Name,
-      team.teamMember2Email,
-      team.teamCoach1,
-      team.teamCoach1Email,
-      team.category,
-      team.schoolName,
-      team.id,
-      team.teamMember1Class,
-      team.teamMember2Class
-    ].filter(Boolean)
+  const filteredTeams = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLocaleLowerCase('hu-HU')
+    const matches = teams.filter((team) => {
+      const searchableValues = [
+        team.teamName,
+        team.teamMember1Name,
+        team.teamMember1Email,
+        team.teamMember2Name,
+        team.teamMember2Email,
+        team.teamCoach1,
+        team.teamCoach1Email,
+        team.schoolName,
+        team.group,
+        team.id,
+        team.teamMember1Class,
+        team.teamMember2Class
+      ].filter((value) => value !== null && value !== undefined && value !== '')
+      const matchesSearch = !normalizedSearch || searchableValues.some(
+        (value) => String(value).toLocaleLowerCase('hu-HU').includes(normalizedSearch)
+      )
+      const matchesCategory = categoryFilter === 'all' || Number(team.category) === Number(categoryFilter)
+      const teamGroup = String(team.group || '').trim().toUpperCase()
+      const matchesGroup = groupFilter === 'all'
+        || (groupFilter === 'none' ? !teamGroup : teamGroup === groupFilter)
+      const matchesSchool = schoolFilter === 'all' || team.schoolName === schoolFilter
+      return matchesSearch && matchesCategory && matchesGroup && matchesSchool
+    })
 
-    return searchableValues.some((value) => String(value).toLowerCase().includes(normalizedSearch))
-  })
+    return matches.sort((left, right) => {
+      if (sortBy === 'name-desc') return String(right.teamName || '').localeCompare(String(left.teamName || ''), 'hu')
+      if (sortBy === 'school') return String(left.schoolName || '').localeCompare(String(right.schoolName || ''), 'hu') || String(left.teamName || '').localeCompare(String(right.teamName || ''), 'hu')
+      if (sortBy === 'group') return String(left.group || 'ZZ').localeCompare(String(right.group || 'ZZ'), 'hu') || String(left.teamName || '').localeCompare(String(right.teamName || ''), 'hu')
+      if (sortBy === 'newest') return Number(right.id || 0) - Number(left.id || 0)
+      if (sortBy === 'oldest') return Number(left.id || 0) - Number(right.id || 0)
+      return String(left.teamName || '').localeCompare(String(right.teamName || ''), 'hu')
+    })
+  }, [teams, searchTerm, categoryFilter, groupFilter, schoolFilter, sortBy])
+
+  const resetFilters = () => {
+    setSearchTerm('')
+    setCategoryFilter('all')
+    setGroupFilter('all')
+    setSchoolFilter('all')
+    setSortBy('name-asc')
+  }
 
   const handleDelete = async () => {
     if (!teamToDelete) {
@@ -216,7 +250,7 @@ export default function AdminPage() {
       }
 
       setTeams((previousTeams) => previousTeams.map((team) => (
-        team.id === payload.id ? { ...team, ...payload } : team
+        team.id === teamToEdit.id ? { ...team, ...payload } : team
       )))
       setTeamToEdit(null)
       setActionMessage({ type: 'success', text: 'A csapat adatai sikeresen frissültek.' })
@@ -239,18 +273,71 @@ export default function AdminPage() {
         <div className="alert alert-secondary">Nincsenek csapatok.</div>
       )}
 
-      <div className="row g-3 align-items-start">
-        <div className="col-lg-4">
-          <label htmlFor="team-search" className="form-label fw-semibold">Keresés</label>
-          <input
-            id="team-search"
-            type="text"
-            className="form-control"
-            placeholder="Keresés név, email, iskola vagy egyéb adat alapján"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-          />
+      <div className="card shadow-sm team-card no-hover-card mb-4">
+        <div className="card-body p-3 p-md-4">
+          <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+              <h3 className="h5 mb-1"><i className="bi bi-search me-2" />Keresés és szűrés</h3>
+              <div className="small text-muted">{filteredTeams.length} találat az összesen {teams.length} csapatból</div>
+            </div>
+            <button type="button" className="btn btn-outline-secondary btn-sm" onClick={resetFilters}>
+              <i className="bi bi-arrow-counterclockwise me-2" />Szűrők törlése
+            </button>
+          </div>
+          <div className="row g-3">
+            <div className="col-12 col-xl-4">
+              <label htmlFor="team-search" className="form-label fw-semibold">Szabad szavas keresés</label>
+              <div className="input-group">
+                <span className="input-group-text"><i className="bi bi-search" /></span>
+                <input
+                  id="team-search"
+                  type="search"
+                  className="form-control"
+                  placeholder="Csapat, személy, e-mail, iskola, osztály vagy azonosító"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                />
+              </div>
+            </div>
+            <div className="col-6 col-md-3 col-xl-2">
+              <label htmlFor="team-category-filter" className="form-label fw-semibold">Korosztály</label>
+              <select id="team-category-filter" className="form-select" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+                <option value="all">Mindegyik</option>
+                <option value="0">Általános iskola</option>
+                <option value="1">Középiskola</option>
+              </select>
+            </div>
+            <div className="col-6 col-md-3 col-xl-2">
+              <label htmlFor="team-group-filter" className="form-label fw-semibold">Csoport</label>
+              <select id="team-group-filter" className="form-select" value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>
+                <option value="all">Mindegyik</option>
+                <option value="none">Nincs csoport</option>
+                {groupOptions.map((group) => <option value={group} key={group}>{group} csoport</option>)}
+              </select>
+            </div>
+            <div className="col-12">
+              <label htmlFor="team-school-filter" className="form-label fw-semibold">Iskola</label>
+              <select id="team-school-filter" className="form-select" value={schoolFilter} onChange={(event) => setSchoolFilter(event.target.value)}>
+                <option value="all">Minden iskola</option>
+                {schoolOptions.map((school) => <option value={school} key={school}>{school}</option>)}
+              </select>
+            </div>
+            <div className="col-12 col-md-6 col-xl-2">
+              <label htmlFor="team-sort" className="form-label fw-semibold">Rendezés</label>
+              <select id="team-sort" className="form-select" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+                <option value="name-asc">Csapatnév A–Z</option>
+                <option value="name-desc">Csapatnév Z–A</option>
+                <option value="school">Iskola szerint</option>
+                <option value="group">Csoport szerint</option>
+                <option value="newest">Legújabb elöl</option>
+                <option value="oldest">Legrégebbi elöl</option>
+              </select>
+            </div>
+          </div>
         </div>
+      </div>
+
+      <div className="row g-3 align-items-start">
         <div className="col-lg-12 d-flex flex-column gap-3">
           {filteredTeams.map((team) => {
           const isOpen = openTeamId === team.id
@@ -266,8 +353,9 @@ export default function AdminPage() {
                 >
                   <span className="d-flex justify-content-between align-items-center gap-3">
                     <span>
-                      <span className="d-block fw-bold fs-5">{team.teamName || `Csapat #${team.id}`}</span>
+                      <span className="d-block fw-bold fs-5"><AgeGroupBadge category={team.category} className="me-2" />{team.teamName || `Csapat #${team.id}`}</span>
                       <span className="small opacity-75">{team.schoolName || 'Nincs megadott iskola'}</span>
+                      {team.group && <span className="badge text-bg-light border text-dark ms-2">{String(team.group).toUpperCase()} csoport</span>}
                     </span>
                     <span className="fs-5" aria-hidden="true">{isOpen ? '▴' : '▾'}</span>
                   </span>
@@ -413,6 +501,11 @@ export default function AdminPage() {
             </div>
           )
           })}
+          {teams.length > 0 && filteredTeams.length === 0 && (
+            <div className="alert alert-secondary mb-0">
+              <i className="bi bi-search me-2" />Nincs a megadott keresésnek és szűrőknek megfelelő csapat.
+            </div>
+          )}
         </div>
       </div>
 
