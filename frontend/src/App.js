@@ -18,7 +18,7 @@ import SettingsManagementPage from './pages/SettingsManagementPage';
 import NewsPage from './pages/NewsPage';
 import NewsDetailsPage from './pages/NewsDetailsPage';
 import NotificationManagementPage from './pages/NotificationManagementPage';
-import { auth, googleProvider } from './firebase';
+import { auth, authPersistenceReady, googleProvider } from './firebase';
 import { isJudgePrivilege } from './config/privilegeConfig';
 import { subscribeTeamsToPush } from './services/notificationApi';
 
@@ -32,9 +32,14 @@ function App() {
   useEffect(() => {
     const handleRedirectResult = async () => {
       try {
+        await authPersistenceReady;
         await getRedirectResult(auth);
       } catch (error) {
         setAuthError(`Sikertelen bejelentkezés: ${error.message}`);
+      } finally {
+        // Mobilböngészőben a redirect eredménye sikertelenül is visszatérhet.
+        // Ilyenkor se maradjon végtelen ideig letiltva a belépés gombja.
+        setAuthLoading(false);
       }
     };
 
@@ -116,23 +121,21 @@ function App() {
     setAuthLoading(true);
 
     try {
-      const isLikelyMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
-
-      if (isLikelyMobile) {
-        await signInWithRedirect(auth, googleProvider);
-        return;
-      }
-
+      await authPersistenceReady;
       try {
         await signInWithPopup(auth, googleProvider);
       } catch (popupError) {
-        if (popupError?.code === 'auth/popup-blocked' || popupError?.code === 'auth/popup-closed-by-user' || popupError?.message?.includes('popup')) {
+        if (popupError?.code === 'auth/popup-blocked') {
           await signInWithRedirect(auth, googleProvider);
+          // Néhány mobilböngésző a navigáció elindítása nélkül oldja fel
+          // a redirect ígéretét. Ebben az esetben újra használható a gomb.
+          setAuthLoading(false);
           return;
         }
 
         throw popupError;
       }
+      setAuthLoading(false);
     } catch (error) {
       setAuthLoading(false);
       setAuthError(`Sikertelen bejelentkezés: ${error.message}`);

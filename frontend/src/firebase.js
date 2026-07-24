@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth, GoogleAuthProvider } from 'firebase/auth'
+import { browserLocalPersistence, getAuth, GoogleAuthProvider, setPersistence } from 'firebase/auth'
 
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
@@ -13,6 +13,10 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig)
 const auth = getAuth(app)
+const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.warn('A Firebase helyi munkamenet beállítása nem sikerült:', error.message)
+})
 const googleProvider = new GoogleAuthProvider()
+googleProvider.setCustomParameters({ prompt: 'select_account' })
 
-export { auth, googleProvider }
+export { auth, authPersistenceReady, googleProvider }

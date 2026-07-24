@@ -125,7 +125,15 @@ export default function MyTeamsPage({ user }) {
                 <h3 className="h4 mb-1"><AgeGroupBadge category={team.category} className="me-2" />{team.teamName || `Csapat #${team.id}`}</h3>
                 <div className="text-muted">{team.schoolName || 'Nincs megadott iskola'}</div>
               </div>
-              <span className="badge text-bg-dark fs-6">#{team.id}</span>
+              <div className="d-flex flex-wrap align-items-center gap-2">
+                <span className={`badge fs-6 ${team.group || team.details?.team?.group ? 'text-bg-primary' : 'text-bg-secondary'}`}>
+                  <i className="bi bi-people-fill me-2" />
+                  {team.group || team.details?.team?.group
+                    ? `${String(team.group || team.details?.team?.group).toUpperCase()} csoport`
+                    : 'Még nincs csoportba osztva'}
+                </span>
+                <span className="badge text-bg-dark fs-6">#{team.id}</span>
+              </div>
             </header>
 
             <div className="card-body border-top">
