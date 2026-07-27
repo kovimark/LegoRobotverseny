@@ -1052,7 +1052,16 @@ form {
 }
 
 .schedule-shift-control {
-  width: min(100%, 330px);
+  width: min(100%, 520px);
+}
+
+.schedule-shift-control > .form-select {
+  width: 135px;
+  flex: 0 0 135px;
+}
+
+.schedule-shift-control > .input-group {
+  flex: 1 1 280px;
 }
 
 @media (max-width: 767.98px) {
@@ -1541,6 +1550,82 @@ form {
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: .25rem;
+}
+
+.scoring-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+  scrollbar-width: auto;
+  border: 1px solid rgba(0, 0, 0, .12);
+  border-radius: .45rem;
+}
+
+.scoring-table-scroll::-webkit-scrollbar {
+  height: .7rem;
+}
+
+.scoring-table-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #6c757d;
+  background-clip: padding-box;
+}
+
+.scoring-results-table {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.scoring-table-hint {
+  margin-bottom: .4rem;
+  color: #6c757d;
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+@media (max-width: 767.98px) {
+  .scoring-results-table th,
+  .scoring-results-table td {
+    white-space: nowrap;
+  }
+}
+
+.floating-refresh-button {
+  position: fixed;
+  left: max(1rem, env(safe-area-inset-left));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  z-index: 1040;
+  display: inline-grid;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+  border: 2px solid var(--black);
+  border-radius: 50%;
+  color: var(--black);
+  background: var(--yellow);
+  box-shadow: .25rem .25rem 0 var(--black);
+  font-size: 1.35rem;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.floating-refresh-button:hover,
+.floating-refresh-button:focus-visible {
+  color: var(--black);
+  transform: translateY(-2px);
+  box-shadow: .35rem .35rem 0 var(--black);
+}
+
+.floating-refresh-button.refreshing i {
+  animation: floating-refresh-spin .7s linear infinite;
+}
+
+@keyframes floating-refresh-spin {
+  to { transform: rotate(360deg); }
 }
 
 .line-round-header {

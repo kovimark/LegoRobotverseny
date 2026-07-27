@@ -3,8 +3,10 @@ import FloatingFeedback from './FloatingFeedback'
 import CategorizedResultsStandings from './CategorizedResultsStandings'
 import AgeGroupBadge from './AgeGroupBadge'
 import { getCompetitionConfig } from '../config/adminScoringConfig'
+import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 
 const competitionConfig = getCompetitionConfig('hegymaszas')
+const MAX_COMPLETED_LEVEL = 4
 
 export default function HillClimbingScoring() {
   const [teams, setTeams] = useState([])
@@ -38,6 +40,8 @@ export default function HillClimbingScoring() {
     }
 
     loadTeams()
+    window.addEventListener(DATA_REFRESH_EVENT, loadTeams)
+    return () => window.removeEventListener(DATA_REFRESH_EVENT, loadTeams)
   }, [])
 
   useEffect(() => {
@@ -118,6 +122,15 @@ export default function HillClimbingScoring() {
       const timeSpent = Number(update.time_spent_on_level ?? team.time_spent_on_level ?? 0)
       const raceStateValue = normalizeRaceState(update.eliminated === undefined ? team.eliminated : update.eliminated)
 
+      if (!Number.isInteger(level) || level < 0 || level > MAX_COMPLETED_LEVEL) {
+        setActionMessage({ type: 'danger', text: 'Az elért szint 0 és 4 közötti egész szám lehet.' })
+        return
+      }
+      if (!Number.isFinite(timeSpent) || timeSpent < 0) {
+        setActionMessage({ type: 'danger', text: 'Az eltöltött idő nem lehet negatív.' })
+        return
+      }
+
       const hasLevelTimeChange = level !== currentLevel || timeSpent !== currentTime
       const hasRaceStateChange = raceStateValue !== currentRaceState
 
@@ -171,7 +184,7 @@ export default function HillClimbingScoring() {
 
       {!loading && !error && teams.length > 0 && <div className="mb-3"><label className="form-label" htmlFor="hill-team-search">Csapat keresése</label><div className="input-group"><span className="input-group-text"><i className="bi bi-search" /></span><input id="hill-team-search" type="search" className="form-control" placeholder="Kezdj el gépelni…" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} /></div></div>}
 
-      <div className="d-flex flex-column gap-3 scoring-search-scroll">
+      <div className="d-grid gap-3">
         {filteredTeams.map((team) => {
           const isOpen = openTeamName === team.team_name
           const draft = pendingUpdates[team.team_name] || {}
@@ -205,12 +218,13 @@ export default function HillClimbingScoring() {
                       <input
                         type="number"
                         min="0"
+                        max={MAX_COMPLETED_LEVEL}
                         step="1"
                         className="form-control form-control-sm scoring-number-input"
                         value={completedLevel}
                         onFocus={(event) => event.target.select()}
                         onClick={(event) => event.target.select()}
-                        onChange={(event) => handleFieldChange(team.team_name, 'completed_level', Number(event.target.value))}
+                        onChange={(event) => handleFieldChange(team.team_name, 'completed_level', Math.min(MAX_COMPLETED_LEVEL, Math.max(0, Number.parseInt(event.target.value, 10) || 0)))}
                       />
                     </div>
                     <div className="flex-grow-1" style={{ minWidth: '9rem' }}>

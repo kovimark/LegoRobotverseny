@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import FloatingFeedback from './FloatingFeedback'
+import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 
 const API_URL = 'https://legocompetition.runasp.net/api/TieBreaker'
 
@@ -39,7 +40,11 @@ export default function TieBreakerManager({ competitionId, competitionLabel = 'V
     loadTieBreakers()
     const handleTieBreakerRefresh = () => loadTieBreakers()
     window.addEventListener('tieBreakersChanged', handleTieBreakerRefresh)
-    return () => window.removeEventListener('tieBreakersChanged', handleTieBreakerRefresh)
+    window.addEventListener(DATA_REFRESH_EVENT, handleTieBreakerRefresh)
+    return () => {
+      window.removeEventListener('tieBreakersChanged', handleTieBreakerRefresh)
+      window.removeEventListener(DATA_REFRESH_EVENT, handleTieBreakerRefresh)
+    }
   }, [loadTieBreakers, reloadKey])
 
   const moveTeam = (tieBreakerId, index, direction) => {

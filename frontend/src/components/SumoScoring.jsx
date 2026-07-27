@@ -3,9 +3,11 @@ import FloatingFeedback from './FloatingFeedback'
 import AgeGroupBadge from './AgeGroupBadge'
 import { getCompetitionConfig } from '../config/adminScoringConfig'
 import { loadSumoScheduleConfig, SUMO_CONFIG_CHANGED_EVENT } from '../services/sumoScheduleConfigApi'
+import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 
 const competitionConfig = getCompetitionConfig('szumo')
 const GROUP_STAGE = 'GS'
+const GROUP_MATCH_RESULT_LIMIT = 3
 const KNOCKOUT_WIN_POINTS = 6
 const KNOCKOUT_STAGES = ['RO16', 'QF', 'SF', 'BM', 'F']
 const KNOCKOUT_STAGE_PRIORITY = [
@@ -424,6 +426,9 @@ export default function SumoScoring() {
   const [showCategoryStandings, setShowCategoryStandings] = useState(false)
   const [groupAdvance, setGroupAdvance] = useState({ psGroupAdvance: 0, hsGroupAdvance: 0, allGroupAdvance: 0 })
   const [matchSearch, setMatchSearch] = useState('')
+  const [matchTableFilter, setMatchTableFilter] = useState('all')
+  const [matchStatusFilter, setMatchStatusFilter] = useState('all')
+  const [matchCategoryFilter, setMatchCategoryFilter] = useState('all')
   const [matchDrafts, setMatchDrafts] = useState({})
   const [openMatches, setOpenMatches] = useState({})
   const [actionMessage, setActionMessage] = useState(null)
@@ -498,6 +503,8 @@ export default function SumoScoring() {
     }
 
     loadData()
+    window.addEventListener(DATA_REFRESH_EVENT, loadData)
+    return () => window.removeEventListener(DATA_REFRESH_EVENT, loadData)
   }, [])
 
   useEffect(() => {
@@ -545,6 +552,21 @@ export default function SumoScoring() {
   )
 
   const groupRoundCount = useMemo(() => buildRoundGroups(groupStageMatches).length, [groupStageMatches])
+  const bonusRoundTeams = useMemo(() => {
+    const matchCounts = new Map(teams.map((team) => [team.name, 0]))
+    groupStageMatches.forEach((match) => {
+      matchCounts.set(match.team1Name, (matchCounts.get(match.team1Name) || 0) + 1)
+      matchCounts.set(match.team2Name, (matchCounts.get(match.team2Name) || 0) + 1)
+    })
+    const pools = ageGroupBreakdown
+      ? [0, 1].map((category) => teams.filter((team) => team.category === category))
+      : [teams]
+    return pools.flatMap((pool) => {
+      if (pool.length < 2) return []
+      const maximum = Math.max(...pool.map((team) => matchCounts.get(team.name) || 0))
+      return pool.filter((team) => (matchCounts.get(team.name) || 0) < maximum)
+    })
+  }, [ageGroupBreakdown, groupStageMatches, teams])
   const latestGroupRoundNumber = useMemo(() => groupStageMatches.reduce((latest, match) => Math.max(latest, Number(match.table) || 0), 0), [groupStageMatches])
   const latestGroupRoundComplete = latestGroupRoundNumber === 0 || groupStageMatches
     .filter((match) => Number(match.table) === latestGroupRoundNumber)
@@ -805,7 +827,34 @@ export default function SumoScoring() {
     return pairings
   }
 
-  const handleGenerateMatches = async (startKnockout = false) => {
+  const generateBonusRoundMatches = () => {
+    if (bonusRoundTeams.length < 2) return []
+    const usedPairKeys = new Set(matches.map((match) => buildPairKey(match.team1Name, match.team2Name)))
+    const pairings = []
+    const pools = ageGroupBreakdown
+      ? [0, 1].map((category) => bonusRoundTeams.filter((team) => team.category === category))
+      : [bonusRoundTeams]
+
+    pools.forEach((pool) => {
+      if (pool.length < 2) return
+      const sortedPool = [...pool].sort((left, right) => left.name.localeCompare(right.name, 'hu'))
+      const result = getRoundPairings(sortedPool, usedPairKeys)
+      const poolPairings = result?.pairings?.length > 0
+        ? result.pairings
+        : Array.from({ length: Math.floor(sortedPool.length / 2) }, (_, index) => ({
+          team1: sortedPool[index * 2],
+          team2: sortedPool[index * 2 + 1]
+        }))
+      poolPairings.forEach((pairing) => {
+        if (!pairing.team1 || !pairing.team2) return
+        usedPairKeys.add(buildPairKey(pairing.team1.name, pairing.team2.name))
+        pairings.push({ ...pairing, table: nextRoundNumber })
+      })
+    })
+    return pairings
+  }
+
+  const handleGenerateMatches = async (startKnockout = false, bonusRound = false) => {
     if (!teams.length) {
       setActionMessage({ type: 'danger', text: 'Előbb töltsd be a nevezett csapatokat.' })
       return
@@ -851,7 +900,9 @@ export default function SumoScoring() {
     }
 
     const shouldGenerateKnockout = startKnockout || stageMode === 'knockout' || isKnockoutStage(selectedStage)
-    const pairings = shouldGenerateKnockout ? generateKnockoutPairings() : generateRoundMatches()
+    const pairings = shouldGenerateKnockout
+      ? generateKnockoutPairings()
+      : bonusRound ? generateBonusRoundMatches() : generateRoundMatches()
 
     if (!pairings || pairings.length === 0) {
       if (shouldGenerateKnockout) {
@@ -866,7 +917,7 @@ export default function SumoScoring() {
       if (shouldGenerateKnockout) {
         setActionMessage({ type: 'danger', text: 'Nem sikerült egyenes kieséses párosítást generálni a jelenlegi csapatszámmal.' })
       } else {
-        setActionMessage({ type: 'danger', text: 'Nem sikerült új fordulót generálni visszavágó nélkül.' })
+        setActionMessage({ type: 'danger', text: bonusRound ? 'Nincs legalább két olyan csapat, amely kevesebb csoportmeccset játszott.' : 'Nem sikerült új fordulót generálni visszavágó nélkül.' })
       }
       return
     }
@@ -921,7 +972,7 @@ export default function SumoScoring() {
         setSelectedStage(generatedMatches[0]?.tournamentStage || KNOCKOUT_STAGES[0])
         setStageMode('knockout')
       }
-      setActionMessage({ type: 'success', text: 'A meccsek sikeresen legenerálva.' })
+      setActionMessage({ type: 'success', text: bonusRound ? 'A kiegyenlítő plusz kör sikeresen legenerálva.' : 'A meccsek sikeresen legenerálva.' })
     } catch (err) {
       setActionMessage({ type: 'danger', text: err.message })
     }
@@ -987,6 +1038,10 @@ export default function SumoScoring() {
 
     if (getKnockoutWinnerName(match)) {
       setActionMessage({ type: 'info', text: 'Ez a kieséses meccs már lezárult, mert az egyik csapat elérte a 6 pontot.' })
+      return
+    }
+    if (getMatchStage(match) === GROUP_STAGE && match.team1Results.length >= GROUP_MATCH_RESULT_LIMIT) {
+      setActionMessage({ type: 'info', text: 'Csoportköri meccsen legfeljebb 3 eredmény rögzíthető.' })
       return
     }
 
@@ -1131,15 +1186,27 @@ export default function SumoScoring() {
 
   const currentRoundLabel = stageMatches.length > 0 ? `${stageMatches.length} meccs` : 'Nincsenek még meccsek'
   const normalizedMatchSearch = matchSearch.trim().toLocaleLowerCase('hu-HU')
-  const visibleRoundGroups = normalizedMatchSearch
-    ? roundGroups.map((round) => ({
+  const categoryByMatchTeam = new Map(teams.map((team) => [team.name, team.category]))
+  const matchTableOptions = Array.from(new Set(roundGroups.flatMap((round) => round.matches.map((match) => Number(match.table))))).sort((left, right) => left - right)
+  const visibleRoundGroups = roundGroups.map((round) => ({
       ...round,
-      matches: round.matches.filter((match) =>
-        `${match.team1Name} ${match.team2Name} ${getStageLabel(getMatchStage(match))} ${round.table}`
+      matches: round.matches.filter((match) => {
+        const stage = getMatchStage(match)
+        const isComplete = stage === GROUP_STAGE
+          ? match.team1Results.length >= GROUP_MATCH_RESULT_LIMIT
+          : Boolean(getKnockoutWinnerName(match))
+        const matchesSearch = !normalizedMatchSearch || `${match.team1Name} ${match.team2Name} ${getStageLabel(stage)} ${match.table}`
           .toLocaleLowerCase('hu-HU')
-          .includes(normalizedMatchSearch))
+          .includes(normalizedMatchSearch)
+        const matchesTable = matchTableFilter === 'all' || Number(match.table) === Number(matchTableFilter)
+        const matchesStatus = matchStatusFilter === 'all'
+          || (matchStatusFilter === 'complete' ? isComplete : !isComplete)
+        const matchesCategory = matchCategoryFilter === 'all'
+          || categoryByMatchTeam.get(match.team1Name) === Number(matchCategoryFilter)
+          || categoryByMatchTeam.get(match.team2Name) === Number(matchCategoryFilter)
+        return matchesSearch && matchesTable && matchesStatus && matchesCategory
+      })
     })).filter((round) => round.matches.length > 0)
-    : roundGroups
 
   return (
     <div>
@@ -1175,6 +1242,17 @@ export default function SumoScoring() {
                 >
                   {primaryActionLabel}
                 </button>
+                {!isKnockoutView && !hasKnockoutStarted && (
+                  <button
+                    type="button"
+                    className="btn btn-outline-warning px-4"
+                    onClick={() => handleGenerateMatches(false, true)}
+                    disabled={!latestGroupRoundComplete || bonusRoundTeams.length < 2}
+                    title={bonusRoundTeams.length < 2 ? 'Nincs legalább két kevesebb meccset játszó csapat.' : `${bonusRoundTeams.length} csapat érintett`}
+                  >
+                    <i className="bi bi-plus-circle me-2" />Kiegyenlítő plusz kör
+                  </button>
+                )}
                 {!isKnockoutView && hasReachedMinimumRounds && !hasKnockoutStarted && (
                   <button
                     type="button"
@@ -1230,8 +1308,8 @@ export default function SumoScoring() {
             <div className="card-body p-4">
               <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3"><h5 className="mb-0">Aktuális sorrend</h5><div className="form-check form-switch"><input id="sumo-category-standings" className="form-check-input" type="checkbox" role="switch" checked={showCategoryStandings} onChange={(event) => setShowCategoryStandings(event.target.checked)} /><label className="form-check-label" htmlFor="sumo-category-standings">Csoportbontásos eredmények megtekintése</label></div></div>
               {groupStandings.length > 0 ? (
-                <div className="d-grid gap-4">{standingsSections.map((section) => <section key={section.key}>{section.label && <h6 className="mb-2">{section.label}</h6>}{section.standings.length > 0 ? <div className="table-responsive">
-                  <table className="table table-sm align-middle mb-0">
+                <div className="d-grid gap-4">{standingsSections.map((section) => <section key={section.key}>{section.label && <h6 className="mb-2">{section.label}</h6>}{section.standings.length > 0 ? <><div className="scoring-table-hint d-md-none"><i className="bi bi-arrows me-1" />A teljes táblázathoz húzd oldalra.</div><div className="table-responsive scoring-table-scroll" tabIndex="0">
+                  <table className="table table-sm align-middle mb-0 scoring-results-table" style={{ minWidth: '44rem' }}>
                     <thead>
                       <tr>
                         <th>Csapat</th>
@@ -1255,7 +1333,7 @@ export default function SumoScoring() {
                       ))}
                     </tbody>
                   </table>
-                </div> : <div className="small text-muted">Ebben a korosztályban még nincs eredmény.</div>}</section>)}</div>
+                </div></> : <div className="small text-muted">Ebben a korosztályban még nincs eredmény.</div>}</section>)}</div>
               ) : (
                 <div className="alert alert-secondary mb-0">Még nincs rögzített eredmény ebben a szakaszban.</div>
               )}
@@ -1273,9 +1351,39 @@ export default function SumoScoring() {
       )}
 
       {!loading && !error && roundGroups.length > 0 && (
-        <div className="mb-3">
-          <label className="form-label" htmlFor="sumo-match-search">Meccs vagy csapat keresése</label>
-          <div className="input-group"><span className="input-group-text"><i className="bi bi-search" /></span><input id="sumo-match-search" type="search" className="form-control" placeholder="Csapatnév, szakasz vagy forduló…" value={matchSearch} onChange={(event) => setMatchSearch(event.target.value)} /></div>
+        <div className="card shadow-sm team-card no-hover-card mb-3">
+          <div className="card-body p-3">
+            <div className="row g-3">
+              <div className="col-12 col-lg-5">
+                <label className="form-label" htmlFor="sumo-match-search">Meccs vagy csapat keresése</label>
+                <div className="input-group"><span className="input-group-text"><i className="bi bi-search" /></span><input id="sumo-match-search" type="search" className="form-control" placeholder="Csapatnév, szakasz vagy tábla…" value={matchSearch} onChange={(event) => setMatchSearch(event.target.value)} /></div>
+              </div>
+              <div className="col-6 col-lg">
+                <label className="form-label" htmlFor="sumo-table-filter">Tábla</label>
+                <select id="sumo-table-filter" className="form-select" value={matchTableFilter} onChange={(event) => setMatchTableFilter(event.target.value)}>
+                  <option value="all">Minden tábla</option>
+                  {matchTableOptions.map((table) => <option value={table} key={table}>{table}. tábla</option>)}
+                </select>
+              </div>
+              <div className="col-6 col-lg">
+                <label className="form-label" htmlFor="sumo-status-filter">Állapot</label>
+                <select id="sumo-status-filter" className="form-select" value={matchStatusFilter} onChange={(event) => setMatchStatusFilter(event.target.value)}>
+                  <option value="all">Mindegyik</option>
+                  <option value="pending">Lejátszásra vár</option>
+                  <option value="complete">Befejezett</option>
+                </select>
+              </div>
+              <div className="col-12 col-lg">
+                <label className="form-label" htmlFor="sumo-category-filter">Korosztály</label>
+                <select id="sumo-category-filter" className="form-select" value={matchCategoryFilter} onChange={(event) => setMatchCategoryFilter(event.target.value)}>
+                  <option value="all">Mindegyik</option>
+                  <option value="0">Általános</option>
+                  <option value="1">Középiskola</option>
+                </select>
+              </div>
+            </div>
+            <div className="form-text mt-2">A backend jelenleg táblát és versenyszakaszt ad vissza; külön kezdési időpontot nem tartalmaz.</div>
+          </div>
         </div>
       )}
 
@@ -1297,11 +1405,12 @@ export default function SumoScoring() {
 
               <div className="card-body p-3 p-md-4 border-0 m-0 w-100">
                 <div className="d-grid gap-3">
-                  {round.matches.map((match) => {
+                  {round.matches.map((match, matchIndex) => {
                     const isOpen = openMatches[match.id] === true
                     const selectedValue = matchDrafts[match.id] ?? ''
                     const knockoutWinnerName = getKnockoutWinnerName(match)
                     const isMatchComplete = Boolean(knockoutWinnerName)
+                    const groupResultLimitReached = getMatchStage(match) === GROUP_STAGE && match.team1Results.length >= GROUP_MATCH_RESULT_LIMIT
                     const team1History = match.team1Results
                     const team2History = match.team2Results
 
@@ -1314,6 +1423,12 @@ export default function SumoScoring() {
 
                     return (
                       <div key={match.id} className="card shadow-sm team-card no-hover-card">
+                        <div className="px-3 py-2 bg-light border-bottom d-flex flex-wrap justify-content-between gap-2 small">
+                          <span><i className="bi bi-grid-3x3-gap-fill me-1" />{match.table}. tábla</span>
+                          <span>{getStageLabel(getMatchStage(match))}</span>
+                          <span>{matchIndex + 1}. meccs</span>
+                          {getMatchStage(match) === GROUP_STAGE && <span>{match.team1Results.length}/{GROUP_MATCH_RESULT_LIMIT} eredmény</span>}
+                        </div>
                         <button
                           type="button"
                           className="btn btn-outline-secondary w-100 text-start rounded-0 border-0 py-3 px-3 team-toggle"
@@ -1389,7 +1504,7 @@ export default function SumoScoring() {
                                   <button
                                     type="button"
                                     className={`btn btn-sm sumo-result-btn ${selectedValue === 'team1' ? 'active' : ''}`}
-                                    disabled={isMatchComplete}
+                                    disabled={isMatchComplete || groupResultLimitReached}
                                     onClick={() => handleMatchDraftChange(match.id, 'team1')}
                                   >
                                     {match.team1Name}
@@ -1397,7 +1512,7 @@ export default function SumoScoring() {
                                   <button
                                     type="button"
                                     className={`btn btn-sm sumo-result-btn ${selectedValue === 'team2' ? 'active' : ''}`}
-                                    disabled={isMatchComplete}
+                                    disabled={isMatchComplete || groupResultLimitReached}
                                     onClick={() => handleMatchDraftChange(match.id, 'team2')}
                                   >
                                     {match.team2Name}
@@ -1405,7 +1520,7 @@ export default function SumoScoring() {
                                   <button
                                     type="button"
                                     className={`btn btn-sm sumo-result-btn ${selectedValue === 'draw' ? 'active' : ''}`}
-                                    disabled={isMatchComplete}
+                                    disabled={isMatchComplete || groupResultLimitReached}
                                     onClick={() => handleMatchDraftChange(match.id, 'draw')}
                                   >
                                     Döntetlen
@@ -1415,7 +1530,7 @@ export default function SumoScoring() {
                                 <button
                                   type="button"
                                   className="btn btn-outline-success align-self-md-center"
-                                  disabled={!selectedValue || isMatchComplete}
+                                  disabled={!selectedValue || isMatchComplete || groupResultLimitReached}
                                   onClick={() => handleSaveMatch(match.id)}
                                 >
                                   Mentés

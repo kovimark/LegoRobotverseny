@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AgeGroupBadge from './AgeGroupBadge'
+import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 
 const sortableColumns = [
   { key: 'overallPosition', label: 'Összesített helyezés' },
@@ -46,6 +47,8 @@ export default function OverallStandings() {
     }
 
     loadStandings()
+    window.addEventListener(DATA_REFRESH_EVENT, loadStandings)
+    return () => window.removeEventListener(DATA_REFRESH_EVENT, loadStandings)
   }, [])
 
   const handleSort = (key) => {
@@ -99,8 +102,9 @@ export default function OverallStandings() {
             <div className="d-grid gap-4">
             {sections.map((section) => <section key={section.key}>
               {section.label && <h5 className="mb-2">{section.label}</h5>}
-            <div className="table-responsive standings-table-wrapper">
-              <table className="table align-middle mb-0">
+            <div className="scoring-table-hint d-md-none"><i className="bi bi-arrows me-1" />A teljes táblázathoz húzd oldalra.</div>
+            <div className="table-responsive standings-table-wrapper scoring-table-scroll" tabIndex="0">
+              <table className="table align-middle mb-0 scoring-results-table">
                 <thead>
                   <tr>
                     {sortableColumns.map((column) => {

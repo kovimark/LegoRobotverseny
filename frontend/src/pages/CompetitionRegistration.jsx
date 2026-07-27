@@ -56,14 +56,16 @@ export default function CompetitionRegistration({ user }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target
-    const parsedValue = name.includes('Class') && value !== ''
-      ? Math.min(13, Number(value))
-      : value
+    const isClassField = name === 'teamMember1Class' || name === 'teamMember2Class'
+    const digitsOnly = isClassField ? value.replace(/\D/g, '').slice(0, 2) : value
+    const parsedValue = isClassField && digitsOnly !== ''
+      ? String(Math.min(13, Number(digitsOnly)))
+      : digitsOnly
 
     setFormData(prev => ({
       ...prev,
       [name]: parsedValue,
-      ...(name.includes('Class') ? {
+      ...(isClassField ? {
         category: getCategory(
           name === 'teamMember1Class' ? parsedValue : prev.teamMember1Class,
           name === 'teamMember2Class' ? parsedValue : prev.teamMember2Class
@@ -284,10 +286,10 @@ export default function CompetitionRegistration({ user }) {
                 <label htmlFor="teamMember1Class" className="form-label">1. Versenyző osztálya</label>
                 <div className="position-relative">
                   <input
-                    type="number"
-                    min="1"
-                    max="13"
-                    step="1"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength="2"
                     className={`form-control pe-4 ${errors.teamMember1Class ? 'border-danger' : ''}`}
                     id="teamMember1Class"
                     name="teamMember1Class"
@@ -338,10 +340,10 @@ export default function CompetitionRegistration({ user }) {
                 <label htmlFor="teamMember2Class" className="form-label">2. Versenyző osztálya</label>
                 <div className="position-relative">
                   <input
-                    type="number"
-                    min="1"
-                    max="13"
-                    step="1"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength="2"
                     className={`form-control pe-4 ${errors.teamMember2Class ? 'border-danger' : ''}`}
                     id="teamMember2Class"
                     name="teamMember2Class"

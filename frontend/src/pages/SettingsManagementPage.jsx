@@ -4,6 +4,7 @@ import FloatingFeedback from '../components/FloatingFeedback'
 import TeamGroupManager from '../components/TeamGroupManager'
 import BackupManager from '../components/BackupManager'
 import CompetitionStatistics from '../components/CompetitionStatistics'
+import { getNotificationTeams as getTeams } from '../services/notificationApi'
 import {
   addCompetitionPhase,
   deleteCompetitionPhase,
@@ -12,7 +13,8 @@ import {
   modifyCompetitionPhase,
   modifySettings,
   resetEveryScore,
-  resetSettings
+  resetSettings,
+  SUMO_CONFIG_CHANGED_EVENT
 } from '../services/sumoScheduleConfigApi'
 const emptyPhase = { phaseName: '', phaseStartTime: '', phaseEndTime: '' }
 const phaseNameOf = (phase) => phase.phaseName || phase.competitionPhaseName || phase.name || ''
@@ -35,13 +37,18 @@ export default function SettingsManagementPage({ groupOnly = false }) {
   const [status, setStatus] = useState(null)
   const [dangerAction, setDangerAction] = useState(null)
   const [shiftMinutes, setShiftMinutes] = useState('')
+  const [shiftDirection, setShiftDirection] = useState('delay')
   const [confirmScheduleShift, setConfirmScheduleShift] = useState(false)
   const [phaseToDelete, setPhaseToDelete] = useState(null)
+  const [teamCounts, setTeamCounts] = useState({ primary: 0, secondary: 0, total: 0 })
 
   const loadData = async () => {
     try {
       setLoading(true)
-      const [settingsData, phaseData] = await Promise.all([getAllSettings(), getAllCompetitionPhases()])
+      const [settingsData, phaseData, teams] = await Promise.all([getAllSettings(), getAllCompetitionPhases(), getTeams().catch(() => [])])
+      const primary = teams.filter((team) => Number(team.category) === 0).length
+      const secondary = teams.filter((team) => Number(team.category) === 1).length
+      setTeamCounts({ primary, secondary, total: primary + secondary })
       setPhases(phaseData)
       const selectedPhase = typeof settingsData?.competitionPhase === 'string'
         ? settingsData.competitionPhase
@@ -61,6 +68,12 @@ export default function SettingsManagementPage({ groupOnly = false }) {
   }
 
   useEffect(() => { if (!groupOnly) loadData() }, [groupOnly])
+  useEffect(() => {
+    if (groupOnly) return undefined
+    const handleSettingsChange = () => loadData()
+    window.addEventListener(SUMO_CONFIG_CHANGED_EVENT, handleSettingsChange)
+    return () => window.removeEventListener(SUMO_CONFIG_CHANGED_EVENT, handleSettingsChange)
+  }, [groupOnly])
   const updateSettings = (name, value) => setSettings((current) => ({ ...current, [name]: value }))
   const updatePhase = (name, value) => setPhaseDraft((current) => ({ ...current, [name]: value }))
 
@@ -216,19 +229,22 @@ export default function SettingsManagementPage({ groupOnly = false }) {
     const firstAffectedIndex = activeIndex >= 0 ? activeIndex : 0
     try {
       setSaving(true)
+      const signedMinutes = shiftDirection === 'advance' ? -minutes : minutes
       const updates = scheduledPhases.slice(firstAffectedIndex).map((phase, relativeIndex) => {
         const isCurrentPhase = activeIndex >= 0 && relativeIndex === 0
         return {
           originalName: phaseNameOf(phase),
           phaseName: phaseNameOf(phase),
-          phaseStartTime: isCurrentPhase ? toTimeInput(phaseStartOf(phase)) : shiftTimeByMinutes(phaseStartOf(phase), minutes),
-          phaseEndTime: shiftTimeByMinutes(phaseEndOf(phase), minutes)
+          phaseStartTime: isCurrentPhase ? toTimeInput(phaseStartOf(phase)) : shiftTimeByMinutes(phaseStartOf(phase), signedMinutes),
+          phaseEndTime: shiftTimeByMinutes(phaseEndOf(phase), signedMinutes)
         }
       })
+      const invalidPhase = updates.find((phase) => phase.phaseStartTime && phase.phaseEndTime && phase.phaseStartTime > phase.phaseEndTime)
+      if (invalidPhase) throw new Error(`A siettetéssel a(z) ${invalidPhase.phaseName} befejezése a kezdése elé kerülne.`)
       for (const update of updates) await modifyCompetitionPhase(update.originalName, update)
       setConfirmScheduleShift(false)
       setShiftMinutes('')
-      setStatus({ type: 'success', text: `A menetrend érintett időpontjai ${minutes} perccel későbbre kerültek.` })
+      setStatus({ type: 'success', text: `A menetrend érintett időpontjai ${minutes} perccel ${shiftDirection === 'advance' ? 'korábbra' : 'későbbre'} kerültek.` })
       await loadData()
     } catch (error) {
       setConfirmScheduleShift(false)
@@ -268,19 +284,26 @@ export default function SettingsManagementPage({ groupOnly = false }) {
 
         <section className="card shadow-sm team-card no-hover-card mb-4">
           <div className="card-body p-4">
-            <h3 className="h5 mb-1">Továbbjutók száma</h3>
-            <p className="text-muted">A csoportkörből a kieséses szakaszba jutó csapatok száma.</p>
+            <div className="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+              <div><h3 className="h5 mb-1">Továbbjutók száma</h3><p className="text-muted mb-0">A csoportkörből a kieséses szakaszba jutó csapatok száma.</p></div>
+              <span className={`badge fs-6 ${Number(settings.ageGroupBreakdown) === 1 ? 'text-bg-success' : 'text-bg-secondary'}`}>Korosztálybontás: {Number(settings.ageGroupBreakdown) === 1 ? 'bekapcsolva' : 'kikapcsolva'}</span>
+            </div>
+            <div className="row g-3 mb-4">
+              <div className="col-md-4"><div className="border rounded-3 p-3 h-100 bg-body-tertiary"><div className="small text-muted">Általános iskolás (Á)</div><div className="fs-3 fw-bold">{teamCounts.primary}</div><div className="small">nevezett csapat</div></div></div>
+              <div className="col-md-4"><div className="border rounded-3 p-3 h-100 bg-body-tertiary"><div className="small text-muted">Középiskolás (K)</div><div className="fs-3 fw-bold">{teamCounts.secondary}</div><div className="small">nevezett csapat</div></div></div>
+              <div className="col-md-4"><div className="border rounded-3 p-3 h-100 bg-body-tertiary"><div className="small text-muted">Összesen</div><div className="fs-3 fw-bold">{teamCounts.total}</div><div className="small">nevezett csapat</div></div></div>
+            </div>
             <div className="row g-3">
-              <div className="col-md-4"><label className="form-label" htmlFor="advance-all">Továbbjutók – korosztálybontás nélkül</label><input id="advance-all" type="number" min="0" step="1" className="form-control" value={settings.allGroupAdvance} onChange={(event) => updateSettings('allGroupAdvance', event.target.value)} /></div>
-              <div className="col-md-4"><label className="form-label" htmlFor="advance-primary">Továbbjutók – általános iskolás</label><input id="advance-primary" type="number" min="0" step="1" className="form-control" value={settings.psGroupAdvance} onChange={(event) => updateSettings('psGroupAdvance', event.target.value)} /></div>
-              <div className="col-md-4"><label className="form-label" htmlFor="advance-secondary">Továbbjutók – középiskolás</label><input id="advance-secondary" type="number" min="0" step="1" className="form-control" value={settings.hsGroupAdvance} onChange={(event) => updateSettings('hsGroupAdvance', event.target.value)} /></div>
+              <div className="col-md-4"><label className="form-label" htmlFor="advance-all">Továbbjutók – korosztálybontás nélkül</label><input id="advance-all" type="number" min="0" max={teamCounts.total} step="1" className="form-control" disabled={Number(settings.ageGroupBreakdown) === 1} value={settings.allGroupAdvance} onChange={(event) => updateSettings('allGroupAdvance', Math.min(teamCounts.total, Math.max(0, Number(event.target.value))))} /><div className="form-text">Maximum {teamCounts.total} csapat.</div></div>
+              <div className="col-md-4"><label className="form-label" htmlFor="advance-primary">Továbbjutók – általános iskolás</label><input id="advance-primary" type="number" min="0" max={teamCounts.primary} step="1" className="form-control" disabled={Number(settings.ageGroupBreakdown) !== 1} value={settings.psGroupAdvance} onChange={(event) => updateSettings('psGroupAdvance', Math.min(teamCounts.primary, Math.max(0, Number(event.target.value))))} /><div className="form-text">Maximum {teamCounts.primary} csapat.</div></div>
+              <div className="col-md-4"><label className="form-label" htmlFor="advance-secondary">Továbbjutók – középiskolás</label><input id="advance-secondary" type="number" min="0" max={teamCounts.secondary} step="1" className="form-control" disabled={Number(settings.ageGroupBreakdown) !== 1} value={settings.hsGroupAdvance} onChange={(event) => updateSettings('hsGroupAdvance', Math.min(teamCounts.secondary, Math.max(0, Number(event.target.value))))} /><div className="form-text">Maximum {teamCounts.secondary} csapat.</div></div>
               <div className="col-12"><div className="form-text">Ugyanezeket a létszámokat használja a vonalkövetés és a szumó csoportköre.</div></div>
               <div className="col-12 text-end"><button type="button" className="btn btn-primary" disabled={saving} onClick={async () => { try { setSaving(true); await modifySettings(settings); setStatus({ type: 'success', text: 'A továbbjutási beállítások mentve.' }); await loadData() } catch (error) { setStatus({ type: 'danger', text: error.message }) } finally { setSaving(false) } }}>Továbbjutási beállítások mentése</button></div>
             </div>
           </div>
         </section>
 
-        <section className="card shadow-sm team-card no-hover-card mb-4"><div className="card-body p-4"><div className="d-flex flex-wrap justify-content-between align-items-center gap-3"><div><h3 className="h5 mb-1">Versenymenetrend</h3><p className="text-muted mb-0">A menetrend menet közben is bővíthető és módosítható. Bármilyen szakasz megadható.</p></div><button type="button" className="btn btn-outline-primary" disabled={saving} onClick={createDefaultPhases}>Alap menetrend létrehozása</button></div><div className="mt-3"><span className="me-2">Most zajlik:</span><span className={`badge ${settings.competitionPhase ? 'text-bg-success' : 'text-bg-secondary'}`}>{settings.competitionPhase || 'Nincs kiválasztva'}</span></div><div className="schedule-shift-panel mt-4"><div><div className="fw-semibold">Menetrend csúsztatása</div><div className="small text-muted">Az aktuális szakasz befejezését és minden későbbi időpontot egyszerre tolja el.</div></div><div className="input-group schedule-shift-control"><input type="number" min="0" step="1" className="form-control" aria-label="Csúszás percekben" placeholder="pl. 15" value={shiftMinutes} onChange={(event) => setShiftMinutes(event.target.value)} /><span className="input-group-text">perc</span><button type="button" className="btn btn-warning" disabled={saving || shiftMinutes === ''} onClick={() => setConfirmScheduleShift(true)}>Hozzáadás</button></div></div></div></section>
+        <section className="card shadow-sm team-card no-hover-card mb-4"><div className="card-body p-4"><div className="d-flex flex-wrap justify-content-between align-items-center gap-3"><div><h3 className="h5 mb-1">Versenymenetrend</h3><p className="text-muted mb-0">A menetrend menet közben is bővíthető és módosítható. Bármilyen szakasz megadható.</p></div><button type="button" className="btn btn-outline-primary" disabled={saving} onClick={createDefaultPhases}>Alap menetrend létrehozása</button></div><div className="mt-3"><span className="me-2">Most zajlik:</span><span className={`badge ${settings.competitionPhase ? 'text-bg-success' : 'text-bg-secondary'}`}>{settings.competitionPhase || 'Nincs kiválasztva'}</span><span className="small text-muted ms-2">A következő elem a jelenlegi befejezési idejekor automatikusan aktiválódik.</span></div><div className="schedule-shift-panel mt-4"><div><div className="fw-semibold">Menetrend időpontjainak módosítása</div><div className="small text-muted">Az aktuális szakasz befejezését és minden későbbi időpontot egyszerre tolja későbbre vagy korábbra.</div></div><div className="d-flex flex-wrap gap-2 schedule-shift-control"><select className="form-select" aria-label="Időpont-módosítás iránya" value={shiftDirection} onChange={(event) => setShiftDirection(event.target.value)}><option value="delay">Csúszás</option><option value="advance">Sietés</option></select><div className="input-group"><input type="number" min="0" step="1" className="form-control" aria-label="Időeltérés percekben" placeholder="pl. 15" value={shiftMinutes} onChange={(event) => setShiftMinutes(event.target.value)} /><span className="input-group-text">perc</span><button type="button" className={`btn ${shiftDirection === 'advance' ? 'btn-success' : 'btn-warning'}`} disabled={saving || shiftMinutes === ''} onClick={() => setConfirmScheduleShift(true)}>{shiftDirection === 'advance' ? 'Korábbra hozás' : 'Hozzáadás'}</button></div></div></div></div></section>
 
         <form className="card shadow-sm team-card no-hover-card mb-4" onSubmit={savePhase}>
           <div className="card-body p-4"><div className="d-flex justify-content-between mb-3"><h3 className="h5 mb-0">{editingPhaseName ? 'Menetrendi elem módosítása' : 'Új menetrendi elem'}</h3>{editingPhaseName && <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => { setEditingPhaseName(null); setPhaseDraft(emptyPhase) }}>Mégse</button>}</div><div className="row g-3">
@@ -311,8 +334,8 @@ export default function SettingsManagementPage({ groupOnly = false }) {
           ? <p className="mb-0">Ez minden rögzített pontot és eredményt törölhet, és nem vonható vissza.</p>
           : <p className="mb-0">Biztosan alaphelyzetbe állítod az összes versenybeállítást?</p>}
       </ConfirmModal>
-      <ConfirmModal open={confirmScheduleShift} title="Menetrend csúsztatása" confirmLabel="Időpontok eltolása" confirmVariant="warning" busy={saving} onClose={() => setConfirmScheduleShift(false)} onConfirm={applyScheduleShift}>
-        <p>Biztosan hozzáadsz <strong>{shiftMinutes || 0} percet</strong> az aktuális szakasz befejezéséhez és minden utána következő időponthoz?</p>
+      <ConfirmModal open={confirmScheduleShift} title={shiftDirection === 'advance' ? 'Menetrend siettetése' : 'Menetrend csúsztatása'} confirmLabel={shiftDirection === 'advance' ? 'Időpontok korábbra hozása' : 'Időpontok eltolása'} confirmVariant={shiftDirection === 'advance' ? 'success' : 'warning'} busy={saving} onClose={() => setConfirmScheduleShift(false)} onConfirm={applyScheduleShift}>
+        <p>Biztosan <strong>{shiftMinutes || 0} perccel {shiftDirection === 'advance' ? 'korábbra hozod' : 'későbbre tolod'}</strong> az aktuális szakasz befejezését és minden utána következő időpontot?</p>
         <p className="small text-muted mb-0">A korábban befejezett szakaszok és az aktuális szakasz kezdési ideje nem változik.</p>
       </ConfirmModal>
       <ConfirmModal open={Boolean(phaseToDelete)} title="Menetrendi elem törlése" confirmLabel="Végleges törlés" confirmVariant="danger" busy={saving} onClose={() => setPhaseToDelete(null)} onConfirm={handleDeletePhase}>

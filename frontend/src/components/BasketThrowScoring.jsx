@@ -3,11 +3,13 @@ import FloatingFeedback from './FloatingFeedback'
 import CategorizedResultsStandings from './CategorizedResultsStandings'
 import AgeGroupBadge from './AgeGroupBadge'
 import { getCompetitionConfig } from '../config/adminScoringConfig'
+import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 
 const competitionConfig = getCompetitionConfig('kosarra-dobas')
 const HOOPS = [1, 2, 3, 4, 5]
 const MAX_THROWS = 5
 const MAX_ATTEMPTS = 10
+const MAX_TIME_SECONDS = 120
 
 const createEmptyDraft = () => ({
   hoop1: 0,
@@ -31,6 +33,13 @@ const calculateTotalThrows = (draft) => HOOPS.reduce(
 const normalizeAttemptInput = (value) => {
   if (value === '') return ''
   return Math.min(MAX_ATTEMPTS, Math.max(1, Number.parseInt(value, 10) || 1))
+}
+
+const normalizeTimeInput = (value) => {
+  if (value === '') return ''
+  const number = Number(value)
+  if (!Number.isFinite(number)) return ''
+  return Math.min(MAX_TIME_SECONDS, Math.max(0, number))
 }
 
 const normalizeResult = (result, index) => ({
@@ -59,6 +68,7 @@ export default function BasketThrowScoring() {
   const [openTeamName, setOpenTeamName] = useState(null)
   const [sortBy, setSortBy] = useState('name')
   const [allTeams, setAllTeams] = useState([])
+  const [attemptSearch, setAttemptSearch] = useState('')
   const [editingResultId, setEditingResultId] = useState(null)
   const [editDraft, setEditDraft] = useState(createEmptyDraft)
   const [modifying, setModifying] = useState(false)
@@ -116,6 +126,8 @@ export default function BasketThrowScoring() {
     }
 
     loadData()
+    window.addEventListener(DATA_REFRESH_EVENT, loadData)
+    return () => window.removeEventListener(DATA_REFRESH_EVENT, loadData)
   }, [])
 
   useEffect(() => {
@@ -131,13 +143,19 @@ export default function BasketThrowScoring() {
         .slice(0, 8)
     : []
 
-  const sortedResults = useMemo(() => [...results].sort((left, right) => {
+  const filteredResults = useMemo(() => {
+    const term = attemptSearch.trim().toLocaleLowerCase('hu-HU')
+    if (!term) return results
+    return results.filter((result) => `${result.team_name} ${result.throwNumber}`.toLocaleLowerCase('hu-HU').includes(term))
+  }, [attemptSearch, results])
+
+  const sortedResults = useMemo(() => [...filteredResults].sort((left, right) => {
     if (sortBy === 'points') {
       return right.points - left.points || left.team_name.localeCompare(right.team_name)
     }
 
     return left.team_name.localeCompare(right.team_name)
-  }), [results, sortBy])
+  }), [filteredResults, sortBy])
 
   const totalThrows = calculateTotalThrows(draft)
 
@@ -174,6 +192,11 @@ export default function BasketThrowScoring() {
 
     if (!Number.isInteger(throwNumber) || throwNumber < 1 || throwNumber > MAX_ATTEMPTS) {
       setActionMessage({ type: 'danger', text: 'A próbálkozás sorszáma 1 és 10 közötti egész szám lehet.' })
+      return
+    }
+
+    if (time > MAX_TIME_SECONDS) {
+      setActionMessage({ type: 'danger', text: 'Az idő legfeljebb 120 másodperc lehet.' })
       return
     }
 
@@ -255,6 +278,11 @@ export default function BasketThrowScoring() {
 
     if (!Number.isInteger(throwNumber) || throwNumber < 1 || throwNumber > MAX_ATTEMPTS) {
       setActionMessage({ type: 'danger', text: 'A próbálkozás sorszáma 1 és 10 közötti egész szám lehet.' })
+      return
+    }
+
+    if (time > MAX_TIME_SECONDS) {
+      setActionMessage({ type: 'danger', text: 'Az idő legfeljebb 120 másodperc lehet.' })
       return
     }
 
@@ -350,11 +378,12 @@ export default function BasketThrowScoring() {
                     id="basket-result-time"
                     type="number"
                     min="0"
+                    max={MAX_TIME_SECONDS}
                     step="0.001"
                     inputMode="decimal"
                     className="form-control"
                     value={draft.time}
-                    onChange={(event) => setDraft((prev) => ({ ...prev, time: event.target.value }))}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, time: normalizeTimeInput(event.target.value) }))}
                   />
                 </div>
 
@@ -406,7 +435,12 @@ export default function BasketThrowScoring() {
             </div>
           </div>
 
-          <CategorizedResultsStandings title="Kosárra dobás eredménytáblája" rows={[...results].sort((left, right) => right.points - left.points || Number(left.time ?? Infinity) - Number(right.time ?? Infinity) || left.team_name.localeCompare(right.team_name)).map((result) => ({ ...result, category: Number(allTeams.find((team) => (team.teamName || team.team_name) === result.team_name)?.category) === 1 ? 1 : 0 }))} getKey={(result) => result.id} columns={[{ key: 'team', label: 'Csapat', render: (result) => result.team_name }, { key: 'throwNumber', label: 'Próbálkozás', align: 'end', render: (result) => `${result.throwNumber}.` }, { key: 'points', label: 'Pont', align: 'end' }, { key: 'time', label: 'Idő', align: 'end', render: (result) => result.time == null ? '-' : `${result.time} s` }, ...HOOPS.map((hoop) => ({ key: `hoop${hoop}`, label: `${hoop}. kosár`, align: 'end' }))]} />
+          <div className="mb-3">
+            <label className="form-label" htmlFor="basket-attempt-search">Próbálkozások keresése</label>
+            <div className="input-group"><span className="input-group-text"><i className="bi bi-search" /></span><input id="basket-attempt-search" type="search" className="form-control" placeholder="Csapatnév vagy próbálkozás sorszáma…" value={attemptSearch} onChange={(event) => setAttemptSearch(event.target.value)} /></div>
+          </div>
+
+          <CategorizedResultsStandings title="Kosárra dobás eredménytáblája" rows={[...filteredResults].sort((left, right) => right.points - left.points || Number(left.time ?? Infinity) - Number(right.time ?? Infinity) || left.team_name.localeCompare(right.team_name)).map((result) => ({ ...result, category: Number(allTeams.find((team) => (team.teamName || team.team_name) === result.team_name)?.category) === 1 ? 1 : 0 }))} getKey={(result) => result.id} columns={[{ key: 'team', label: 'Csapat', render: (result) => result.team_name }, { key: 'throwNumber', label: 'Próbálkozás', align: 'end', render: (result) => `${result.throwNumber}.` }, { key: 'points', label: 'Pont', align: 'end' }, { key: 'time', label: 'Idő', align: 'end', render: (result) => result.time == null ? '-' : `${result.time} s` }, ...HOOPS.map((hoop) => ({ key: `hoop${hoop}`, label: `${hoop}. kosár`, align: 'end' }))]} />
 
           <div className="d-flex justify-content-end mb-3">
             <div className="btn-group" role="group" aria-label="Rendezés">
@@ -481,10 +515,11 @@ export default function BasketThrowScoring() {
                                 id={`${result.id}-edit-time`}
                                 type="number"
                                 min="0"
+                                max={MAX_TIME_SECONDS}
                                 step="0.001"
                                 className="form-control"
                                 value={editDraft.time}
-                                onChange={(event) => setEditDraft((prev) => ({ ...prev, time: event.target.value }))}
+                                onChange={(event) => setEditDraft((prev) => ({ ...prev, time: normalizeTimeInput(event.target.value) }))}
                               />
                             </div>
                             <div className="col-6 col-md">

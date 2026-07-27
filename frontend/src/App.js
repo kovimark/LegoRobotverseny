@@ -22,6 +22,8 @@ import EmailManagementPage from './pages/EmailManagementPage';
 import { auth, authPersistenceReady, googleProvider } from './firebase';
 import { isJudgePrivilege } from './config/privilegeConfig';
 import { subscribeTeamsToPush } from './services/notificationApi';
+import FloatingRefreshButton from './components/FloatingRefreshButton';
+import AutomaticPhaseAdvancer from './components/AutomaticPhaseAdvancer';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -155,6 +157,7 @@ function App() {
 
   return (
     <div className="App">
+      <AutomaticPhaseAdvancer enabled={userRole === 'admin'} />
       <Navbar
         user={user}
         userRole={userRole}
@@ -196,6 +199,7 @@ function App() {
           }
         />
       </Routes>
+      <FloatingRefreshButton />
       <footer className="container py-4 mt-4 border-top text-center text-muted small">
         A LEGO® a LEGO Group védjegye. Ez egy független rendezvény és weboldal, amely nem áll kapcsolatban a LEGO Grouppal, és amelyet a LEGO Group nem szponzorál.
       </footer>

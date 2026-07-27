@@ -4,9 +4,11 @@ import CategorizedResultsStandings from './CategorizedResultsStandings'
 import AgeGroupBadge from './AgeGroupBadge'
 import { getCompetitionConfig } from '../config/adminScoringConfig'
 import { loadSumoScheduleConfig, SUMO_CONFIG_CHANGED_EVENT } from '../services/sumoScheduleConfigApi'
+import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 
 const competitionConfig = getCompetitionConfig('vonalkovetes')
-const MIN_FINAL_TEAMS = 3
+const MIN_FINAL_TEAMS = 4
+const MAX_TIME_SECONDS = 120
 const LINE_FOLLOWING_STAGE_STORAGE_KEY = 'lineFollowingCurrentStage'
 const LINE_FOLLOWING_STAGES = [
   { value: 1, label: 'Csoportkör' },
@@ -19,6 +21,13 @@ const createEmptyTimeDraft = () => ({
   firstTime: '',
   secondTime: ''
 })
+
+const normalizeTimeInput = (value) => {
+  if (value === '') return ''
+  const number = Number(value)
+  if (!Number.isFinite(number)) return ''
+  return Math.min(MAX_TIME_SECONDS, Math.max(0, number))
+}
 
 const getAdvancingCount = (teamCount) => {
   if (teamCount <= MIN_FINAL_TEAMS) {
@@ -259,6 +268,8 @@ export default function LineFollowingScoring() {
     }
 
     loadTeams()
+    window.addEventListener(DATA_REFRESH_EVENT, loadTeams)
+    return () => window.removeEventListener(DATA_REFRESH_EVENT, loadTeams)
   }, [])
 
   useEffect(() => {
@@ -381,6 +392,10 @@ export default function LineFollowingScoring() {
       setActionMessage({ type: 'danger', text: 'Mindkét időt ki kell tölteni másodpercben.' })
       return
     }
+    if (firstTime > MAX_TIME_SECONDS || secondTime > MAX_TIME_SECONDS) {
+      setActionMessage({ type: 'danger', text: 'Egy próbálkozás ideje legfeljebb 120 másodperc lehet.' })
+      return
+    }
 
     if (!hasPendingChange(roundId, team)) {
       return
@@ -439,6 +454,10 @@ export default function LineFollowingScoring() {
 
     if (!Number.isFinite(time) || time <= 0) {
       setActionMessage({ type: 'danger', text: 'Adj meg egy érvényes időt másodpercben.' })
+      return
+    }
+    if (time > MAX_TIME_SECONDS) {
+      setActionMessage({ type: 'danger', text: 'Egy próbálkozás ideje legfeljebb 120 másodperc lehet.' })
       return
     }
 
@@ -775,11 +794,12 @@ export default function LineFollowingScoring() {
                   id="line-result-time"
                   type="number"
                   min="0"
+                  max={MAX_TIME_SECONDS}
                   step="0.001"
                   inputMode="decimal"
                   className="form-control"
                   value={resultTime}
-                  onChange={(event) => setResultTime(event.target.value)}
+                  onChange={(event) => setResultTime(normalizeTimeInput(event.target.value))}
                 />
               </div>
 
@@ -792,7 +812,20 @@ export default function LineFollowingScoring() {
           </div>
           </div>
 
-          <CategorizedResultsStandings title={`Vonalkövetés csoportköri tabellája – ${Number(groupAdvance.ageGroupBreakdown) === 1 ? `Á: top ${groupAdvance.psGroupAdvance}, K: top ${groupAdvance.hsGroupAdvance}` : `top ${groupAdvance.allGroupAdvance}`}`} rows={lineStandings} getKey={(result) => result.teamName} columns={[{ key: 'team', label: 'Csapat', render: (result) => result.teamName }, { key: 'category', label: 'Korosztály', render: (result) => result.category === 1 ? 'Középiskolás' : 'Általános iskolás' }, { key: 'time', label: 'Legjobb idő', align: 'end', render: (result) => `${result.time} s` }, { key: 'qualifier', label: 'Továbbjutás', render: (result) => result.isQualifier ? <span className="badge text-bg-success">Továbbjutó</span> : '-' }]} />
+          {currentResultStage === 1 ? (
+            <CategorizedResultsStandings title={`Vonalkövetés csoportköri tabellája – ${Number(groupAdvance.ageGroupBreakdown) === 1 ? `Á: top ${groupAdvance.psGroupAdvance}, K: top ${groupAdvance.hsGroupAdvance}` : `top ${groupAdvance.allGroupAdvance}`}`} rows={lineStandings} getKey={(result) => result.teamName} columns={[{ key: 'team', label: 'Csapat', render: (result) => result.teamName }, { key: 'category', label: 'Korosztály', render: (result) => result.category === 1 ? 'Középiskolás' : 'Általános iskolás' }, { key: 'time', label: 'Legjobb idő', align: 'end', render: (result) => `${result.time} s` }, { key: 'qualifier', label: 'Továbbjutás', render: (result) => result.isQualifier ? <span className="badge text-bg-success">Továbbjutó</span> : '-' }]} />
+          ) : (
+            <section className="card shadow-sm team-card no-hover-card mb-4">
+              <div className="card-body p-3 p-md-4">
+                <h4 className="h5 mb-1">Versenyben maradt csapatok</h4>
+                <p className="text-muted mb-3">{currentStageConfig.label} · {teamNames.length} csapat</p>
+                <div className="d-flex flex-wrap gap-2">
+                  {teamNames.map((teamName) => <span className="badge rounded-pill bg-light text-dark border border-dark p-2" key={teamName}><AgeGroupBadge category={categoryByTeamName.get(teamName)} className="me-1" />{teamName}</span>)}
+                </div>
+                {teamNames.length <= MIN_FINAL_TEAMS && <div className="alert alert-success mt-3 mb-0">Elérte a legjobb 4 mezőnyét, ezért további kieséses kör már nem generálható.</div>}
+              </div>
+            </section>
+          )}
 
           <div className="mb-3">
             <label className="form-label" htmlFor="line-display-search">Eredmények keresése</label>
@@ -918,13 +951,14 @@ export default function LineFollowingScoring() {
                                 <input
                                   type="number"
                                   min="0"
+                                  max={MAX_TIME_SECONDS}
                                   step="0.001"
                                   inputMode="decimal"
                                   className="form-control form-control-sm scoring-number-input"
                                   value={entry.firstTime}
                                   onFocus={(event) => event.target.select()}
                                   onClick={(event) => event.target.select()}
-                                  onChange={(event) => handleFieldChange(round.id, teamName, 'firstTime', event.target.value === '' ? '' : Number(event.target.value))}
+                                  onChange={(event) => handleFieldChange(round.id, teamName, 'firstTime', normalizeTimeInput(event.target.value))}
                                 />
                               </div>
                               <div className="col-12 col-md-4">
@@ -932,13 +966,14 @@ export default function LineFollowingScoring() {
                                 <input
                                   type="number"
                                   min="0"
+                                  max={MAX_TIME_SECONDS}
                                   step="0.001"
                                   inputMode="decimal"
                                   className="form-control form-control-sm scoring-number-input"
                                   value={entry.secondTime}
                                   onFocus={(event) => event.target.select()}
                                   onClick={(event) => event.target.select()}
-                                  onChange={(event) => handleFieldChange(round.id, teamName, 'secondTime', event.target.value === '' ? '' : Number(event.target.value))}
+                                  onChange={(event) => handleFieldChange(round.id, teamName, 'secondTime', normalizeTimeInput(event.target.value))}
                                 />
                               </div>
                               <div className="col-12 col-md-4 d-flex align-items-end justify-content-md-end">
