@@ -1553,6 +1553,8 @@ form {
 }
 
 .scoring-table-scroll {
+  display: block;
+  position: relative;
   width: 100%;
   max-width: 100%;
   overflow-x: auto !important;
@@ -1563,6 +1565,20 @@ form {
   scrollbar-width: auto;
   border: 1px solid rgba(0, 0, 0, .12);
   border-radius: .45rem;
+}
+
+/* Minden Bootstrap táblázatburkoló valóban a saját szélességén belül
+   görgessen, ne a teljes oldalt húzza szélesebbre. */
+.table-responsive {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
 }
 
 .scoring-table-scroll::-webkit-scrollbar {
@@ -1589,8 +1605,30 @@ form {
 }
 
 @media (max-width: 767.98px) {
+  .card,
+  .card-body,
+  .card-body > *,
+  .row > *,
+  .d-grid,
+  .d-grid > section {
+    min-width: 0;
+  }
+
+  .table-responsive {
+    overflow-x: scroll !important;
+    scrollbar-gutter: stable;
+  }
+
+  .table-responsive > table {
+    width: max-content !important;
+    min-width: max(42rem, 100%) !important;
+    max-width: none !important;
+  }
+
   .scoring-results-table th,
-  .scoring-results-table td {
+  .scoring-results-table td,
+  .table-responsive > table th,
+  .table-responsive > table td {
     white-space: nowrap;
   }
 }
