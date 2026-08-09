@@ -1,8 +1,10 @@
 import './App.css';
 import { useEffect, useState } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { getRedirectResult, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
 import HomePage from './pages/HomePage';
+import AboutPage from './pages/AboutPage';
+import ShowPage from './pages/ShowPage';
 import AdminPage from './pages/AdminPage';
 import AdminScoringPage from './pages/AdminScoringPage';
 import CompetitionRegistration from './pages/CompetitionRegistration';
@@ -26,6 +28,8 @@ import FloatingRefreshButton from './components/FloatingRefreshButton';
 import AutomaticPhaseAdvancer from './components/AutomaticPhaseAdvancer';
 
 function App() {
+  const location = useLocation();
+  const isShowPage = location.pathname === '/show';
   const [user, setUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [userPrivilege, setUserPrivilege] = useState(null);
@@ -158,7 +162,7 @@ function App() {
   return (
     <div className="App">
       <AutomaticPhaseAdvancer enabled={userRole === 'admin'} />
-      <Navbar
+      {!isShowPage && <Navbar
         user={user}
         userRole={userRole}
         userPrivilege={userPrivilege}
@@ -166,10 +170,12 @@ function App() {
         authError={authError}
         onGoogleSignIn={handleGoogleSignIn}
         onSignOut={handleSignOut}
-      />
+      />}
       <Routes>
         <Route path="*" element={<HomePage />} />
         <Route path="/" element={<HomePage />} />
+        <Route path="/rolunk" element={<AboutPage />} />
+        <Route path="/show" element={<ShowPage />} />
         <Route path="/versenyjelentkezes" element={<CompetitionRegistration user={user} />} />
         <Route path="/szabalyzat" element={<RulesPage />} />
         <Route path="/hirek" element={<NewsPage />} />
@@ -199,10 +205,10 @@ function App() {
           }
         />
       </Routes>
-      <FloatingRefreshButton />
-      <footer className="container py-4 mt-4 border-top text-center text-muted small">
+      {!isShowPage && <FloatingRefreshButton />}
+      {!isShowPage && <footer className="container py-4 mt-4 border-top text-center text-muted small">
         A LEGO® a LEGO Group védjegye. Ez egy független rendezvény és weboldal, amely nem áll kapcsolatban a LEGO Grouppal, és amelyet a LEGO Group nem szponzorál.
-      </footer>
+      </footer>}
     </div>
   );
 }

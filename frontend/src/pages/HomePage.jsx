@@ -48,6 +48,22 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="home-about-section">
+        <div className="home-about-card">
+          <div className="home-about-copy">
+            <span className="home-kicker">Bemutatkozás</span>
+            <h2>Építs, programozz, versenyezz!</h2>
+            <p>A Robotverseny olyan általános és középiskolás diákokat hoz össze, akik szeretnék próbára tenni ötleteiket, robotjukat és csapatmunkájukat. Négy eltérő kihívásban minden csapat megmutathatja a saját erősségeit.</p>
+            <Link className="btn btn-outline-dark" to="/rolunk">Ismerj meg minket <i className="bi bi-arrow-right ms-1" /></Link>
+          </div>
+          <div className="home-about-highlights" aria-label="A verseny fő jellemzői">
+            <div><i className="bi bi-controller" /><strong>4</strong><span>versenyszám</span></div>
+            <div><i className="bi bi-people" /><strong>2</strong><span>versenyző egy csapatban</span></div>
+            <div><i className="bi bi-mortarboard" /><strong>1–13.</strong><span>évfolyam</span></div>
+          </div>
+        </div>
+      </section>
+
       <section className="home-carousel-section">
         <div className="home-section-heading">          
           <h2 >Hírek és információk</h2>

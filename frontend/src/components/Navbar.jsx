@@ -47,6 +47,11 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                     </button>
                     <div className={`navbar-menu ${isMenuOpen ? 'open' : ''}`} id="navbarNavAltMarkup">
                         <div className="navbar-nav">
+                            <Link className="nav-link" to="/rolunk" onClick={closeMenu}>
+                                Rólunk
+                            </Link>
+                        </div>
+                        <div className="navbar-nav">
                             <Link className="nav-link" to="/szabalyzat" onClick={closeMenu}>
                                 Szabályzat
                             </Link>
@@ -59,6 +64,11 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                         <div className="navbar-nav">
                             <Link className="nav-link" to="/hirek" onClick={closeMenu}>
                                 Hírek
+                            </Link>
+                        </div>
+                        <div className="navbar-nav">
+                            <Link className="nav-link" to="/show" onClick={closeMenu}>
+                                Kivetítő
                             </Link>
                         </div>
                         <div className="navbar-nav">
