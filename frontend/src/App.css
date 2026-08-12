@@ -59,27 +59,30 @@ h2::after {
   z-index: 1000;
   border-bottom: 3px solid var(--yellow);
   background:
-    linear-gradient(90deg, rgba(91, 192, 235, 0.18), rgba(253, 231, 76, 0.3)),
-    var(--white) !important;
-  box-shadow: 0 0.7rem 1.5rem rgba(0, 0, 0, 0.08);
+    linear-gradient(90deg, rgba(91, 192, 235, 0.42), rgba(253, 231, 76, 0.48)),
+    #d6e7ec !important;
+  box-shadow: 0 0.8rem 1.65rem rgba(0, 0, 0, 0.15);
 }
 
 .navbar-brand {
   color: var(--black) !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
 }
 
-.navbar-brand::before {
-  content: "";
-  display: inline-block;
-  width: 0.75rem;
-  height: 0.75rem;
-  margin-right: 0.55rem;
-  background: var(--red);
-  border: 2px solid var(--black);
-  border-radius: 2px;
-  box-shadow:
-    0.3rem 0 var(--yellow),
-    0.6rem 0 var(--green);
+.navbar-brand-logo {
+  width: 3.75rem;
+  height: 3.75rem;
+  object-fit: contain;
+  display: block;
+}
+
+.navbar-brand-name {
+  width: min(23rem, 52vw);
+  max-height: 5rem;
+  object-fit: contain;
+  display: block;
 }
 
 .nav-link {
@@ -92,7 +95,7 @@ h2::after {
 .nav-link:hover,
 .nav-link:focus {
   color: var(--black) !important;
-  background-color: rgba(253, 231, 76, 0.62);
+  background-color: rgba(253, 231, 76, 0.72);
   transform: translateY(-1px);
 }
 
@@ -1676,11 +1679,11 @@ form {
     flex-direction: column;
     align-items: flex-start;
     background:
-      linear-gradient(135deg, rgba(253, 231, 76, 0.36), rgba(91, 192, 235, 0.18)),
-      var(--white);
+      linear-gradient(135deg, rgba(253, 231, 76, 0.5), rgba(91, 192, 235, 0.42)),
+      #d6e7ec;
     padding: 0.75rem 1rem 1rem;
-    border-bottom: 2px solid var(--black);
-    box-shadow: 0 0.8rem 0 var(--black);
+    border-bottom: 2px solid var(--yellow);
+    box-shadow: 0 0.85rem 1.35rem rgba(0, 0, 0, 0.18);
     max-height: 0;
     opacity: 0;
     overflow: hidden;
