@@ -724,7 +724,7 @@ function buildDocument(section) {
     </style>
   </head>
   <body><div class="page">
-    <div class="meta">Robotverseny • Szabályzat</div>
+    <div class="meta">Brickathlon • Szabályzat</div>
     <h1>${escapeHtml(section.title)}</h1>
     ${buildContentHtml(section.content)}
     <div class="footer">A szabályok nem ismerete nem mentesít azok betartása alól.</div>
@@ -976,7 +976,7 @@ export default function RulesPage() {
                   <div className="rules-body open">
                     <div className="rules-body-inner">
                       <div className="rules-document-preview">
-                        <div className="rules-document-meta">Robotverseny • Szabályzat</div>
+                        <div className="rules-document-meta">Brickathlon • Szabályzat</div>
                         <h3>{section.title}</h3>
                         <div className="rules-list-items">
                           {renderContentItems(section.content, section.id, setSelectedImage)}

@@ -23,7 +23,7 @@ export default function AboutPage() {
           <div className="about-hero-content">
             <span className="home-kicker">Rólunk</span>
             <h1>Robotok, ötletek és közös élmények</h1>
-            <p>A Robotverseny egy diákoknak szóló műszaki megmérettetés, ahol az építés, a programozás és a csapatmunka találkozik. Olyan eseményt szeretnénk teremteni, amely egyszerre kihívás, tanulási lehetőség és emlékezetes közösségi élmény.</p>
+            <p>A Brickathlon egy diákoknak szóló műszaki megmérettetés, ahol az építés, a programozás és a csapatmunka találkozik. Olyan eseményt szeretnénk teremteni, amely egyszerre kihívás, tanulási lehetőség és emlékezetes közösségi élmény.</p>
             <div className="d-flex flex-wrap gap-2 mt-4">
               <Link className="btn btn-primary px-4" to="/versenyjelentkezes">Jelentkezés</Link>
               <Link className="btn btn-theme-secondary px-4" to="/szabalyzat">Szabályzat megtekintése</Link>

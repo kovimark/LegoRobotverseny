@@ -31,8 +31,9 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
             <nav className="navbar navbar-expand-lg navbar-light bg-light custom-navbar">
                 <div className="container-fluid">
                     <Link className="navbar-brand" to="/" onClick={closeMenu}>
-                        <img className="navbar-brand-logo" src="/Images/Logokicsi.png" alt="" aria-hidden="true" />
+                        <img className="navbar-brand-logo" src="/Images/LogoKicsi.png" alt="" aria-hidden="true" />
                         <img className="navbar-brand-name" src="/Images/Nev.png" alt="Robotverseny" />
+                        <img className="navbar-brand-mobile-logo" src="/Images/telefonLogo.png" alt="Robotverseny" />
                     </Link>
                     <button
                         className={`navbar-toggler ${isMenuOpen ? 'active' : ''}`}

@@ -29,10 +29,11 @@ export default function HomePage() {
     <main className="home-page">
       <section className="home-hero">
         <div className="home-panel">
-          <span className="home-kicker">Őszi robotverseny</span>
-          <h1 className="home-title">Robotverseny</h1>
+          <h1 className="home-title home-brand-title">
+            <img className="home-brand-name" src="/Images/Nev.png" alt="Robotverseny" />
+          </h1>
           <p className="home-copy">
-            Jelentkezzetek max 2 fős csapattal, hozzátok az ötleteket, és mutassátok meg, mire képes a robototok a pályán.
+            Jelentkezzetek max 2 fős csapattal a szezonnyitó őszi robotversenyre, hozzátok az ötleteket, és mutassátok meg, mire képes a robototok a pályán.
           </p>
           <p className="home-description">
             A célunk egy egyszerű, átlátható és izgalmas verseny létrehozása, ahol a résztvevők megmutathatják kreativitásukat és programozási tudásukat. A csapatok különböző kihívásokkal találkoznak, a legjobb megoldások pedig értékes díjakat nyerhetnek.
@@ -53,7 +54,7 @@ export default function HomePage() {
           <div className="home-about-copy">
             <span className="home-kicker">Bemutatkozás</span>
             <h2>Építs, programozz, versenyezz!</h2>
-            <p>A Robotverseny olyan általános és középiskolás diákokat hoz össze, akik szeretnék próbára tenni ötleteiket, robotjukat és csapatmunkájukat. Négy eltérő kihívásban minden csapat megmutathatja a saját erősségeit.</p>
+            <p>A Brickathlon olyan általános és középiskolás diákokat hoz össze, akik szeretnék próbára tenni ötleteiket, robotjukat és csapatmunkájukat. Négy eltérő kihívásban minden csapat megmutathatja a saját erősségeit.</p>
             <Link className="btn btn-outline-dark" to="/rolunk">Ismerj meg minket <i className="bi bi-arrow-right ms-1" /></Link>
           </div>
           <div className="home-about-highlights" aria-label="A verseny fő jellemzői">
