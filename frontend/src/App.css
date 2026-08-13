@@ -59,9 +59,9 @@ h2::after {
   z-index: 1000;
   border-bottom: 3px solid var(--yellow);
   background:
-    linear-gradient(90deg, rgba(91, 192, 235, 0.42), rgba(253, 231, 76, 0.48)),
-    #d6e7ec !important;
-  box-shadow: 0 0.8rem 1.65rem rgba(0, 0, 0, 0.15);
+    linear-gradient(90deg, rgba(91, 192, 235, 0.18), rgba(253, 231, 76, 0.3)),
+    var(--white) !important;
+  box-shadow: 0 0.7rem 1.5rem rgba(0, 0, 0, 0.08);
 }
 
 .navbar-brand {
@@ -1679,11 +1679,11 @@ form {
     flex-direction: column;
     align-items: flex-start;
     background:
-      linear-gradient(135deg, rgba(253, 231, 76, 0.5), rgba(91, 192, 235, 0.42)),
-      #d6e7ec;
+      linear-gradient(135deg, rgba(253, 231, 76, 0.36), rgba(91, 192, 235, 0.18)),
+      var(--white);
     padding: 0.75rem 1rem 1rem;
     border-bottom: 2px solid var(--yellow);
-    box-shadow: 0 0.85rem 1.35rem rgba(0, 0, 0, 0.18);
+    box-shadow: 0 0.8rem 0 var(--black);
     max-height: 0;
     opacity: 0;
     overflow: hidden;
