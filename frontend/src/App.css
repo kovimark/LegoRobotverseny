@@ -59,7 +59,7 @@ h2::after {
   z-index: 1000;
   border-bottom: 3px solid var(--yellow);
   background:
-    linear-gradient(90deg, rgba(91, 192, 235, 0.18), rgba(253, 231, 76, 0.3)),
+    linear-gradient(90deg, rgba(67, 151, 187, 0.18), rgba(253, 231, 76, 0.3)),
     var(--white) !important;
   box-shadow: 0 0.7rem 1.5rem rgba(0, 0, 0, 0.08);
 }
