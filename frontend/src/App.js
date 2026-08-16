@@ -7,6 +7,7 @@ import AboutPage from './pages/AboutPage';
 import ShowPage from './pages/ShowPage';
 import AdminPage from './pages/AdminPage';
 import AdminScoringPage from './pages/AdminScoringPage';
+import GameScoringPage from './pages/GameScoringPage';
 import CompetitionRegistration from './pages/CompetitionRegistration';
 import RulesPage from './pages/RulesPage';
 import StandingsPage from './pages/StandingsPage';
@@ -30,6 +31,8 @@ import AutomaticPhaseAdvancer from './components/AutomaticPhaseAdvancer';
 function App() {
   const location = useLocation();
   const isShowPage = location.pathname === '/show';
+  const isGameScoringPage = location.pathname.startsWith('/admin/pontozas-jatek');
+  const isFocusPage = isShowPage || isGameScoringPage;
   const [user, setUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [userPrivilege, setUserPrivilege] = useState(null);
@@ -159,10 +162,15 @@ function App() {
     }
   };
 
+  const canScore = userRole === 'admin' || userRole === 'judge';
+  const protectedAdminPage = (element) => (
+    authLoading ? <main className="container py-5"><div className="alert alert-info">Jogosultság ellenőrzése...</div></main> : element
+  );
+
   return (
     <div className="App">
       <AutomaticPhaseAdvancer enabled={userRole === 'admin'} />
-      {!isShowPage && <Navbar
+      {!isFocusPage && <Navbar
         user={user}
         userRole={userRole}
         userPrivilege={userPrivilege}
@@ -184,14 +192,16 @@ function App() {
         <Route path="/allasok" element={<StandingsPage />} />
         <Route path="/csapat/:teamName" element={<TeamDetailsPage />} />
         <Route path="/sajat-csapataim" element={user ? <MyTeamsPage user={user} /> : <LoginPage user={user} authLoading={authLoading} authError={authError} onGoogleSignIn={handleGoogleSignIn} onSignOut={handleSignOut} />} />
-        <Route path="/admin" element={userRole === 'admin' ? <AdminPage /> : <HomePage />} />
-        <Route path="/admin/jogosultsagok" element={userRole === 'admin' ? <PrivilegeManagementPage /> : <HomePage />} />
-        <Route path="/admin/uzenetek" element={userRole === 'admin' ? <MessageManagementPage /> : <HomePage />} />
-        <Route path="/admin/ertesitesek" element={userRole === 'admin' ? <NotificationManagementPage /> : <HomePage />} />
-        <Route path="/admin/emailek" element={userRole === 'admin' ? <EmailManagementPage /> : <HomePage />} />
-        <Route path="/admin/beallitasok" element={userRole === 'admin' || userRole === 'judge' ? <SettingsManagementPage groupOnly={userRole === 'judge'} /> : <HomePage />} />
-        <Route path="/admin/pontozas" element={userRole === 'admin' || userRole === 'judge' ? <AdminScoringPage userPrivilege={userPrivilege} /> : <HomePage />} />
-        <Route path="/admin/pontozas/:competitionType" element={userRole === 'admin' || userRole === 'judge' ? <AdminScoringPage userPrivilege={userPrivilege} /> : <HomePage />} />
+        <Route path="/admin" element={protectedAdminPage(userRole === 'admin' ? <AdminPage /> : <HomePage />)} />
+        <Route path="/admin/jogosultsagok" element={protectedAdminPage(userRole === 'admin' ? <PrivilegeManagementPage /> : <HomePage />)} />
+        <Route path="/admin/uzenetek" element={protectedAdminPage(userRole === 'admin' ? <MessageManagementPage /> : <HomePage />)} />
+        <Route path="/admin/ertesitesek" element={protectedAdminPage(userRole === 'admin' ? <NotificationManagementPage /> : <HomePage />)} />
+        <Route path="/admin/emailek" element={protectedAdminPage(userRole === 'admin' ? <EmailManagementPage /> : <HomePage />)} />
+        <Route path="/admin/beallitasok" element={protectedAdminPage(canScore ? <SettingsManagementPage groupOnly={userRole === 'judge'} /> : <HomePage />)} />
+        <Route path="/admin/pontozas" element={protectedAdminPage(canScore ? <AdminScoringPage userPrivilege={userPrivilege} /> : <HomePage />)} />
+        <Route path="/admin/pontozas/:competitionType" element={protectedAdminPage(canScore ? <AdminScoringPage userPrivilege={userPrivilege} /> : <HomePage />)} />
+        <Route path="/admin/pontozas-jatek" element={protectedAdminPage(canScore ? <GameScoringPage userPrivilege={userPrivilege} /> : <HomePage />)} />
+        <Route path="/admin/pontozas-jatek/:competitionType" element={protectedAdminPage(canScore ? <GameScoringPage userPrivilege={userPrivilege} /> : <HomePage />)} />
         <Route
           path="/bejelentkezes"
           element={
@@ -205,8 +215,8 @@ function App() {
           }
         />
       </Routes>
-      {!isShowPage && <FloatingRefreshButton />}
-      {!isShowPage && <footer className="container py-4 mt-4 border-top text-center text-muted small">
+      {!isFocusPage && <FloatingRefreshButton />}
+      {!isFocusPage && <footer className="container py-4 mt-4 border-top text-center text-muted small">
         A LEGO® a LEGO Group védjegye. Ez egy független rendezvény és weboldal, amely nem áll kapcsolatban a LEGO Grouppal, és amelyet a LEGO Group nem szponzorál.
       </footer>}
     </div>

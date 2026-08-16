@@ -116,6 +116,9 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                                     <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/pontozas" onClick={() => setIsProfileOpen(false)}>
                                         <i className="bi bi-trophy-fill" aria-hidden="true" /><span>Pontozás kezelése</span>
                                     </Link>
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/pontozas-jatek" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-controller" aria-hidden="true" /><span>Játékos pontozás</span>
+                                    </Link>
                                     <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/jogosultsagok" onClick={() => setIsProfileOpen(false)}>
                                         <i className="bi bi-person-lock" aria-hidden="true" /><span>E-mailek és jogosultságok kezelése</span>
                                     </Link>
@@ -133,7 +136,7 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                                     </Link>
                                 </div>
                             ) : userRole === 'judge' ? (
-                                <div className="d-grid gap-2"><Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/pontozas" onClick={() => setIsProfileOpen(false)}><i className="bi bi-trophy-fill" aria-hidden="true" /><span>Saját versenyszám pontozása</span></Link><Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/beallitasok" onClick={() => setIsProfileOpen(false)}><i className="bi bi-diagram-3-fill" aria-hidden="true" /><span>Csapatcsoportok</span></Link></div>
+                                <div className="d-grid gap-2"><Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/pontozas" onClick={() => setIsProfileOpen(false)}><i className="bi bi-trophy-fill" aria-hidden="true" /><span>Saját versenyszám pontozása</span></Link><Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/pontozas-jatek" onClick={() => setIsProfileOpen(false)}><i className="bi bi-controller" aria-hidden="true" /><span>Játékos pontozás</span></Link><Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/beallitasok" onClick={() => setIsProfileOpen(false)}><i className="bi bi-diagram-3-fill" aria-hidden="true" /><span>Csapatcsoportok</span></Link></div>
                             ) : (
                                 <div className="d-grid gap-2">
                                     <Link className="btn btn-primary w-100 profile-menu-link" to="/sajat-csapataim" onClick={() => setIsProfileOpen(false)}>

@@ -7,7 +7,7 @@ import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 
 const competitionConfig = getCompetitionConfig('kosarra-dobas')
 const HOOPS = [1, 2, 3, 4, 5]
-const MAX_THROWS = 5
+const MAX_THROWS = 10
 const MAX_ATTEMPTS = 10
 const MAX_TIME_SECONDS = 120
 
@@ -164,7 +164,7 @@ export default function BasketThrowScoring() {
     const nextDraft = { ...draft, [`hoop${hoop}`]: normalizedValue }
 
     if (calculateTotalThrows(nextDraft) > MAX_THROWS) {
-      setActionMessage({ type: 'danger', text: 'Összesen legfeljebb 5 dobás adható meg.' })
+      setActionMessage({ type: 'danger', text: 'Összesen legfeljebb 10 dobás adható meg.' })
       return
     }
 
@@ -181,7 +181,7 @@ export default function BasketThrowScoring() {
     }
 
     if (totalThrows <= 0 || totalThrows > MAX_THROWS) {
-      setActionMessage({ type: 'danger', text: 'Adj meg legalább 1, legfeljebb 5 dobást.' })
+      setActionMessage({ type: 'danger', text: 'Adj meg legalább 1, legfeljebb 10 dobást.' })
       return
     }
 
@@ -257,7 +257,7 @@ export default function BasketThrowScoring() {
     const normalizedValue = value === '' ? 0 : Math.max(0, Number.parseInt(value, 10) || 0)
     const nextDraft = { ...editDraft, [`hoop${hoop}`]: normalizedValue }
     if (calculateTotalThrows(nextDraft) > MAX_THROWS) {
-      setActionMessage({ type: 'danger', text: 'Összesen legfeljebb 5 dobás adható meg.' })
+      setActionMessage({ type: 'danger', text: 'Összesen legfeljebb 10 dobás adható meg.' })
       return
     }
     setEditDraft(nextDraft)
@@ -268,7 +268,7 @@ export default function BasketThrowScoring() {
     const total = calculateTotalThrows(editDraft)
     const throwNumber = Number.parseInt(editDraft.throwNumber, 10)
     if (total <= 0 || total > MAX_THROWS) {
-      setActionMessage({ type: 'danger', text: 'Adj meg legalább 1, legfeljebb 5 dobást.' })
+      setActionMessage({ type: 'danger', text: 'Adj meg legalább 1, legfeljebb 10 dobást.' })
       return
     }
     if (!Number.isFinite(time) || time <= 0) {
@@ -440,7 +440,7 @@ export default function BasketThrowScoring() {
             <div className="input-group"><span className="input-group-text"><i className="bi bi-search" /></span><input id="basket-attempt-search" type="search" className="form-control" placeholder="Csapatnév vagy próbálkozás sorszáma…" value={attemptSearch} onChange={(event) => setAttemptSearch(event.target.value)} /></div>
           </div>
 
-          <CategorizedResultsStandings title="Kosárra dobás eredménytáblája" rows={[...filteredResults].sort((left, right) => right.points - left.points || Number(left.time ?? Infinity) - Number(right.time ?? Infinity) || left.team_name.localeCompare(right.team_name)).map((result) => ({ ...result, category: Number(allTeams.find((team) => (team.teamName || team.team_name) === result.team_name)?.category) === 1 ? 1 : 0 }))} getKey={(result) => result.id} columns={[{ key: 'team', label: 'Csapat', render: (result) => result.team_name }, { key: 'throwNumber', label: 'Próbálkozás', align: 'end', render: (result) => `${result.throwNumber}.` }, { key: 'points', label: 'Pont', align: 'end' }, { key: 'time', label: 'Idő', align: 'end', render: (result) => result.time == null ? '-' : `${result.time} s` }, ...HOOPS.map((hoop) => ({ key: `hoop${hoop}`, label: `${hoop}. kosár`, align: 'end' }))]} />
+          <CategorizedResultsStandings title="Kosárra dobás eredménytáblája" tableWrapperClassName="basket-throw-standings-scroll" rows={[...filteredResults].sort((left, right) => right.points - left.points || Number(left.time ?? Infinity) - Number(right.time ?? Infinity) || left.team_name.localeCompare(right.team_name)).map((result) => ({ ...result, category: Number(allTeams.find((team) => (team.teamName || team.team_name) === result.team_name)?.category) === 1 ? 1 : 0 }))} getKey={(result) => result.id} columns={[{ key: 'team', label: 'Csapat', render: (result) => result.team_name }, { key: 'throwNumber', label: 'Próbálkozás', align: 'end', render: (result) => `${result.throwNumber}.` }, { key: 'points', label: 'Pont', align: 'end' }, { key: 'time', label: 'Idő', align: 'end', render: (result) => result.time == null ? '-' : `${result.time} s` }, ...HOOPS.map((hoop) => ({ key: `hoop${hoop}`, label: `${hoop}. kosár`, align: 'end' }))]} />
 
           <div className="d-flex justify-content-end mb-3">
             <div className="btn-group" role="group" aria-label="Rendezés">

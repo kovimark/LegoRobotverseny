@@ -2108,6 +2108,31 @@ form {
   background-clip: padding-box;
 }
 
+.basket-throw-standings-scroll {
+  overflow-x: scroll !important;
+  overflow-y: hidden !important;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+  scrollbar-gutter: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.basket-throw-standings-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.basket-throw-standings-scroll .scoring-results-table {
+  width: max-content !important;
+  min-width: 100% !important;
+  max-width: none !important;
+}
+
+.basket-throw-standings-scroll .scoring-results-table th,
+.basket-throw-standings-scroll .scoring-results-table td {
+  white-space: nowrap;
+}
+
 .scoring-results-table {
   width: 100%;
   margin-bottom: 0;
