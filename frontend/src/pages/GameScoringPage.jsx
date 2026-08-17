@@ -42,157 +42,134 @@ const SUMO_TIMER_PRESETS = {
   break: 30
 }
 
-const JUDGE_SCENARIOS = {
-  sumo: {
-    intro: 'A szumóban két robot küzd meg egymással egy körpályán. A cél, hogy az ellenfelet letolják a pályáról, miközben a saját robotjuk talpon marad. Most nézzük meg, milyen helyzetekkel találkozhatunk egy mérkőzés során, és ezekre milyen szabályok vonatkoznak.',
-    items: [
-      {
-        id: 'sumo-no-white-line',
-        label: 'Nem megy el a fehér vonalig',
-        action: 'A rajt után a robotnak a pálya szélét jelző fehér vonalig kell eljutnia. Ha ezt nem teszi meg, az szabálytalanságnak számít, és ismétlődés esetén a menet elvesztésével jár.'
-      },
-      {
-        id: 'sumo-no-start',
-        label: 'Nem indul el a robot',
-        action: 'A rajt után a robotnak öt másodpercen belül el kell indulnia. Ha nem indul el, vagy rossz irányba indul, az első alkalommal figyelmeztetés jár. Ismétlődés esetén a robot elveszíti a menetet.'
-      },
-      {
-        id: 'sumo-win',
-        label: 'Győztes menet',
-        action: 'A menet akkor ér véget, amikor az egyik robot letolja ellenfelét a pályáról, és az eléri a földet. Ebben az esetben a pályán maradó robot nyeri a menetet. A robot, amelyik leesett vagy le lett tolva, elveszíti azt.'
-      },
-      {
-        id: 'sumo-fall',
-        label: 'Leesik a robot',
-        action: 'Ha egy robot leesik a pályáról és eléri a földet, elveszíti az adott menetet. A mérkőzés ezzel véget ér.'
-      },
-      {
-        id: 'sumo-draw',
-        label: 'Döntetlen',
-        action: 'Ha lejár a rendelkezésre álló idő, és egyik robot sem esik le a pályáról, a menet döntetlennel zárul. Ilyenkor mindkét csapat egy pontot kap. Ha a jelzés után esne le bármelyik robot, az már nem érvényes.'
-      },
-      {
-        id: 'sumo-ref-end',
-        label: 'Bírói jelzés utáni leesés',
-        action: 'A bíró a menet végét kézjelzéssel és szóban is jelzi. Ettől a pillanattól kezdve az események már nem számítanak bele az eredménybe. Ha a robot ezután esik le, az már nem változtatja meg a menet eredményét.'
-      },
-      {
-        id: 'sumo-overturn',
-        label: 'Felborul a robot',
-        action: 'Ha a robot felborul, de továbbra is a pályán marad, a menet tovább zajlik. A felborulás önmagában nem jelent vereséget.'
-      },
-      {
-        id: 'sumo-touch',
-        label: 'Hozzányúlnak a robothoz',
-        action: 'A robot indítása után a versenyzőknek a kijelölt helyükre kell ülniük. A menet közben a robothoz hozzányúlni tilos. A szabályba való beavatkozás az adott menet elvesztését eredményezheti.'
-      },
-      {
-        id: 'sumo-part-fall',
-        label: 'Leesik egy alkatrész',
-        action: 'Ha a robotról egy alkatrész leesik, de a robot továbbra is működőképes és versenyképes marad, a menet folytatható. A következő menet előtt azonban a robotot ismét szabályos állapotba kell hozni.'
-      },
-      {
-        id: 'sumo-timeout',
-        label: 'Időkérés',
-        action: 'Minden fordulóban egy alkalommal lehet időt kérni. Ez legfeljebb harminc másodpercig tarthat, és a két menet közötti szünetben használható fel.'
-      }
-    ]
-  },
-  line: {
-    intro: 'A vonalkövetésben a robotnak egy előre kijelölt pályán kell végighaladnia, és önállóan követnie a fekete vonalat. A cél, hogy minél gyorsabban teljesítse a teljes kört, miközben a robot végig a pályán marad. Most nézzük meg, milyen helyzetekkel találkozhatunk egy próbálkozás során, és ezekre milyen szabályok vonatkoznak.',
-    items: [
-      {
-        id: 'line-normal',
-        label: 'Rendes vonalkövetés',
-        action: 'A robotnak önállóan kell követnie a kijelölt vonalat, és egy teljes kört kell megtennie a pályán. A próbálkozás idejét a fotocellás kapu méri, és a csoportkörben a két próbálkozás közül a jobb idő számít.'
-      },
-      {
-        id: 'line-straight-mode',
-        label: 'Straight Mode',
-        action: 'A pálya egyenes szakaszainak elején és végén piros jelzések találhatók. Ezek segítségével a robot felismerheti, hogy egyenes szakasz következik, és ennek megfelelően gyorsíthat. A piros jelzések használata nem kötelező.'
-      },
-      {
-        id: 'line-leave-replace',
-        label: 'Elhagyja a vonalat, visszatenni',
-        action: 'Ha a robot elhagyja a vonalat, és a versenyző úgy ítéli meg, hogy nem fog visszatalálni, a robot visszahelyezhető arra a pontra, ahol elvesztette a vonalat. Ezért nem jár büntetés, de az időbe beleszámít.'
-      },
-      {
-        id: 'line-leave-cannot-find',
-        label: 'Elhagyja a vonalat, visszatenni, és nem találja',
-        action: 'Ha a robotot visszahelyeztük a megfelelő pontra, de továbbra sem találja a vonalat, a versenyző ismét hozzáérhet és segíthet a robotnak.'
-      },
-      {
-        id: 'line-wrong-replace',
-        label: 'Elhagyja a vonalat, rossz helyre visszatenni',
-        action: 'A robotot arra a pontra kell visszahelyezni, ahol még szabályosan követte a vonalat. Ha a bíró úgy ítéli meg, hogy a robot rossz helyre került, kérheti a versenyzőt a helyes pozícióba történő visszaállításra.'
-      },
-      {
-        id: 'line-cut-corner',
-        label: 'Levágja a kanyart',
-        action: 'Ha a robot elhagyja a pályát, és ezzel levág egy kanyart, nem folytathatja a versenyt onnan, ahová eljutott, hanem kötelező visszahelyezni arra a pontra, ahol még szabályosan követte a vonalat. Ha ez nem történik meg, a próbálkozás nem értékelhető, és a maximális kétperces idő kerül rögzítésre.'
-      },
-      {
-        id: 'line-stop',
-        label: 'Megáll a robot',
-        action: 'Ha a robot a pályán megáll vagy mozgásképtelenné válik, és nem tudja folytatni a kört, a próbálkozás véget ér. Ilyenkor a teljesítés nem értékelhető, és a maximális kétperces idő kerül rögzítésre.'
-      }
-    ]
-  },
-  basket: {
-    intro: 'A kosárra dobásban a robotoknak különböző távolságra elhelyezett kosarakba kell ping-pong labdát dobniuk. A csapatnak három perc és legfeljebb tíz dobás áll rendelkezésére, a cél pedig minél több érvényes pontszerzés. Most nézzük meg, milyen helyzetekkel találkozhatunk egy próbálkozás során, és ezekre milyen szabályok vonatkoznak.',
-    items: [
-      {
-        id: 'basket-no-move',
-        label: 'Nem mozdul meg a robot dobás előtt vagy után',
-        action: 'Minden dobás előtt és után a robotnak egyértelműen meghatározható helyváltoztató mozgást kell végeznie. Ha a robot a dobás előtt vagy után nem mozdul meg, az adott dobás nem lesz érvényes.'
-      },
-      {
-        id: 'basket-time-expire-in-motion',
-        label: 'Lejár az idő, de megy a robot',
-        action: 'Ha a három perc lejár, de a robot már elvégezte a dobás előtti szükséges mozgást, a megkezdett dobás még befejezhető és értékelhető.'
-      },
-      {
-        id: 'basket-time-expire-after',
-        label: 'Lejár az idő és utána indul el a robot',
-        action: 'Ha a robot csak az idő lejárta után kezdi meg a dobás előtti mozgást, az már nem számít érvényes dobásnak, és ami ezután történik, nem értékelhető.'
-      },
-      {
-        id: 'basket-outside-area',
-        label: 'Kilóg a robot vagy a kar a dobásnál',
-        action: 'A dobás teljes ideje alatt a robot minden részének a kijelölt dobóterületen belül kell maradnia. Ha akár a robot teste, akár egy kinyúló kar elhagyja a területet, a dobás nem lesz érvényes.'
-      },
-      {
-        id: 'basket-ball-drop-inside',
-        label: 'Kiesik a robot karjából a labda, de nem hagyja el a dobóterületet',
-        action: 'Ha a labda mozgás közben kiesik a robotból, de a dobóterületen belül marad, a csapat újrakezdheti a dobást. Ilyenkor a dobás még nem számít befejezettnek.'
-      },
-      {
-        id: 'basket-ball-drop-outside',
-        label: 'Kiesik a robot karjából a labda és elhagyja a dobóterületet',
-        action: 'Ha a labda elhagyja a dobóterületet, a dobás befejezettnek számít. Innentől már nem lehet ugyanazt a dobást újrakezdeni, a dobás pedig a szabályok szerint értékelhető vagy érvényteleníthető.'
-      }
-    ]
-  },
-  hill: {
-    intro: 'A hegymászásban a robotnak négy, egyre nehezebb emelkedőt kell önállóan teljesítenie. A szinteket sorrendben kell megmásznia, és mindig csak akkor léphet tovább a következőre, ha az előzőt sikeresen teljesítette. Most nézzük meg, milyen helyzetekkel találkozhatunk egy próbálkozás során, és ezekre milyen szabályok vonatkoznak.',
-    items: [
-      {
-        id: 'hill-complete',
-        label: 'Végig felmegy az emelkedőn',
-        action: 'Egy emelkedő akkor számít sikeresen teljesítettnek, ha a robot eléri a tetején található célvonalat. Ezután a robotot a következő nehézségi szint rajtvonalára lehet helyezni, és folytathatja a mászást. A végső eredményt elsősorban a teljesített szintek száma, azonos eredmény esetén pedig az utolsó teljesített szint ideje határozza meg.'
-      },
-      {
-        id: 'hill-cannot-climb',
-        label: 'A robot nem megy fel',
-        action: 'A rajtjelzés után a robotnak önállóan kell megkezdenie az emelkedő megmászását. Ha nem indul el, az emelkedőn megáll, visszagurul, vagy letér az emelkedőről és emiatt nem tud továbbhaladni, a próbálkozás véget ér. Ilyenkor a robotot nem lehet visszahelyezni a pályára, és csak az addig sikeresen teljesített szintek kerülnek értékelésre.'
-      },
-      {
-        id: 'hill-touch',
-        label: 'Hozzányúl valaki a robothoz',
-        action: 'A próbálkozás során a robotnak teljesen önállóan kell működnie. Ha a csapat versenyzője bármely ponton hozzáér a robothoz, a próbálkozás befejezettnek tekintendő. Ha viszont egy csapattól független külső személy ér hozzá, a próbálkozás megismételhető.'
-      }
-    ]
-  }
+const JUDGE_GUIDE = {
+  title: 'Versenybírói kézikönyv 2026',
+  intro: [
+    'Ez a bírói kézikönyved, ha bármi kérdés merülne fel, akkor ezt hívhatod segítségül. A hivatalos kézikönyvből idézett részeket tartalmaz, de a versenyen a bírói felület és a segítők is segítenek a döntéshozatalban.',
+    'A NYOMTAOTT KÖNYVET KIEGÉSZÍTI, DE NEM ÍRJA FELÜL.',
+    'Ha nem tudsz dönteni, akkor kérj segítséget a melletted lévő segítőtől, vagy hívd a főrendezőt.',
+  ],
+  goldenRules: [
+    'A szabálykönyv az úr: ez a kivonat csak segédlet, vitás esetben a hivatalos szabálykönyv dönt.',
+    'Kérj segítséget: ha bizonytalan vagy, azonnal szólj a melletted lévő segítőnek, aki hívja a főrendezőket.',
+    'Figyelj magadra: ha elfáradtál, válts egy kollégáddal. A friss bíró a jó bíró.'
+  ],
+  interfaceUsage: [
+    'Jelentkezz be a megadott Google-fiókodba.',
+    'Kattints a profil gombra: Saját versenyszám pontozása.',
+    'Itt rögzítheted az eredményeket az aktuális tabella és a beviteli mezők segítségével (az összetett tabella is itt érhető el).'
+  ],
+  rightsAndDuties: [
+    'Döntéshozatal: az elsődleges döntés a tiéd, a szabálykönyv alapján. Ha vitás a helyzet, hívj rendezőt.',
+    'Kommunikáció: mindig magyarázd el a döntésedet a csapatnak. A versenyzőknek joguk van ellenőrizni az eredmény rögzítését.',
+    'Érvénytelenítés: jogod van egy próbálkozást érvényteleníteni a szabálykönyv szerint, ezt is magyarázd meg a csapatnak.',
+    'NINCS JOGOD: bónuszpontot adni, pontot levonni vagy kizárni csapatot. Ilyen esetben azonnal tegyél javaslatot a főrendezőknek.'
+  ],
+  objectionProtocol: [
+    'Csak addig nyújtható be óvás, amíg a csapat a versenyszám területén van.',
+    'Állítsd meg a vitát: közöld a csapatokkal, hogy hívod a főrendezőt.',
+    'Add át a pályát: egy szabad kollégád vegye át a következő meccset, a verseny nem állhat le.',
+    'Várd meg a döntést: a segítővel hívott főrendező átveszi az ügyet, az ő szava a végső.'
+  ],
+  universalStartProcedure: [
+    'A csapat visel passzt (azonosítható).',
+    'A robot megfelel a mérethatárnak és az alkatrész-szabályoknak.',
+    'A felületen látszik, hogy a csapat még próbálkozhat.',
+    'Egyértelmű visszaszámlálás, rajtjelzés és stopper indítása.'
+  ],
+  competitions: [
+    {
+      id: 'hill',
+      title: '1. Hegymászás',
+      presence: 'Jelenlévők: 4 bíró, 1 segítő (minimum: 2 bíró).',
+      rotation: 'Rotáció: csere minden levezetett csapat után. Egy bíró kíséri végig a csapatot az összes emelkedőn.',
+      rule: 'Szabály: minden csapat csak egyszer próbálkozhat, és azt egyben kell letudnia. Mindig az első emelkedőnél kezdenek.',
+      flow: [
+        'A csapat a rajtzónába helyezi a robotot.',
+        'Indítás + stopper indítás.',
+        'A robot teljesíti a szintet (ha bármely része érinti a célvonalat).',
+        'Eredmény rögzítése, majd új emelkedő kezdése (stopper nullázása).'
+      ],
+      decisions: [
+        'Robot leesik vagy felborul: a próbálkozás véget ér (megfoghatod, hogy ne sérüljön).',
+        'Robot megáll vagy visszagurul: a próbálkozás véget ér.',
+        'Versenyző a robothoz ér: a próbálkozás véget ér.',
+        'Külső beavatkozás: a próbálkozás az adott emelkedőn újrakezdhető.',
+        'Pályahiba vagy akadály: a próbálkozás az adott emelkedőn újrakezdhető. Hívj rendezőt.'
+      ]
+    },
+    {
+      id: 'basket',
+      title: '2. Kosárra dobás',
+      presence: 'Jelenlévők: 3 bíró, 2 segítő (minimum: 2 bíró).',
+      rotation: 'Rotáció: csere 2 levezetett csapat után.',
+      rule: 'Szabály: csak a bíró által adott labdával dobhatnak (folyamatosan adogasd nekik). A csapatnak egy próbálkozása van.',
+      flow: [
+        'A csapat a dobóterületre teszi a robotot.',
+        'Indítás + stopper indítás.',
+        'A próba véget ér, ha letelik a 3 perc, vagy elérik a 10 dobást, vagy elérik az 5 érvényes pontszerzést.'
+      ],
+      validity: [
+        'A dobás előtt és után helyváltoztató mozgást végzett.',
+        'A robot dobta el a labdát.',
+        'A robot végig a dobóterületen belül maradt.',
+        'A dobás megkezdett: amint megvan az első mozgás. Elvégzett: amint a labda elhagyja a területet.'
+      ],
+      decisions: [
+        'Szabályos dobás: a dobás érvényes. Rögzítsd a dobások számánál (+ ha kosárba ment, ott is).',
+        'Első mozgás után kimegy a területből: a dobás újrakezdhető (amíg el nem dobta). Ne számold dobásnak.',
+        'A labda elhagyja a területet: a dobás elvégzettnek minősül. Rögzítsd a dobás számát.',
+        'A versenyző hozzáér a robothoz vagy későn teszi be a labdát: ha eldobta, a dobás érvénytelen; ha nem dobta el, újrakezdhető.'
+      ]
+    },
+    {
+      id: 'line',
+      title: '3. Vonalkövetés',
+      presence: 'Jelenlévők: 3 bíró, 2 segítő (minimum: 2 bíró).',
+      rotation: 'Rotáció: csere 2 levezetett csapat után.',
+      rule: 'Szabály: minden csapatnak 2 próbálkozása van.',
+      flow: [
+        'A csapat a rajtvonal elé teszi a robotot (fotocella még nem indul).',
+        'Indítás (figyeld az időmérést).',
+        'Érvényes célba érés: a robot áthalad a célvonalon és leállítja az órát, idő rögzítése.',
+        'Hibapont: ha a csapat eléri a 120 másodpercet, állítsd le őket, és 120 másodpercet rögzíts.'
+      ],
+      checkpoints: [
+        'A versenyző bármikor hozzáérhet a robothoz.',
+        'Ilyenkor a legutoljára elhagyott ellenőrző pont (sárga pötty) mögé kell visszatenni. Mondd be a pötty betűjelét.',
+        'Helyes visszahelyezés: a robot teljes terjedelmével a pont mögött van.'
+      ],
+      decisions: [
+        'Rossz helyre teszi vissza: szólj azonnal. Ha figyelmen kívül hagyja az utasítást, a próba véget ér, 120 másodpercet rögzíts.',
+        'A robot nem állítja le az órát: ajánld fel az általad mért (vagy látott) időt. Ha nem fogadják el, újrapróbálkozhatnak.'
+      ]
+    },
+    {
+      id: 'sumo',
+      title: '4. Szumó',
+      presence: 'Jelenlévők: 6 bíró, 3 segítő (minimum: 4 bíró).',
+      rotation: 'Rotáció: csere 2 levezetett párharc után.',
+      rule: 'Szabály: 1 párharc = 3 mérkőzés. Mind a hármat le kell játszani.',
+      flow: [
+        'Robotok startpozícióba helyezése.',
+        'Indítás + stopper indítás.',
+        'Győztes: aki letolja a másikat a pályáról.',
+        'Két meccs között max. 30 mp szünet (időkérés: csapatonként, fordulónként 1x 30 mp).'
+      ],
+      warnings: [
+        'A versenyző nem ül le a helyére.',
+        'A robot nem indul el 5 mp-en belül.',
+        'A robot nem az ellentétes irányba mozog.',
+        'A robot nem megy el a pálya szélét jelző fehér sávig.',
+        'Egy párharcon belül 2 figyelmeztetés = vesztett meccs.'
+      ],
+      decisions: [
+        'Patthelyzet (összeakadás): csak akkor állítsd meg, ha mindkét versenyző kézfeltartással jelzi. A robotokon nem módosíthatnak, az idő megy tovább.',
+        'Leesés időzítése nem egyértelmű: az eredmény döntetlen (vagy ha az idő lejár, és mindkettő a pályán van).',
+        'Forduló vége: ha tiéd az utolsó párharc a fordulóban, a kezdés előtt értesíts egy rendezőt.'
+      ]
+    }
+  ]
 }
 
 const parseResultHistory = (value) => {
@@ -335,43 +312,129 @@ function SearchPicker({
   )
 }
 
-function JudgeScenarioHelper({ title = 'Bírói szituációk', intro = '', scenarios = [] }) {
-  const [activeScenarioId, setActiveScenarioId] = useState(scenarios[0]?.id || '')
+function JudgeScenarioHelper({ competitionId }) {
+  const selectedCompetition = JUDGE_GUIDE.competitions.find((competition) => competition.id === competitionId) || JUDGE_GUIDE.competitions[0] || null
+  const [activeSectionId, setActiveSectionId] = useState(selectedCompetition ? `${selectedCompetition.id}-basics` : 'general-golden')
 
   useEffect(() => {
-    setActiveScenarioId(scenarios[0]?.id || '')
-  }, [scenarios])
+    setActiveSectionId(selectedCompetition ? `${selectedCompetition.id}-basics` : 'general-golden')
+  }, [selectedCompetition])
 
-  if (!Array.isArray(scenarios) || scenarios.length === 0) {
-    return null
+  const generalSections = [
+    { id: 'general-golden', title: 'A 3 aranyszabályod', items: JUDGE_GUIDE.goldenRules },
+    { id: 'general-interface', title: 'A bírói felület használata', items: JUDGE_GUIDE.interfaceUsage },
+    { id: 'general-rights', title: 'Jogok és kötelességek', items: JUDGE_GUIDE.rightsAndDuties },
+    { id: 'general-objection', title: 'Az óvás protokollja', items: JUDGE_GUIDE.objectionProtocol },
+    { id: 'general-start', title: 'Univerzális rajtprocedúra', items: JUDGE_GUIDE.universalStartProcedure }
+  ]
+
+  const competitionSections = selectedCompetition
+    ? [
+      {
+        id: `${selectedCompetition.id}-basics`,
+        title: selectedCompetition.title,
+        items: [selectedCompetition.presence, selectedCompetition.rotation, selectedCompetition.rule]
+      },
+      {
+        id: `${selectedCompetition.id}-flow`,
+        title: 'A próbálkozás menete',
+        items: selectedCompetition.flow
+      },
+      ...(selectedCompetition.validity ? [{
+        id: `${selectedCompetition.id}-validity`,
+        title: 'Az érvényes dobás feltételei',
+        items: selectedCompetition.validity
+      }] : []),
+      ...(selectedCompetition.checkpoints ? [{
+        id: `${selectedCompetition.id}-checkpoints`,
+        title: 'Ellenőrző pontok (sárga pöttyök) használata',
+        items: selectedCompetition.checkpoints
+      }] : []),
+      ...(selectedCompetition.warnings ? [{
+        id: `${selectedCompetition.id}-warnings`,
+        title: 'Figyelmeztetések',
+        items: selectedCompetition.warnings
+      }] : []),
+      {
+        id: `${selectedCompetition.id}-decisions`,
+        title: 'Mire figyelj (döntések)',
+        items: selectedCompetition.decisions
+      }
+    ]
+    : []
+
+  const renderGuideItem = (item, key) => {
+    if (typeof item !== 'string') {
+      return <li key={key}>{String(item)}</li>
+    }
+
+    const separatorIndex = item.indexOf(':')
+    if (separatorIndex === -1) {
+      return <li key={key}>{item}</li>
+    }
+
+    const label = item.slice(0, separatorIndex).trim()
+    const description = item.slice(separatorIndex + 1).trim()
+
+    if (!label || !description) {
+      return <li key={key}>{item}</li>
+    }
+
+    return (
+      <li key={key}>
+        <strong>{label}:</strong> "{description}"
+      </li>
+    )
   }
 
   return (
     <section className="judge-scenarios mb-3">
       <div className="judge-scenarios__shell">
         <div className="judge-scenarios__head">
-          <h5 className="mb-2">{title}</h5>
-          <p className="text-muted small mb-2">Gyors segédlet a szabályzat alapján. Kattints a helyzetre, és látod a javasolt bírói lépést.</p>
-          {intro && <p className="small mb-0">{intro}</p>}
+          <h5 className="mb-2">{JUDGE_GUIDE.title}</h5>
+          {JUDGE_GUIDE.intro.map((paragraph, index) => (
+            <p className={`${index === JUDGE_GUIDE.intro.length - 1 ? 'small mb-0' : 'small mb-2'}`} key={`intro-${index}`}>{paragraph}</p>
+          ))}
         </div>
 
         <div className="judge-scenarios__body">
           <div className="judge-scenarios__list">
-            {scenarios.map((scenario) => (
-              <div key={scenario.id} className="judge-scenarios__item">
+            {competitionSections.map((section) => (
+              <div key={section.id} className="judge-scenarios__item">
                 <button
                   type="button"
-                  className={`judge-scenarios__trigger ${activeScenarioId === scenario.id ? 'is-open' : ''}`}
-                  onClick={() => setActiveScenarioId((current) => (current === scenario.id ? '' : scenario.id))}
-                  aria-expanded={activeScenarioId === scenario.id}
+                  className={`judge-scenarios__trigger ${activeSectionId === section.id ? 'is-open' : ''}`}
+                  onClick={() => setActiveSectionId((current) => (current === section.id ? '' : section.id))}
+                  aria-expanded={activeSectionId === section.id}
                 >
-                  <span>{scenario.label}</span>
-                  <i className={`bi ${activeScenarioId === scenario.id ? 'bi-chevron-up' : 'bi-chevron-down'}`} aria-hidden="true" />
+                  <span>{section.title}</span>
+                  <i className={`bi ${activeSectionId === section.id ? 'bi-chevron-up' : 'bi-chevron-down'}`} aria-hidden="true" />
                 </button>
-                <div className={`judge-scenarios__content ${activeScenarioId === scenario.id ? 'is-open' : ''}`}>
+                <div className={`judge-scenarios__content ${activeSectionId === section.id ? 'is-open' : ''}`}>
                   <div className="judge-scenarios__result mt-2">
-                    <div className="small fw-semibold mb-1">Mi a teendő?</div>
-                    <div>{scenario.action}</div>
+                    <ul className="mb-0 ps-3">
+                      {section.items.map((item, index) => renderGuideItem(item, `${section.id}-${index}`))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {generalSections.map((section) => (
+              <div key={section.id} className="judge-scenarios__item">
+                <button
+                  type="button"
+                  className={`judge-scenarios__trigger ${activeSectionId === section.id ? 'is-open' : ''}`}
+                  onClick={() => setActiveSectionId((current) => (current === section.id ? '' : section.id))}
+                  aria-expanded={activeSectionId === section.id}
+                >
+                  <span>{section.title}</span>
+                  <i className={`bi ${activeSectionId === section.id ? 'bi-chevron-up' : 'bi-chevron-down'}`} aria-hidden="true" />
+                </button>
+                <div className={`judge-scenarios__content ${activeSectionId === section.id ? 'is-open' : ''}`}>
+                  <div className="judge-scenarios__result mt-2">
+                    <ul className="mb-0 ps-3">
+                      {section.items.map((item) => <li key={`${section.id}-${item}`}>{item}</li>)}
+                    </ul>
                   </div>
                 </div>
               </div>
@@ -591,7 +654,7 @@ function GameBasketScoring() {
         </>
       )}
 <br /><br />
-      <JudgeScenarioHelper title="Kosárra dobás: bírói szituációk" intro={JUDGE_SCENARIOS.basket.intro} scenarios={JUDGE_SCENARIOS.basket.items} />
+      <JudgeScenarioHelper competitionId="basket" />
     </section>
   )
 }
@@ -784,7 +847,7 @@ function GameLineFollowingScoring() {
         </>
       )}
 <br /><br />
-      <JudgeScenarioHelper title="Vonalkövetés: bírói szituációk" intro={JUDGE_SCENARIOS.line.intro} scenarios={JUDGE_SCENARIOS.line.items} />
+      <JudgeScenarioHelper competitionId="line" />
     </section>
   )
 }
@@ -998,7 +1061,7 @@ function GameHillClimbingScoring() {
         </>
       )}
 <br /><br />
-      <JudgeScenarioHelper title="Hegymászás: bírói szituációk" intro={JUDGE_SCENARIOS.hill.intro} scenarios={JUDGE_SCENARIOS.hill.items} />
+      <JudgeScenarioHelper competitionId="hill" />
     </section>
   )
 }
@@ -1277,7 +1340,7 @@ function GameSumoScoring() {
         </>
       )}
 <br /><br />
-      <JudgeScenarioHelper title="Szumó: bírói szituációk" intro={JUDGE_SCENARIOS.sumo.intro} scenarios={JUDGE_SCENARIOS.sumo.items} />
+      <JudgeScenarioHelper competitionId="sumo" />
     </section>
   )
 }
