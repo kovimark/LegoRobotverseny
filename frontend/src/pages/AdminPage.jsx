@@ -367,6 +367,18 @@ export default function AdminPage() {
                 >
                   Szerkesztés
                 </button>
+                {/* ⬇️ KIZÁRÁS GOMB – PIROS SZÍNBEN, FUNKCIÓ NÉLKÜL */}
+                <button
+                  type="button"
+                  className="btn btn-sm flex-shrink-0"
+                  style={{
+                    backgroundColor: 'var(--red)',
+                    borderColor: 'var(--red)',
+                    color: 'var(--white)'
+                  }}
+                >
+                  Kizárás
+                </button>
               </div>
 
               <div className={`team-details ${isOpen ? 'open' : ''}`}>

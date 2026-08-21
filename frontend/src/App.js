@@ -190,7 +190,7 @@ function App() {
         <Route path="/hirek/:messageId" element={<NewsDetailsPage />} />
         <Route path="/hirek/cim/:messageTitle" element={<NewsDetailsPage />} />
         <Route path="/allasok" element={<StandingsPage />} />
-        <Route path="/csapat/:teamName" element={<TeamDetailsPage />} />
+        <Route path="/csapat/:teamName" element={<TeamDetailsPage userRole={userRole} userPrivilege={userPrivilege} />} />
         <Route path="/sajat-csapataim" element={user ? <MyTeamsPage user={user} /> : <LoginPage user={user} authLoading={authLoading} authError={authError} onGoogleSignIn={handleGoogleSignIn} onSignOut={handleSignOut} />} />
         <Route path="/admin" element={protectedAdminPage(userRole === 'admin' ? <AdminPage /> : <HomePage />)} />
         <Route path="/admin/jogosultsagok" element={protectedAdminPage(userRole === 'admin' ? <PrivilegeManagementPage /> : <HomePage />)} />

@@ -6,6 +6,7 @@ import ProfileNotificationStatus from './ProfileNotificationStatus'
 export default function Navbar({ user, userRole, userPrivilege, authLoading, authError, onGoogleSignIn, onSignOut }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [isProfileOpen, setIsProfileOpen] = useState(false)
+    const isAdmin = userRole === 'admin' || Number(userPrivilege) === 1
 
     const closeMenu = () => {
         setIsMenuOpen(false)
@@ -68,11 +69,13 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                                 Hírek
                             </Link>
                         </div>
-                        <div className="navbar-nav">
-                            <Link className="nav-link" to="/show" onClick={closeMenu}>
-                                Kivetítő
-                            </Link>
-                        </div>
+                        {isAdmin && (
+                            <div className="navbar-nav">
+                                <Link className="nav-link" to="/show" onClick={closeMenu}>
+                                    Kivetítő
+                                </Link>
+                            </div>
+                        )}
                         <div className="navbar-nav">
                             <Link className="nav-link" to="/versenyjelentkezes" onClick={closeMenu}>
                                 Versenyjelentkezés
@@ -108,7 +111,7 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                         <div className="profile-drawer-content">
                             <p><i className="bi bi-google me-2" aria-hidden="true" />Google fiókkal bejelentkezve.</p>
                             <ProfileNotificationStatus user={user} />
-                            {userRole === 'admin' || Number(userPrivilege) === 1 ? (
+                            {isAdmin ? (
                                 <div className="d-grid gap-2">
                                     <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin" onClick={() => setIsProfileOpen(false)}>
                                         <i className="bi bi-people-fill" aria-hidden="true" /><span>Csapatok</span>
