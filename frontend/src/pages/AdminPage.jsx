@@ -4,20 +4,20 @@ import AgeGroupBadge from '../components/AgeGroupBadge'
 
 const editableTeamFields = [
   'teamName',
-  'teamMember1Email',
-  'teamMember2Email',
+  'schoolName',
+  'category',
+  'group',
   'teamMember1Name',
-  'teamMember2Name',
+  'teamMember1Email',
   'teamMember1Class',
+  'teamMember2Name',
+  'teamMember2Email',
   'teamMember2Class',
   'teamCoach1',
-  'teamCoach1Email',
-  'schoolName'
+  'teamCoach1Email'
 ]
 
-const getCategory = (member1Class, member2Class) => (
-  Number(member1Class) >= 9 || Number(member2Class) >= 9 ? 1 : 0
-)
+const API_BASE_URL = 'https://legocompetition.runasp.net'
 
 export default function AdminPage() {
   const [teams, setTeams] = useState([])
@@ -35,11 +35,12 @@ export default function AdminPage() {
   const [groupFilter, setGroupFilter] = useState('all')
   const [schoolFilter, setSchoolFilter] = useState('all')
   const [sortBy, setSortBy] = useState('name-asc')
+  const [disqualifying, setDisqualifying] = useState(null)
 
   const fetchTeams = async () => {
     try {
       setLoading(true)
-      const response = await fetch('https://legocompetition.runasp.net/api/Teams')
+      const response = await fetch(`${API_BASE_URL}/api/Teams`)
       if (!response.ok) {
         throw new Error('Nem sikerült betölteni a csapatokat.')
       }
@@ -87,17 +88,15 @@ export default function AdminPage() {
     const matches = teams.filter((team) => {
       const searchableValues = [
         team.teamName,
+        team.schoolName,
+        team.group,
+        team.id,
         team.teamMember1Name,
         team.teamMember1Email,
         team.teamMember2Name,
         team.teamMember2Email,
         team.teamCoach1,
-        team.teamCoach1Email,
-        team.schoolName,
-        team.group,
-        team.id,
-        team.teamMember1Class,
-        team.teamMember2Class
+        team.teamCoach1Email
       ].filter((value) => value !== null && value !== undefined && value !== '')
       const matchesSearch = !normalizedSearch || searchableValues.some(
         (value) => String(value).toLocaleLowerCase('hu-HU').includes(normalizedSearch)
@@ -134,7 +133,7 @@ export default function AdminPage() {
     }
 
     try {
-      const response = await fetch(`https://legocompetition.runasp.net/api/Teams/${teamToDelete.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/Teams/${teamToDelete.id}`, {
         method: 'DELETE'
       })
 
@@ -151,6 +150,33 @@ export default function AdminPage() {
     }
   }
 
+  const handleDisqualify = async (team) => {
+    if (!team) {
+      return
+    }
+
+    try {
+      setDisqualifying(team.id)
+      const response = await fetch(`${API_BASE_URL}/api/Teams/disqualify/${team.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('A kizárás nem sikerült.')
+      }
+
+      setActionMessage({ type: 'success', text: 'A csapat sikeresen kizárva.' })
+      await fetchTeams()
+    } catch (err) {
+      setActionMessage({ type: 'danger', text: err.message })
+    } finally {
+      setDisqualifying(null)
+    }
+  }
+
   const startInlineEdit = async (team) => {
     setEditLoading(true)
     setEditErrors({})
@@ -158,7 +184,7 @@ export default function AdminPage() {
     setOpenTeamId(team.id)
 
     try {
-      const response = await fetch(`https://legocompetition.runasp.net/api/Teams/${team.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/Teams/${team.id}`, {
         headers: { accept: '*/*' }
       })
 
@@ -167,10 +193,7 @@ export default function AdminPage() {
       }
 
       const data = await response.json()
-      setTeamToEdit({
-        ...data,
-        category: getCategory(data.teamMember1Class, data.teamMember2Class)
-      })
+      setTeamToEdit(data)
     } catch (err) {
       setTeamToEdit(null)
       setActionMessage({ type: 'danger', text: err.message })
@@ -181,13 +204,8 @@ export default function AdminPage() {
 
   const handleEditChange = (event) => {
     const { name, value } = event.target
-    const parsedValue = name.includes('Class') && value !== ''
-      ? Math.min(13, Number(value))
-      : value
-
     setTeamToEdit((previousTeam) => {
-      const updatedTeam = { ...previousTeam, [name]: parsedValue }
-      updatedTeam.category = getCategory(updatedTeam.teamMember1Class, updatedTeam.teamMember2Class)
+      const updatedTeam = { ...previousTeam, [name]: value }
       return updatedTeam
     })
     setEditErrors((previousErrors) => ({ ...previousErrors, [name]: '' }))
@@ -201,17 +219,10 @@ export default function AdminPage() {
     }
 
     const validationErrors = {}
-    editableTeamFields.forEach((fieldName) => {
+    ;['teamName', 'schoolName'].forEach((fieldName) => {
       const value = teamToEdit[fieldName]
       if (value === '' || value === null || value === undefined) {
         validationErrors[fieldName] = 'A mező kitöltése kötelező.'
-      }
-    })
-
-    ;['teamMember1Class', 'teamMember2Class'].forEach((fieldName) => {
-      const value = Number(teamToEdit[fieldName])
-      if (!Number.isInteger(value) || value < 1 || value > 13) {
-        validationErrors[fieldName] = 'Az osztály 1 és 13 közötti egész szám lehet.'
       }
     })
 
@@ -220,22 +231,24 @@ export default function AdminPage() {
       return
     }
 
-    const payload = editableTeamFields.reduce((result, fieldName) => {
-      result[fieldName] = typeof teamToEdit[fieldName] === 'string'
-        ? teamToEdit[fieldName].trim()
-        : teamToEdit[fieldName]
-      return result
-    }, {
-      category: getCategory(teamToEdit.teamMember1Class, teamToEdit.teamMember2Class),
-      group: teamToEdit.group || '-'
-    })
-
-    payload.teamMember1Class = Number(teamToEdit.teamMember1Class)
-    payload.teamMember2Class = Number(teamToEdit.teamMember2Class)
+    const payload = {
+      teamName: typeof teamToEdit.teamName === 'string' ? teamToEdit.teamName.trim() : teamToEdit.teamName,
+      schoolName: typeof teamToEdit.schoolName === 'string' ? teamToEdit.schoolName.trim() : teamToEdit.schoolName,
+      category: Number(teamToEdit.category),
+      group: teamToEdit.group || '-',
+      teamMember1Name: teamToEdit.teamMember1Name || null,
+      teamMember1Email: teamToEdit.teamMember1Email || null,
+      teamMember1Class: teamToEdit.teamMember1Class ? Number(teamToEdit.teamMember1Class) : null,
+      teamMember2Name: teamToEdit.teamMember2Name || null,
+      teamMember2Email: teamToEdit.teamMember2Email || null,
+      teamMember2Class: teamToEdit.teamMember2Class ? Number(teamToEdit.teamMember2Class) : null,
+      teamCoach1: teamToEdit.teamCoach1 || null,
+      teamCoach1Email: teamToEdit.teamCoach1Email || null
+    }
 
     try {
       setSaving(true)
-      const response = await fetch(`https://legocompetition.runasp.net/api/Teams/${teamToEdit.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/Teams/${teamToEdit.id}`, {
         method: 'PUT',
         headers: {
           accept: '*/*',
@@ -253,7 +266,10 @@ export default function AdminPage() {
         team.id === teamToEdit.id ? { ...team, ...payload } : team
       )))
       setTeamToEdit(null)
+
       setActionMessage({ type: 'success', text: 'A csapat adatai sikeresen frissültek.' })
+
+      await fetchTeams()
     } catch (err) {
       setActionMessage({ type: 'danger', text: err.message })
     } finally {
@@ -293,7 +309,7 @@ export default function AdminPage() {
                   id="team-search"
                   type="search"
                   className="form-control"
-                  placeholder="Csapat, személy, e-mail, iskola, osztály vagy azonosító"
+                  placeholder="Csapat, iskola, személy e-mail vagy azonosító"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                 />
@@ -353,7 +369,11 @@ export default function AdminPage() {
                 >
                   <span className="d-flex justify-content-between align-items-center gap-3">
                     <span>
-                      <span className="d-block fw-bold fs-5"><AgeGroupBadge category={team.category} className="me-2" />{team.teamName || `Csapat #${team.id}`}</span>
+                      <span className="d-block fw-bold fs-5">
+                        <AgeGroupBadge category={team.category} className="me-2" />
+                        {team.teamName || `Csapat #${team.id}`}
+                        {team.isDisqualified && <span className="badge text-bg-danger ms-2">Kizárva</span>}
+                      </span>
                       <span className="small opacity-75">{team.schoolName || 'Nincs megadott iskola'}</span>
                       {team.group && <span className="badge text-bg-light border text-dark ms-2">{String(team.group).toUpperCase()} csoport</span>}
                     </span>
@@ -367,17 +387,18 @@ export default function AdminPage() {
                 >
                   Szerkesztés
                 </button>
-                {/* ⬇️ KIZÁRÁS GOMB – PIROS SZÍNBEN, FUNKCIÓ NÉLKÜL */}
                 <button
                   type="button"
                   className="btn btn-sm flex-shrink-0"
                   style={{
-                    backgroundColor: 'var(--red)',
-                    borderColor: 'var(--red)',
+                    backgroundColor: team.isDisqualified ? 'var(--gray)' : 'var(--red)',
+                    borderColor: team.isDisqualified ? 'var(--gray)' : 'var(--red)',
                     color: 'var(--white)'
                   }}
+                  onClick={() => handleDisqualify(team)}
+                  disabled={disqualifying === team.id || team.isDisqualified}
                 >
-                  Kizárás
+                  {disqualifying === team.id ? 'Kizárás...' : team.isDisqualified ? 'Kizárva' : 'Kizárás'}
                 </button>
               </div>
 
@@ -393,68 +414,204 @@ export default function AdminPage() {
                         <div className="alert alert-info mb-0">Csapat adatainak betöltése...</div>
                       ) : (
                         <div className="row g-3">
-                          {[
-                            {
-                              title: 'Csapatadatok',
-                              fields: [['teamName', 'Csapatnév', 'text'], ['schoolName', 'Iskola neve', 'text']]
-                            },
-                            {
-                              title: '1. versenyző',
-                              fields: [['teamMember1Name', 'Név', 'text'], ['teamMember1Email', 'E-mail-cím', 'email'], ['teamMember1Class', 'Osztály', 'number']]
-                            },
-                            {
-                              title: '2. versenyző',
-                              fields: [['teamMember2Name', 'Név', 'text'], ['teamMember2Email', 'E-mail-cím', 'email'], ['teamMember2Class', 'Osztály', 'number']]
-                            },
-                            {
-                              title: 'Felkészítő tanár',
-                              fields: [['teamCoach1', 'Név', 'text'], ['teamCoach1Email', 'E-mail-cím', 'email']]
-                            }
-                          ].map((group) => (
-                            <div className="col-md-6 col-xl-3" key={group.title}>
-                              <section className="team-info-box h-100">
-                                <h3 className="team-info-title">{group.title}</h3>
-                                <div className="d-flex flex-column gap-3">
-                                  {group.fields.map(([name, label, type]) => (
-                                    <div key={name}>
-                                      <label className="form-label small fw-semibold mb-1" htmlFor={`edit-${team.id}-${name}`}>{label}</label>
-                                      <input
-                                        className={`form-control ${editErrors[name] ? 'is-invalid' : ''}`}
-                                        id={`edit-${team.id}-${name}`}
-                                        name={name}
-                                        type={type}
-                                        min={type === 'number' ? 1 : undefined}
-                                        max={type === 'number' ? 13 : undefined}
-                                        step={type === 'number' ? 1 : undefined}
-                                        value={teamToEdit[name] ?? ''}
-                                        onChange={handleEditChange}
-                                      />
-                                      {editErrors[name] && <div className="invalid-feedback">{editErrors[name]}</div>}
-                                    </div>
-                                  ))}
-                                </div>
-                              </section>
-                            </div>
-                          ))}
-                          <div className="col-12">
-                            <section className="team-info-box team-info-category">
-                              <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                          <div className="col-md-6 col-xl-3">
+                            <section className="team-info-box h-100">
+                              <h3 className="team-info-title">Csapatadatok</h3>
+                              <div className="d-flex flex-column gap-3">
                                 <div>
-                                  <h3 className="team-info-title mb-1">Automatikus besorolás</h3>
-                                  <div className="team-info-value">
-                                    {teamToEdit.category === 1 ? 'Középiskolás' : 'Általános iskolás'}
-                                  </div>
+                                  <label className="form-label small fw-semibold mb-1" htmlFor={`edit-${team.id}-teamName`}>Csapatnév</label>
+                                  <input
+                                    className={`form-control ${editErrors.teamName ? 'is-invalid' : ''}`}
+                                    id={`edit-${team.id}-teamName`}
+                                    name="teamName"
+                                    type="text"
+                                    value={teamToEdit.teamName ?? ''}
+                                    onChange={handleEditChange}
+                                  />
+                                  {editErrors.teamName && <div className="invalid-feedback">{editErrors.teamName}</div>}
                                 </div>
-                                <span className="badge text-bg-dark fs-6">
-                                  {teamToEdit.category === 1 ? '9–13. osztály' : '1–8. osztály'}
-                                </span>
+                                <div>
+                                  <label className="form-label small fw-semibold mb-1" htmlFor={`edit-${team.id}-schoolName`}>Iskola neve</label>
+                                  <input
+                                    className={`form-control ${editErrors.schoolName ? 'is-invalid' : ''}`}
+                                    id={`edit-${team.id}-schoolName`}
+                                    name="schoolName"
+                                    type="text"
+                                    value={teamToEdit.schoolName ?? ''}
+                                    onChange={handleEditChange}
+                                  />
+                                  {editErrors.schoolName && <div className="invalid-feedback">{editErrors.schoolName}</div>}
+                                </div>
+                              </div>
+                            </section>
+                          </div>
+                          <div className="col-md-6 col-xl-3">
+                            <section className="team-info-box h-100">
+                              <h3 className="team-info-title">Szűrési adatok</h3>
+                              <div className="d-flex flex-column gap-3">
+                                <div>
+                                  <label className="form-label small fw-semibold mb-1" htmlFor={`edit-${team.id}-category`}>Korosztály</label>
+                                  <select
+                                    className={`form-select ${editErrors.category ? 'is-invalid' : ''}`}
+                                    id={`edit-${team.id}-category`}
+                                    name="category"
+                                    value={teamToEdit.category ?? 0}
+                                    onChange={handleEditChange}
+                                  >
+                                    <option value="0">Általános iskola</option>
+                                    <option value="1">Középiskola</option>
+                                  </select>
+                                  {editErrors.category && <div className="invalid-feedback">{editErrors.category}</div>}
+                                </div>
+                                <div>
+                                  <label className="form-label small fw-semibold mb-1" htmlFor={`edit-${team.id}-group`}>Csoport</label>
+                                  <input
+                                    className={`form-control ${editErrors.group ? 'is-invalid' : ''}`}
+                                    id={`edit-${team.id}-group`}
+                                    name="group"
+                                    type="text"
+                                    value={teamToEdit.group ?? ''}
+                                    onChange={handleEditChange}
+                                  />
+                                  {editErrors.group && <div className="invalid-feedback">{editErrors.group}</div>}
+                                </div>
+                              </div>
+                            </section>
+                          </div>
+                          <div className="col-12 col-lg-6">
+                            <section className="team-info-box h-100">
+                              <h3 className="team-info-title mb-3">1. versenyző</h3>
+                              <div className="d-flex flex-column gap-3">
+                                <div>
+                                  <label className="form-label small fw-semibold mb-1" htmlFor={`edit-${team.id}-member1-name`}>Név</label>
+                                  <input
+                                    className="form-control"
+                                    id={`edit-${team.id}-member1-name`}
+                                    name="teamMember1Name"
+                                    type="text"
+                                    placeholder="Versenyző neve"
+                                    value={teamToEdit.teamMember1Name ?? ''}
+                                    onChange={handleEditChange}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="form-label small fw-semibold mb-1" htmlFor={`edit-${team.id}-member1-email`}>E-mail</label>
+                                  <input
+                                    className="form-control"
+                                    id={`edit-${team.id}-member1-email`}
+                                    name="teamMember1Email"
+                                    type="email"
+                                    placeholder="email@example.com"
+                                    value={teamToEdit.teamMember1Email ?? ''}
+                                    onChange={handleEditChange}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="form-label small fw-semibold mb-1" htmlFor={`edit-${team.id}-member1-class`}>Osztály</label>
+                                  <input
+                                    className="form-control"
+                                    id={`edit-${team.id}-member1-class`}
+                                    name="teamMember1Class"
+                                    type="number"
+                                    min="1"
+                                    max="13"
+                                    placeholder="Osztály"
+                                    value={teamToEdit.teamMember1Class ?? ''}
+                                    onChange={handleEditChange}
+                                  />
+                                </div>
+                              </div>
+                            </section>
+                          </div>
+                          <div className="col-12 col-lg-6">
+                            <section className="team-info-box h-100">
+                              <h3 className="team-info-title mb-3">2. versenyző</h3>
+                              <div className="d-flex flex-column gap-3">
+                                <div>
+                                  <label className="form-label small fw-semibold mb-1" htmlFor={`edit-${team.id}-member2-name`}>Név</label>
+                                  <input
+                                    className="form-control"
+                                    id={`edit-${team.id}-member2-name`}
+                                    name="teamMember2Name"
+                                    type="text"
+                                    placeholder="Versenyző neve"
+                                    value={teamToEdit.teamMember2Name ?? ''}
+                                    onChange={handleEditChange}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="form-label small fw-semibold mb-1" htmlFor={`edit-${team.id}-member2-email`}>E-mail</label>
+                                  <input
+                                    className="form-control"
+                                    id={`edit-${team.id}-member2-email`}
+                                    name="teamMember2Email"
+                                    type="email"
+                                    placeholder="email@example.com"
+                                    value={teamToEdit.teamMember2Email ?? ''}
+                                    onChange={handleEditChange}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="form-label small fw-semibold mb-1" htmlFor={`edit-${team.id}-member2-class`}>Osztály</label>
+                                  <input
+                                    className="form-control"
+                                    id={`edit-${team.id}-member2-class`}
+                                    name="teamMember2Class"
+                                    type="number"
+                                    min="1"
+                                    max="13"
+                                    placeholder="Osztály"
+                                    value={teamToEdit.teamMember2Class ?? ''}
+                                    onChange={handleEditChange}
+                                  />
+                                </div>
+                              </div>
+                            </section>
+                          </div>
+                          <div className="col-12 col-lg-6">
+                            <section className="team-info-box h-100">
+                              <h3 className="team-info-title mb-3">Felkészítő tanár</h3>
+                              <div className="d-flex flex-column gap-3">
+                                <div>
+                                  <label className="form-label small fw-semibold mb-1" htmlFor={`edit-${team.id}-coach-name`}>Név</label>
+                                  <input
+                                    className="form-control"
+                                    id={`edit-${team.id}-coach-name`}
+                                    name="teamCoach1"
+                                    type="text"
+                                    placeholder="Tanár neve"
+                                    value={teamToEdit.teamCoach1 ?? ''}
+                                    onChange={handleEditChange}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="form-label small fw-semibold mb-1" htmlFor={`edit-${team.id}-coach-email`}>E-mail</label>
+                                  <input
+                                    className="form-control"
+                                    id={`edit-${team.id}-coach-email`}
+                                    name="teamCoach1Email"
+                                    type="email"
+                                    placeholder="email@example.com"
+                                    value={teamToEdit.teamCoach1Email ?? ''}
+                                    onChange={handleEditChange}
+                                  />
+                                </div>
                               </div>
                             </section>
                           </div>
                         </div>
                       )}
                       <div className="d-flex justify-content-end gap-2 mt-4">
-                        <button type="button" className="btn btn-outline-secondary" onClick={() => setTeamToEdit(null)} disabled={saving}>Mégse</button>
+                        <button
+                          type="button"
+                          className="btn btn-outline-secondary"
+                          onClick={() => {
+                            setTeamToEdit(null)
+                          }}
+                          disabled={saving}
+                        >
+                          Mégse
+                        </button>
                         <button type="submit" className="btn btn-primary" disabled={saving || editLoading}>
                           {saving ? 'Mentés...' : 'Módosítások mentése'}
                         </button>
@@ -465,35 +622,66 @@ export default function AdminPage() {
                   <div className="row g-3">
                     <div className="col-md-6 col-xl-3">
                       <section className="team-info-box h-100">
+                        <h3 className="team-info-title">Csapatadatok</h3>
+                        <div className="team-info-value">{team.teamName || '-'}</div>
+                        <div className="team-info-meta">{team.schoolName || '-'}</div>
+                      </section>
+                    </div>
+                    <div className="col-md-6 col-xl-3">
+                      <section className="team-info-box h-100">
+                        <h3 className="team-info-title">Szűrési adatok</h3>
+                        <div className="team-info-value">
+                          {team.category === 0 ? 'Általános iskola' : team.category === 1 ? 'Középiskola' : '-'}
+                        </div>
+                        <div className="team-info-meta">{team.category === 0 ? '1–8. osztály' : team.category === 1 ? '9–13. osztály' : ''}</div>
+                        {team.group && <span className="badge text-bg-dark mt-2">{team.group} csoport</span>}
+                      </section>
+                    </div>
+                    <div className="col-md-6 col-xl-3">
+                      <section className="team-info-box h-100">
                         <h3 className="team-info-title">1. versenyző</h3>
-                        <div className="team-info-value">{team.teamMember1Name || '-'}</div>
-                        <div className="team-info-meta">{team.teamMember1Email || '-'}</div>
-                        <span className="badge text-bg-light mt-2">{team.teamMember1Class ? `${team.teamMember1Class}. osztály` : '-'}</span>
+                        <div className="team-info-meta">
+                          {team.teamMember1Name ? (
+                            <>
+                              <div className="fw-semibold">{team.teamMember1Name}</div>
+                              <div className="text-muted">{team.teamMember1Email || '-'}</div>
+                              <div className="text-muted">{team.teamMember1Class ? `${team.teamMember1Class}. osztály` : '-'}</div>
+                            </>
+                          ) : (
+                            <div className="text-muted">-</div>
+                          )}
+                        </div>
                       </section>
                     </div>
                     <div className="col-md-6 col-xl-3">
                       <section className="team-info-box h-100">
                         <h3 className="team-info-title">2. versenyző</h3>
-                        <div className="team-info-value">{team.teamMember2Name || '-'}</div>
-                        <div className="team-info-meta">{team.teamMember2Email || '-'}</div>
-                        <span className="badge text-bg-light mt-2">{team.teamMember2Class ? `${team.teamMember2Class}. osztály` : '-'}</span>
+                        <div className="team-info-meta">
+                          {team.teamMember2Name ? (
+                            <>
+                              <div className="fw-semibold">{team.teamMember2Name}</div>
+                              <div className="text-muted">{team.teamMember2Email || '-'}</div>
+                              <div className="text-muted">{team.teamMember2Class ? `${team.teamMember2Class}. osztály` : '-'}</div>
+                            </>
+                          ) : (
+                            <div className="text-muted">-</div>
+                          )}
+                        </div>
                       </section>
                     </div>
                     <div className="col-md-6 col-xl-3">
                       <section className="team-info-box h-100">
                         <h3 className="team-info-title">Felkészítő tanár</h3>
-                        <div className="team-info-value">{team.teamCoach1 || '-'}</div>
-                        <div className="team-info-meta">{team.teamCoach1Email || '-'}</div>
-                      </section>
-                    </div>
-                    <div className="col-md-6 col-xl-3">
-                      <section className="team-info-box team-info-category h-100">
-                        <h3 className="team-info-title">Besorolás</h3>
-                        <div className="team-info-value">
-                          {team.category === 0 ? 'Általános iskola' : team.category === 1 ? 'Középiskola' : '-'}
+                        <div className="team-info-meta">
+                          {team.teamCoach1 ? (
+                            <>
+                              <div className="fw-semibold">{team.teamCoach1}</div>
+                              <div className="text-muted">{team.teamCoach1Email || '-'}</div>
+                            </>
+                          ) : (
+                            <div className="text-muted">-</div>
+                          )}
                         </div>
-                        <div className="team-info-meta">{team.category === 0 ? '1–8. osztály' : team.category === 1 ? '9–13. osztály' : ''}</div>
-                        <span className="badge text-bg-dark mt-2">Csapatazonosító: {team.id}</span>
                       </section>
                     </div>
                   </div>

@@ -25,31 +25,22 @@ export default function MyTeamsPage({ user }) {
       try {
         setLoading(true)
         setError('')
-        const response = await fetch(
+
+        const teamsResponse = await fetch(
           `https://legocompetition.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`,
           { headers: { accept: '*/*' }, signal: controller.signal }
         )
 
-        if (!response.ok) {
+        if (!teamsResponse.ok) {
           throw new Error('Nem sikerült betölteni a csapataidat.')
         }
 
-        const data = await response.json()
-        const emailTeams = Array.isArray(data) ? data : []
-        const teamsWithDetails = await Promise.all(emailTeams.map(async (team) => {
-          try {
-            const detailsResponse = await fetch(
-              `https://legocompetition.runasp.net/api/Teams/alldata/${encodeURIComponent(team.id)}`,
-              { headers: { accept: '*/*' }, signal: controller.signal }
-            )
-            if (!detailsResponse.ok) return { ...team, details: null }
-            return { ...team, details: await detailsResponse.json() }
-          } catch (detailsError) {
-            if (detailsError.name === 'AbortError') throw detailsError
-            return { ...team, details: null }
-          }
-        }))
-        setTeams(teamsWithDetails)
+        const teamsData = await teamsResponse.json()
+
+        // Handle both single team and array of teams
+        const teamsArray = Array.isArray(teamsData) ? teamsData : [teamsData]
+
+        setTeams(teamsArray)
       } catch (requestError) {
         if (requestError.name !== 'AbortError') setError(requestError.message)
       } finally {
@@ -85,6 +76,43 @@ export default function MyTeamsPage({ user }) {
     }
   }
 
+  // Extract competitors from Teams table structure
+  const getCompetitors = (team) => {
+    const competitors = []
+
+    if (team.teamMember1Name || team.teamMember1Email) {
+      competitors.push({
+        name: team.teamMember1Name || '–',
+        email: team.teamMember1Email || '–',
+        class: team.teamMember1Class || '–',
+        id: 'member1'
+      })
+    }
+
+    if (team.teamMember2Name || team.teamMember2Email) {
+      competitors.push({
+        name: team.teamMember2Name || '–',
+        email: team.teamMember2Email || '–',
+        class: team.teamMember2Class || '–',
+        id: 'member2'
+      })
+    }
+
+    return competitors
+  }
+
+  // Extract coach from Teams table structure
+  const getCoach = (team) => {
+    if (team.teamCoach1 || team.teamCoach1Email) {
+      return {
+        name: team.teamCoach1 || '–',
+        email: team.teamCoach1Email || '–',
+        id: 'coach'
+      }
+    }
+    return null
+  }
+
   return (
     <div className="container py-4">
       <div className="mb-4">
@@ -118,91 +146,107 @@ export default function MyTeamsPage({ user }) {
       )}
 
       <div className="d-flex flex-column gap-4">
-        {teams.map((team) => (
-          <article className="card shadow-sm team-card overflow-hidden" key={team.id}>
-            <header className="team-card-header p-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
-              <div>
-                <h3 className="h4 mb-1"><AgeGroupBadge category={team.category} className="me-2" />{team.teamName || `Csapat #${team.id}`}</h3>
-                <div className="text-muted">{team.schoolName || 'Nincs megadott iskola'}</div>
-              </div>
-              <div className="d-flex flex-wrap align-items-center gap-2">
-                <span className={`badge fs-6 ${team.group || team.details?.team?.group ? 'text-bg-primary' : 'text-bg-secondary'}`}>
-                  <i className="bi bi-people-fill me-2" />
-                  {team.group || team.details?.team?.group
-                    ? `${String(team.group || team.details?.team?.group).toUpperCase()} csoport`
-                    : 'Még nincs csoportba osztva'}
-                </span>
-                <span className="badge text-bg-dark fs-6">#{team.id}</span>
-              </div>
-            </header>
+        {teams.map((team) => {
+          const competitors = getCompetitors(team)
+          const coach = getCoach(team)
+          const hasTeamData = competitors.length > 0 || coach
 
-            <div className="card-body border-top">
-              <section className="team-info-box team-info-category mb-3">
-                <div className="row g-3 align-items-center">
-                  <div className="col-md-4">
-                    <h4 className="team-info-title mb-1">Összes pont</h4>
-                    <div className="display-6 fw-bold">{team.details?.allPoint ?? team.point ?? 0}</div>
-                  </div>
-                  <div className="col-md-8">
-                    <div className="row g-2">
-                      {[
-                        ['Vonalkövetés', team.details?.lineFollowPoint, team.details?.lineFollowPosition],
-                        ['Hegymászás', team.details?.hillClimbPoint, team.details?.hillClimbPosition],
-                        ['Szumó', team.details?.sumoPoint, team.details?.sumoPosition],
-                        ['Kosárra dobás', team.details?.basketballPoint, team.details?.basketballPosition]
-                      ].map(([label, point, position]) => (
-                        <div className="col-sm-6 col-xl-3" key={label}>
-                          <div className="bg-white border rounded p-2 h-100">
-                            <div className="small text-muted">{label}</div>
-                            <div className="fw-bold">{point ?? 0} pont</div>
-                            <div className="small">{position ? `${position}. hely` : 'Nincs helyezés'}</div>
+          return (
+            <article className="card shadow-sm team-card overflow-hidden" key={team.id}>
+              <header className="team-card-header p-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                  <h3 className="h4 mb-1"><AgeGroupBadge category={team.category} className="me-2" />{team.teamName || `Csapat #${team.id}`}</h3>
+                  <div className="text-muted">{team.schoolName || 'Nincs megadott iskola'}</div>
+                </div>
+                <div className="d-flex flex-wrap align-items-center gap-2">
+                  <span className={`badge fs-6 ${team.group || team.details?.team?.group ? 'text-bg-primary' : 'text-bg-secondary'}`}>
+                    <i className="bi bi-people-fill me-2" />
+                    {team.group || team.details?.team?.group
+                      ? `${String(team.group || team.details?.team?.group).toUpperCase()} csoport`
+                      : 'Még nincs csoportba osztva'}
+                  </span>
+                  <span className="badge text-bg-dark fs-6">#{team.id}</span>
+                </div>
+              </header>
+
+              <div className="card-body border-top">
+                <section className="team-info-box team-info-category mb-3">
+                  <div className="row g-3 align-items-center">
+                    <div className="col-md-4">
+                      <h4 className="team-info-title mb-1">Összes pont</h4>
+                      <div className="display-6 fw-bold">{team.details?.allPoint ?? team.point?.allPoint ?? 0}</div>
+                    </div>
+                    <div className="col-md-8">
+                      <div className="row g-2">
+                        {[
+                          ['Vonalkövetés', team.details?.lineFollowPoint, team.details?.lineFollowPosition],
+                          ['Hegymászás', team.details?.hillClimbPoint, team.details?.hillClimbPosition],
+                          ['Szumó', team.details?.sumoPoint, team.details?.sumoPosition],
+                          ['Kosárra dobás', team.details?.basketballPoint, team.details?.basketballPosition]
+                        ].map(([label, point, position]) => (
+                          <div className="col-sm-6 col-xl-3" key={label}>
+                            <div className="bg-white border rounded p-2 h-100">
+                              <div className="small text-muted">{label}</div>
+                              <div className="fw-bold">{point ?? 0} pont</div>
+                              <div className="small">{position ? `${position}. hely` : 'Nincs helyezés'}</div>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </section>
+                </section>
 
-              <div className="row g-3">
-                <div className="col-md-6 col-xl-3">
-                  <section className="team-info-box h-100">
-                    <h4 className="team-info-title">1. versenyző</h4>
-                    <div className="team-info-value">{team.teamMember1Name || '–'}</div>
-                    <div className="team-info-meta">{team.teamMember1Email || '–'}</div>
-                    <span className="badge text-bg-light mt-2">{team.teamMember1Class ? `${team.teamMember1Class}. osztály` : '–'}</span>
-                  </section>
+                <div className="row g-3">
+                  {competitors.length > 0 && (
+                    <>
+                      <div className="col-12">
+                        <h4 className="team-info-title mb-3">Versenyzők</h4>
+                      </div>
+                      {competitors.map((competitor, index) => (
+                        <div className="col-md-6 col-xl-3" key={competitor.id}>
+                          <section className="team-info-box h-100">
+                            <h5 className="team-info-title">{index + 1}. versenyző</h5>
+                            <div className="team-info-value">{competitor.name}</div>
+                            <div className="team-info-meta">{competitor.email}</div>
+                            <span className="badge text-bg-light mt-2">
+                              {competitor.class !== '–' ? `${competitor.class}. osztály` : '–'}
+                            </span>
+                          </section>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  {coach && (
+                    <>
+                      <div className="col-12 mt-2">
+                        <h4 className="team-info-title mb-3">Felkészítő tanárok</h4>
+                      </div>
+                      <div className="col-md-6 col-xl-3">
+                        <section className="team-info-box h-100">
+                          <h5 className="team-info-title">Felkészítő tanár</h5>
+                          <div className="team-info-value">{coach.name}</div>
+                          <div className="team-info-meta">{coach.email}</div>
+                        </section>
+                      </div>
+                    </>
+                  )}
+
+                  {!hasTeamData && (
+                    <div className="col-12">
+                      <div className="alert alert-secondary">Nincs elérhető versenyző adat.</div>
+                    </div>
+                  )}
                 </div>
-                <div className="col-md-6 col-xl-3">
-                  <section className="team-info-box h-100">
-                    <h4 className="team-info-title">2. versenyző</h4>
-                    <div className="team-info-value">{team.teamMember2Name || '–'}</div>
-                    <div className="team-info-meta">{team.teamMember2Email || '–'}</div>
-                    <span className="badge text-bg-light mt-2">{team.teamMember2Class ? `${team.teamMember2Class}. osztály` : '–'}</span>
-                  </section>
-                </div>
-                <div className="col-md-6 col-xl-3">
-                  <section className="team-info-box h-100">
-                    <h4 className="team-info-title">Felkészítő tanár</h4>
-                    <div className="team-info-value">{team.teamCoach1 || '–'}</div>
-                    <div className="team-info-meta">{team.teamCoach1Email || '–'}</div>
-                  </section>
-                </div>
-                <div className="col-md-6 col-xl-3">
-                  <section className="team-info-box team-info-category h-100">
-                    <h4 className="team-info-title">Kategória</h4>
-                    <div className="team-info-value">{team.category === 1 ? 'Középiskolás' : 'Általános iskolás'}</div>
-                    <div className="team-info-meta">{team.category === 1 ? '9–13. osztály' : '1–8. osztály'}</div>
-                  </section>
+
+                <div className="d-flex flex-wrap justify-content-end gap-2 mt-3">
+                  <Link className="btn btn-outline-primary" to="/allasok">Összesített állás</Link>
                 </div>
               </div>
-
-              <div className="d-flex flex-wrap justify-content-end gap-2 mt-3">
-                <Link className="btn btn-outline-primary" to="/allasok">Összesített állás</Link>
-              </div>
-            </div>
-          </article>
-        ))}
+            </article>
+          )
+        })}
       </div>
     </div>
   )

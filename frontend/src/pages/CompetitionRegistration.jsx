@@ -19,6 +19,7 @@ export default function CompetitionRegistration({ user }) {
   })
   const [errors, setErrors] = useState({})
   const [submitMessage, setSubmitMessage] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const requiredFields = {
     schoolName: 'Az iskola nevének kitöltése kötelező.',
@@ -144,6 +145,7 @@ export default function CompetitionRegistration({ user }) {
     }
 
     try {
+      setIsSubmitting(true)
       const payload = {
         teamName: formData.teamName.trim(),
         teamMember1Name: formData.teamMember1Name.trim(),
@@ -175,7 +177,7 @@ export default function CompetitionRegistration({ user }) {
           const errorData = JSON.parse(errorText)
           readableError = Object.values(errorData.errors || {}).flat().join(' ') || errorData.title || errorText
         } catch {
-          // A backend nem JSON hibát küldött, ezért az eredeti szöveget mutatjuk.
+          // Backend nem JSON hibát küldött
         }
         throw new Error(readableError || 'A jelentkezés mentése nem sikerült.')
       }
@@ -206,6 +208,8 @@ export default function CompetitionRegistration({ user }) {
         type: 'danger',
         text: `Hiba történt a jelentkezés során: ${error.message}`
       })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -225,6 +229,7 @@ export default function CompetitionRegistration({ user }) {
                   name="teamName"
                   value={formData.teamName}
                   onChange={handleChange}
+                  disabled={isSubmitting}
                 />
                 {requiredMark}
               </div>
@@ -241,6 +246,7 @@ export default function CompetitionRegistration({ user }) {
                   name="schoolName"
                   value={formData.schoolName}
                   onChange={handleChange}
+                  disabled={isSubmitting}
                 />
                 {requiredMark}
               </div>
@@ -248,162 +254,194 @@ export default function CompetitionRegistration({ user }) {
             </div>
 
             <div className="row">
-              <div className="col-md-6 mb-3">
-                <label htmlFor="teamMember1Name" className="form-label">1. Versenyző Neve</label>
-                <div className="position-relative">
+              <div className="col-md-6">
+                <div className="mb-3">
+                  <label htmlFor="teamMember1Name" className="form-label">1. versenyző neve</label>
+                  <div className="position-relative">
+                    <input
+                      type="text"
+                      className={`form-control pe-4 ${errors.teamMember1Name ? 'border-danger' : ''}`}
+                      id="teamMember1Name"
+                      name="teamMember1Name"
+                      value={formData.teamMember1Name}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                    />
+                    {requiredMark}
+                  </div>
+                  {errors.teamMember1Name && <div className="text-danger small mt-1">{errors.teamMember1Name}</div>}
+                </div>
+              </div>
+
+              <div className="col-md-6">
+                <div className="mb-3">
+                  <label htmlFor="teamMember1Email" className="form-label">1. versenyző email</label>
+                  <div className="position-relative">
+                    <input
+                      type="email"
+                      className={`form-control pe-4 ${errors.teamMember1Email ? 'border-danger' : ''}`}
+                      id="teamMember1Email"
+                      name="teamMember1Email"
+                      value={formData.teamMember1Email}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                    />
+                    {requiredMark}
+                  </div>
+                  {errors.teamMember1Email && <div className="text-danger small mt-1">{errors.teamMember1Email}</div>}
+                </div>
+              </div>
+
+              <div className="col-md-6">
+                <div className="mb-3">
+                  <label htmlFor="teamMember1Class" className="form-label">1. versenyző osztálya</label>
+                  <div className="position-relative">
+                    <input
+                      type="number"
+                      className={`form-control pe-4 ${errors.teamMember1Class ? 'border-danger' : ''}`}
+                      id="teamMember1Class"
+                      name="teamMember1Class"
+                      min="1"
+                      max="13"
+                      value={formData.teamMember1Class}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                    />
+                    {requiredMark}
+                  </div>
+                  {errors.teamMember1Class && <div className="text-danger small mt-1">{errors.teamMember1Class}</div>}
+                </div>
+              </div>
+
+              <div className="col-md-6">
+                <div className="mb-3">
+                  <label htmlFor="teamMember2Name" className="form-label">2. versenyző neve</label>
+                  <div className="position-relative">
+                    <input
+                      type="text"
+                      className={`form-control pe-4 ${errors.teamMember2Name ? 'border-danger' : ''}`}
+                      id="teamMember2Name"
+                      name="teamMember2Name"
+                      value={formData.teamMember2Name}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                    />
+                    {requiredMark}
+                  </div>
+                  {errors.teamMember2Name && <div className="text-danger small mt-1">{errors.teamMember2Name}</div>}
+                </div>
+              </div>
+
+              <div className="col-md-6">
+                <div className="mb-3">
+                  <label htmlFor="teamMember2Email" className="form-label">2. versenyző email</label>
+                  <div className="position-relative">
+                    <input
+                      type="email"
+                      className={`form-control pe-4 ${errors.teamMember2Email ? 'border-danger' : ''}`}
+                      id="teamMember2Email"
+                      name="teamMember2Email"
+                      value={formData.teamMember2Email}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                    />
+                    {requiredMark}
+                  </div>
+                  {errors.teamMember2Email && <div className="text-danger small mt-1">{errors.teamMember2Email}</div>}
+                </div>
+              </div>
+
+              <div className="col-md-6">
+                <div className="mb-3">
+                  <label htmlFor="teamMember2Class" className="form-label">2. versenyző osztálya</label>
+                  <div className="position-relative">
+                    <input
+                      type="number"
+                      className={`form-control pe-4 ${errors.teamMember2Class ? 'border-danger' : ''}`}
+                      id="teamMember2Class"
+                      name="teamMember2Class"
+                      min="1"
+                      max="13"
+                      value={formData.teamMember2Class}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                    />
+                    {requiredMark}
+                  </div>
+                  {errors.teamMember2Class && <div className="text-danger small mt-1">{errors.teamMember2Class}</div>}
+                </div>
+              </div>
+
+              <div className="col-md-6">
+                <div className="mb-3">
+                  <label htmlFor="teamCoach1" className="form-label">Felkészítő tanár neve</label>
+                  <div className="position-relative">
+                    <input
+                      type="text"
+                      className={`form-control pe-4 ${errors.teamCoach1 ? 'border-danger' : ''}`}
+                      id="teamCoach1"
+                      name="teamCoach1"
+                      value={formData.teamCoach1}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                    />
+                    {requiredMark}
+                  </div>
+                  {errors.teamCoach1 && <div className="text-danger small mt-1">{errors.teamCoach1}</div>}
+                </div>
+              </div>
+
+              <div className="col-md-6">
+                <div className="mb-3">
+                  <label htmlFor="teamCoach1Email" className="form-label">Felkészítő tanár email</label>
+                  <div className="position-relative">
+                    <input
+                      type="email"
+                      className={`form-control pe-4 ${errors.teamCoach1Email ? 'border-danger' : ''}`}
+                      id="teamCoach1Email"
+                      name="teamCoach1Email"
+                      value={formData.teamCoach1Email}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                    />
+                    {requiredMark}
+                  </div>
+                  {errors.teamCoach1Email && <div className="text-danger small mt-1">{errors.teamCoach1Email}</div>}
+                </div>
+              </div>
+
+              <div className="col-md-6">
+                <div className="mb-3">
+                  <label htmlFor="group" className="form-label">Csoport (opcionális)</label>
                   <input
                     type="text"
-                    className={`form-control pe-4 ${errors.teamMember1Name ? 'border-danger' : ''}`}
-                    id="teamMember1Name"
-                    name="teamMember1Name"
-                    value={formData.teamMember1Name}
+                    className="form-control"
+                    id="group"
+                    name="group"
+                    value={formData.group}
                     onChange={handleChange}
+                    disabled={isSubmitting}
+                    placeholder="pl. A"
                   />
-                  {requiredMark}
                 </div>
-                {errors.teamMember1Name && <div className="text-danger small mt-1">{errors.teamMember1Name}</div>}
-              </div>
-              <div className="col-md-6 mb-3">
-                <label htmlFor="teamMember1Email" className="form-label">1. Versenyző E-mail</label>
-                <div className="position-relative">
-                  <input
-                    type="email"
-                    className={`form-control pe-4 ${errors.teamMember1Email ? 'border-danger' : ''}`}
-                    id="teamMember1Email"
-                    name="teamMember1Email"
-                    value={formData.teamMember1Email}
-                    onChange={handleChange}
-                    disabled={Boolean(user?.email)}
-                  />
-                  {requiredMark}
-                </div>                
-                {errors.teamMember1Email && <div className="text-danger small mt-1">{errors.teamMember1Email}</div>}
               </div>
             </div>
 
-            <div className="row">
-              <div className="col-md-6 mb-3">
-                <label htmlFor="teamMember1Class" className="form-label">1. Versenyző osztálya</label>
-                <div className="position-relative">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength="2"
-                    className={`form-control pe-4 ${errors.teamMember1Class ? 'border-danger' : ''}`}
-                    id="teamMember1Class"
-                    name="teamMember1Class"
-                    value={formData.teamMember1Class}
-                    onChange={handleChange}
-                  />
-                  {requiredMark}
-                </div>
-                {errors.teamMember1Class && <div className="text-danger small mt-1">{errors.teamMember1Class}</div>}
-              </div>
-            </div>
-
-            <div className="row">
-              <div className="col-md-6 mb-3">
-                <label htmlFor="teamMember2Name" className="form-label">2. Versenyző Neve</label>
-                <div className="position-relative">
-                  <input
-                    type="text"
-                    className={`form-control pe-4 ${errors.teamMember2Name ? 'border-danger' : ''}`}
-                    id="teamMember2Name"
-                    name="teamMember2Name"
-                    value={formData.teamMember2Name}
-                    onChange={handleChange}
-                  />
-                  {requiredMark}
-                </div>
-                {errors.teamMember2Name && <div className="text-danger small mt-1">{errors.teamMember2Name}</div>}
-              </div>
-              <div className="col-md-6 mb-3">
-                <label htmlFor="teamMember2Email" className="form-label">2. Versenyző E-mail</label>
-                <div className="position-relative">
-                  <input
-                    type="email"
-                    className={`form-control pe-4 ${errors.teamMember2Email ? 'border-danger' : ''}`}
-                    id="teamMember2Email"
-                    name="teamMember2Email"
-                    value={formData.teamMember2Email}
-                    onChange={handleChange}
-                  />
-                  {requiredMark}
-                </div>
-                {errors.teamMember2Email && <div className="text-danger small mt-1">{errors.teamMember2Email}</div>}
-              </div>
-            </div>
-
-            <div className="row">
-              <div className="col-md-6 mb-3">
-                <label htmlFor="teamMember2Class" className="form-label">2. Versenyző osztálya</label>
-                <div className="position-relative">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength="2"
-                    className={`form-control pe-4 ${errors.teamMember2Class ? 'border-danger' : ''}`}
-                    id="teamMember2Class"
-                    name="teamMember2Class"
-                    value={formData.teamMember2Class}
-                    onChange={handleChange}
-                  />
-                  {requiredMark}
-                </div>
-                {errors.teamMember2Class && <div className="text-danger small mt-1">{errors.teamMember2Class}</div>}
-              </div>
-            </div>
-
-            <div className="row">
-              <div className="col-md-6 mb-3">
-                <label htmlFor="teamCoach1" className="form-label">1. Felkészítő Tanár Neve</label>
-                <div className="position-relative">
-                  <input
-                    type="text"
-                    className={`form-control pe-4 ${errors.teamCoach1 ? 'border-danger' : ''}`}
-                    id="teamCoach1"
-                    name="teamCoach1"
-                    value={formData.teamCoach1}
-                    onChange={handleChange}
-                  />
-                  {requiredMark}
-                </div>
-                {errors.teamCoach1 && <div className="text-danger small mt-1">{errors.teamCoach1}</div>}
-              </div>
-              <div className="col-md-6 mb-3">
-                <label htmlFor="teamCoach1Email" className="form-label">1. Felkészítő Tanár E-mail</label>
-                <div className="position-relative">
-                  <input
-                    type="email"
-                    className={`form-control pe-4 ${errors.teamCoach1Email ? 'border-danger' : ''}`}
-                    id="teamCoach1Email"
-                    name="teamCoach1Email"
-                    value={formData.teamCoach1Email}
-                    onChange={handleChange}
-                  />
-                  {requiredMark}
-                </div>
-                {errors.teamCoach1Email && <div className="text-danger small mt-1">{errors.teamCoach1Email}</div>}
-              </div>
-            </div>
-
-            <div className="row">
-              <div className="col-md-6 mb-3">
-                <label htmlFor="category" className="form-label">Automatikus korosztály</label>
-                <input
-                  className="form-control"
-                  id="category"
-                  value={category === 1 ? 'Középiskolás (9–13. osztály)' : 'Általános iskolás (1–8. osztály)'}
-                  readOnly
-                />
-                <div className="form-text">Ha legalább az egyik versenyző 9–13. osztályos, a csapat középiskolás kategóriába kerül.</div>
-              </div>
-            </div>
-
-            <button type="submit" className="btn btn-primary w-100">Jelentkezés</button>
             <FloatingFeedback message={submitMessage} onClose={() => setSubmitMessage(null)} />
+
+            <div className="mb-3">
+              <p className="text-muted small">
+                <strong>Korosztály:</strong> {category === 1 ? 'Középiskolás (9–13. osztály)' : 'Általános iskolás (1–8. osztály)'}
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary w-100"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Regisztráció...' : 'Regisztráció'}
+            </button>
           </form>
         </div>
       </div>

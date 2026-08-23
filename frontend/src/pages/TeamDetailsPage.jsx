@@ -9,45 +9,33 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
   const [teamData, setTeamData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [pointEdit, setPointEdit] = useState({
-    operation: 'add',
-    amount: '',
-    reason: '',
-  })
+  const [pointSaving, setPointSaving] = useState(false)
+  const [disqualifying, setDisqualifying] = useState(false)
+  const [teamId, setTeamId] = useState(null)
+  const [pointEdit, setPointEdit] = useState({ operation: 'add', amount: '', reason: '' })
   const [pointEditFeedback, setPointEditFeedback] = useState(null)
 
-  const resolveTeamIdentifier = useCallback(async () => {
-    const trimmedName = decodedTeamName.trim()
-    if (!trimmedName) return null
-
-    const teamListResponse = await fetch('https://legocompetition.runasp.net/api/Teams')
-    if (!teamListResponse.ok) {
-      return trimmedName
-    }
-
-    const teams = await teamListResponse.json()
-    const matchedTeam = Array.isArray(teams)
-      ? teams.find((item) => item.teamName?.toLowerCase() === trimmedName.toLowerCase())
-      : null
-
-    return matchedTeam?.id ?? trimmedName
-  }, [decodedTeamName])
-
+  // Load team data and set teamId
   useEffect(() => {
     const loadTeamData = async () => {
       try {
         setLoading(true)
         setError('')
-
-        const teamIdentifier = await resolveTeamIdentifier()
-        const response = await fetch(`https://legocompetition.runasp.net/api/Teams/alldata/${encodeURIComponent(teamIdentifier ?? decodedTeamName)}`)
+        const response = await fetch(`https://legocompetition.runasp.net/api/Teams/teambyname/${encodeURIComponent(decodedTeamName)}`, {
+          headers: { accept: '*/*' }
+        })
 
         if (!response.ok) {
-          throw new Error('A csapat adatainak betöltése sikertelen volt.')
+          throw new Error('A csapat adatainak betöltése nem sikerült.')
         }
 
         const data = await response.json()
         setTeamData(data)
+
+        // Extract teamId from the response
+        if (data?.id) {
+          setTeamId(data.id)
+        }
       } catch (err) {
         setError(err.message)
       } finally {
@@ -58,9 +46,9 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
     if (decodedTeamName) {
       loadTeamData()
     }
-  }, [decodedTeamName, resolveTeamIdentifier])
+  }, [decodedTeamName])
 
-  const applyPointEdit = () => {
+  const applyPointEdit = async () => {
     if (!isAdmin) {
       setPointEditFeedback({ type: 'danger', text: 'Ehhez a művelethez admin jogosultság szükséges.' })
       return
@@ -81,22 +69,76 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
 
     const delta = pointEdit.operation === 'subtract' ? -amountNumber : amountNumber
 
-    setTeamData((prev) => {
-      if (!prev) return prev
+    try {
+      setPointSaving(true)
+      const response = await fetch(`https://legocompetition.runasp.net/api/Points/${encodeURIComponent(decodedTeamName)}/${delta}`, {
+        method: 'PUT',
+        headers: { accept: '*/*', 'Content-Type': 'application/json' }
+      })
 
-      const currentAllPoint = Number(prev.allPoint ?? 0)
-
-      return {
-        ...prev,
-        allPoint: currentAllPoint + delta,
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || 'A pontmódosítás nem sikerült.')
       }
-    })
 
-    setPointEditFeedback({
-      type: 'success',
-      text: `Összesített pont: ${Math.abs(amountNumber)} pont ${pointEdit.operation === 'subtract' ? 'levonva' : 'hozzáadva'} (ok: ${trimmedReason}).`,
-    })
-    setPointEdit((prev) => ({ ...prev, amount: '', reason: '' }))
+      setTeamData((prev) => {
+        if (!prev) return prev
+        const currentAllPoint = Number(prev.allPoint ?? 0)
+        return { ...prev, allPoint: currentAllPoint + delta }
+      })
+
+      setPointEditFeedback({
+        type: 'success',
+        text: `Összesített pont: ${Math.abs(amountNumber)} pont ${pointEdit.operation === 'subtract' ? 'levonva' : 'hozzáadva'} (ok: ${trimmedReason}).`
+      })
+      setPointEdit((prev) => ({ ...prev, amount: '', reason: '' }))
+    } catch (err) {
+      setPointEditFeedback({ type: 'danger', text: err.message })
+    } finally {
+      setPointSaving(false)
+    }
+  }
+
+  const handleDisqualify = async () => {
+    if (!isAdmin) {
+      setPointEditFeedback({ type: 'danger', text: 'Ehhez a művelethez admin jogosultság szükséges.' })
+      return
+    }
+
+    if (!teamId) {
+      setPointEditFeedback({ type: 'danger', text: 'A csapat ID-ja nincs meghatározva.' })
+      return
+    }
+
+    const confirmed = window.confirm(`Biztos, hogy kizárod a(z) "${decodedTeamName}" csapatot a versenyből?`)
+    if (!confirmed) return
+
+    try {
+      setDisqualifying(true)
+      const response = await fetch(`https://legocompetition.runasp.net/api/Teams/disqualify/${teamId}`, {
+        method: 'PATCH',
+        headers: { accept: '*/*' }
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || 'A kizárás nem sikerült.')
+      }
+
+      setTeamData((prev) => {
+        if (!prev) return prev
+        return { ...prev, isDisqualified: true }
+      })
+
+      setPointEditFeedback({
+        type: 'success',
+        text: `A "${decodedTeamName}" csapat kizárva lett a versenyből.`
+      })
+    } catch (err) {
+      setPointEditFeedback({ type: 'danger', text: err.message })
+    } finally {
+      setDisqualifying(false)
+    }
   }
 
   return (
@@ -116,10 +158,16 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
                   <Link to="/admin/pontozas/osszesitett" className="btn btn-outline-primary">
                     ← Vissza a pontokhoz
                   </Link>
-                  {/* Új Kizárás gomb – jelenleg funkció nélkül */}
-                  <button type="button" className="btn team-exclude-btn">
-                    Kizárás
-                  </button>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      className={`btn ${teamData?.isDisqualified ? 'btn-secondary' : 'btn-danger'}`}
+                      onClick={handleDisqualify}
+                      disabled={teamData?.isDisqualified || disqualifying}
+                    >
+                      {teamData?.isDisqualified ? 'Kizárva' : 'Kizárás'}
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -213,8 +261,13 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
                                   </div>
                                 </div>
                                 <div className="d-flex flex-wrap align-items-center gap-2 mt-3">
-                                  <button type="button" className="btn btn-primary" onClick={applyPointEdit}>
-                                    Módosítás alkalmazása
+                                  <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={applyPointEdit}
+                                    disabled={pointSaving}
+                                  >
+                                    {pointSaving ? 'Mentés...' : 'Módosítás alkalmazása'}
                                   </button>
                                 </div>
                               </div>

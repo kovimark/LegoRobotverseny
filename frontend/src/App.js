@@ -27,6 +27,7 @@ import { isJudgePrivilege } from './config/privilegeConfig';
 import { subscribeTeamsToPush } from './services/notificationApi';
 import FloatingRefreshButton from './components/FloatingRefreshButton';
 import AutomaticPhaseAdvancer from './components/AutomaticPhaseAdvancer';
+import TopThrees from './pages/TopThrees';
 
 function App() {
   const location = useLocation();
@@ -36,6 +37,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [userPrivilege, setUserPrivilege] = useState(null);
+  const [userTeamId, setUserTeamId] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState('');
 
@@ -60,6 +62,7 @@ function App() {
       if (!currentUser?.email) {
         setUserRole(null);
         setUserPrivilege(null);
+        setUserTeamId(null);
         return;
       }
 
@@ -71,13 +74,21 @@ function App() {
         ]);
 
         let roleValue = 0;
+        let teamIdValue = null;
         let isLegacyAdmin = false;
 
+        // Try to fetch the new Privilege API
         if (privilegeResult.status === 'fulfilled' && privilegeResult.value.ok) {
-          const privilege = await privilegeResult.value.json();
-          roleValue = Number(privilege.privilege1) || 0;
+          try {
+            const privilege = await privilegeResult.value.json();
+            roleValue = Number(privilege.privilege1) || 0;
+            teamIdValue = privilege.teamId || null;
+          } catch (e) {
+            console.warn('Error parsing Privilege response:', e);
+          }
         }
 
+        // Fallback to legacy API if new API didn't work
         if (legacyResult.status === 'fulfilled' && legacyResult.value.ok) {
           const legacyValue = (await legacyResult.value.text()).trim().replace(/^"|"$/g, '');
           isLegacyAdmin = Number(legacyValue) === 1;
@@ -85,9 +96,12 @@ function App() {
 
         const effectivePrivilege = isLegacyAdmin ? 1 : roleValue;
         setUserPrivilege(effectivePrivilege);
+        setUserTeamId(teamIdValue);
         setUserRole(effectivePrivilege === 1 ? 'admin' : isJudgePrivilege(effectivePrivilege) ? 'judge' : 'competitor');
       } catch (error) {
+        console.warn('Error fetching privilege:', error);
         setUserPrivilege(0);
+        setUserTeamId(null);
         setUserRole('competitor');
       }
     });
@@ -214,6 +228,7 @@ function App() {
             />
           }
         />
+        <Route path="/admin/eredmenyhirdetes" element={protectedAdminPage(userRole === 'admin' ? <TopThrees userPrivilege={userPrivilege} /> : <HomePage />)} />
       </Routes>
       {!isFocusPage && <FloatingRefreshButton />}
       {!isFocusPage && <footer className="container py-4 mt-4 border-top text-center text-muted small">
@@ -224,3 +239,4 @@ function App() {
 }
 
 export default App;
+

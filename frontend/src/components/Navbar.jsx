@@ -69,13 +69,6 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                                 Hírek
                             </Link>
                         </div>
-                        {isAdmin && (
-                            <div className="navbar-nav">
-                                <Link className="nav-link" to="/show" onClick={closeMenu}>
-                                    Kivetítő
-                                </Link>
-                            </div>
-                        )}
                         <div className="navbar-nav">
                             <Link className="nav-link" to="/versenyjelentkezes" onClick={closeMenu}>
                                 Versenyjelentkezés
@@ -137,6 +130,18 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                                     <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/beallitasok" onClick={() => setIsProfileOpen(false)}>
                                         <i className="bi bi-gear-fill" aria-hidden="true" /><span>Versenybeállítások</span>
                                     </Link>
+                                    {isAdmin && (
+                                        <div className="navbar-nav">
+                                            <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/show" onClick={closeMenu}>
+                                                <i className="bi bi-gear-fill" aria-hidden="true" /><span>Kivetítő</span>
+                                            </Link>
+                                        </div>
+                                    )}
+                                    {isAdmin && (
+                                        <div className="navbar-nav">
+                                            <Link to="/admin/eredmenyhirdetes" className="btn btn-outline-primary w-100 profile-menu-link"><i className="bi bi-gear-fill" aria-hidden="true" /><span>Eredményhirdetés</span></Link>
+                                        </div>
+                                    )}
                                 </div>
                             ) : userRole === 'judge' ? (
                                 <div className="d-grid gap-2"><Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/pontozas" onClick={() => setIsProfileOpen(false)}><i className="bi bi-trophy-fill" aria-hidden="true" /><span>Saját versenyszám pontozása</span></Link><Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/pontozas-jatek" onClick={() => setIsProfileOpen(false)}><i className="bi bi-controller" aria-hidden="true" /><span>Játékos pontozás</span></Link><Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/beallitasok" onClick={() => setIsProfileOpen(false)}><i className="bi bi-diagram-3-fill" aria-hidden="true" /><span>Csapatcsoportok</span></Link></div>
