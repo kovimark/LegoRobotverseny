@@ -1,219 +1,100 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getActiveMessages, MESSAGE_BOARD_CHANGED_EVENT } from '../services/messageBoardApi'
 import { stripMessageLinkMarkers } from '../utils/messageContent'
 import { getCategoryBadgeStyle } from '../utils/categoryColor'
 
-const competitions = [
-  {
-    title: 'Szumó',
-    icon: 'bi-record-circle',
-    text: 'Közvetlen robotpárharcok, gyors döntések és stabil szerkezet a győzelemért.'
-  },
-  {
-    title: 'Vonalkövetés',
-    icon: 'bi-sign-turn-right',
-    text: 'Precíz érzékelés és megbízható programozás időre teljesítendő pályán.'
-  },
-  {
-    title: 'Hegymászás',
-    icon: 'bi-graph-up-arrow',
-    text: 'Tapadás, erőátvitel és szerkezeti tervezés különböző meredekségű emelkedőkön.'
-  },
-  {
-    title: 'Kosárra dobás',
-    icon: 'bi-bullseye',
-    text: 'Pontosság, következetesség és jól hangolt mechanika minden próbálkozásnál.'
-  }
-]
-
-const quickLinks = [
-  {
-    title: 'Szabálykönyv',
-    text: 'Olvasd el a teljes hivatalos szabálykönyvet és a részletes versenyfeltételeket.',
-    to: '/szabalyzat',
-    cta: 'Szabályzat megnyitása',
-    icon: 'bi-journal-text'
-  },
-  {
-    title: 'Jelentkezés',
-    text: 'Nevezd be a csapatodat az online felületen, és kezdd meg a felkészülést időben.',
-    to: '/versenyjelentkezes',
-    cta: 'Jelentkezés indítása',
-    icon: 'bi-pencil-square'
-  },
-  {
-    title: 'Állások',
-    text: 'Kövesd a pontokat, helyezéseket és az összesített eredményeket egy helyen.',
-    to: '/allasok',
-    cta: 'Állások megtekintése',
-    icon: 'bi-trophy'
-  },
-  {
-    title: 'Hírek',
-    text: 'Minden fontos közlemény, frissítés és versenyinformáció elérhető a hírek között.',
-    to: '/hirek',
-    cta: 'Hírek böngészése',
-    icon: 'bi-megaphone'
-  }
-]
-
-const excerpt = (text, length = 180) => {
-  const normalized = stripMessageLinkMarkers(text).replace(/\s+/g, ' ').trim()
-  return normalized.length > length ? `${normalized.slice(0, length).trimEnd()}…` : normalized
-}
-
-const getMessageTimestamp = (message) => {
-  const timestamp = message.start ? new Date(message.start).getTime() : 0
-  return Number.isNaN(timestamp) ? 0 : timestamp
-}
-
 export default function HomePage() {
   const [messages, setMessages] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
 
   useEffect(() => {
-    const loadMessages = async () => {
-      try {
-        setLoading(true)
-        setError('')
-        setMessages(await getActiveMessages())
-      } catch (loadError) {
-        setError(loadError.message)
-      } finally {
-        setLoading(false)
-      }
-    }
-
+    const loadMessages = () => getActiveMessages().then((items) => {
+      const newestFirst = [...items].sort((a, b) => {
+        const dateDifference = (b.start ? new Date(b.start).getTime() : 0) - (a.start ? new Date(a.start).getTime() : 0)
+        return dateDifference || Number(b.id || 0) - Number(a.id || 0)
+      })
+      setMessages(newestFirst.slice(0, 5))
+    }).catch(() => setMessages([]))
     loadMessages()
     window.addEventListener(MESSAGE_BOARD_CHANGED_EVENT, loadMessages)
     return () => window.removeEventListener(MESSAGE_BOARD_CHANGED_EVENT, loadMessages)
   }, [])
 
-  const featuredMessages = useMemo(() => (
-    [...messages]
-      .sort((left, right) => getMessageTimestamp(right) - getMessageTimestamp(left))
-      .slice(0, 3)
-  ), [messages])
+  const excerpt = (text, length = 150) => {
+    const normalized = stripMessageLinkMarkers(text).replace(/\s+/g, ' ').trim()
+    return normalized.length > length ? `${normalized.slice(0, length).trimEnd()}…` : normalized
+  }
 
   return (
     <main className="home-page">
       <section className="home-hero">
         <div className="home-panel">
-          <span className="home-kicker">BRICKATHLON 2026</span>
-          <h1 className="home-title">LEGO robotverseny diákoknak</h1>
+          <h1 className="home-title home-brand-title">
+            <img className="home-brand-name" src="/Images/Nev.png" alt="Robotverseny" />
+          </h1>
           <p className="home-copy">
-            Négy versenyszám, átlátható lebonyolítás és egy olyan felület, ahol minden fontos információ egy helyen követhető.
-          </p>
+            Készen álltok az ősz legnagyobb robotikai kihívására? Jelentkezzetek 2 fős csapatokkal, és méressétek meg magatokat a BRICKATHLON négy teljesen különböző versenyszámában!</p>
+
+
           <p className="home-description">
-            A Brickathlon célja, hogy a csapatok megmutathassák kreativitásukat építésben, programozásban és problémamegoldásban. A weboldalon megtalálod a szabályokat, a jelentkezést, a híreket és az aktuális állásokat is.
+            Küzdjetek meg közvetlen párharcokban a Szumóban, versenyezzetek az idővel a Vonalkövetésben, hódítsátok meg a csúcsokat a Hegymászásban, és bizonyítsátok be a pontosságotokat a Kosárra dobásnál. </p>
+          <p className="home-description">
+            Egykori versenyzőkként egy olyan pörgős és modern esemény megteremtése volt a célunk, ahol a saját telefonotok is a verseny szerves részévé válik. Építsetek, programozzatok, mutassátok meg a kreativitásotokat, és szerezzétek meg a különleges trófeákat!
           </p>
           <div className="home-actions">
             <Link className="btn btn-primary px-4 py-2" to="/versenyjelentkezes">
               Jelentkezés
             </Link>
             <Link className="btn btn-theme-secondary px-4 py-2" to="/szabalyzat">
-              Szabálykönyv
-            </Link>
-            <Link className="btn btn-outline-primary px-4 py-2" to="/allasok">
-              Állások
+              Szabályzat
             </Link>
           </div>
         </div>
       </section>
 
-      <section className="container py-4">
-        <div className="home-section-heading">
-          <span className="home-kicker">Versenyszámok</span>
-          <h2>Négy különböző kihívás</h2>
-        </div>
-        <div className="row g-3">
-          {competitions.map((competition) => (
-            <div className="col-md-6 col-xl-3" key={competition.title}>
-              <article className="news-card h-100">
-                <span className="home-card-tag">{competition.title}</span>
-                <h3 className="h5 d-flex align-items-center gap-2">
-                  <i className={`bi ${competition.icon}`} />
-                  <span>{competition.title}</span>
-                </h3>
-                <p className="mb-0">{competition.text}</p>
-              </article>
-            </div>
-          ))}
+      <section className="home-about-section">
+        <div className="home-about-card">
+          <div className="home-about-copy">
+            <span className="home-kicker">Bemutatkozás</span>
+            <h2>Építs, programozz, versenyezz!</h2>
+            <p>A Brickathlon olyan általános és középiskolás diákokat hoz össze, akik szeretnék próbára tenni ötleteiket, robotjukat és csapatmunkájukat. Négy eltérő kihívásban minden csapat megmutathatja a saját erősségeit.</p>
+            <Link className="btn btn-outline-dark" to="/rolunk">Ismerj meg minket <i className="bi bi-arrow-right ms-1" /></Link>
+          </div>
+          <div className="home-about-highlights" aria-label="A verseny fő jellemzői">
+            <div><i className="bi bi-controller" /><strong>4</strong><span>versenyszám</span></div>
+            <div><i className="bi bi-people" /><strong>2</strong><span>versenyző egy csapatban</span></div>
+            <div><i className="bi bi-mortarboard" /><strong>1–13.</strong><span>évfolyam</span></div>
+          </div>
         </div>
       </section>
 
-      <section className="container py-4">
+      <section className="home-carousel-section">
         <div className="home-section-heading">
-          <span className="home-kicker">Gyors elérés</span>
-          <h2>Legfontosabb oldalak</h2>
+          <h2 >Hírek és információk</h2>
         </div>
-        <div className="row g-3">
-          {quickLinks.map((item) => (
-            <div className="col-md-6 col-xl-3" key={item.title}>
-              <Link className="news-card-link" to={item.to}>
-                <article className="news-card h-100">
-                  <span className="home-card-tag">
-                    <i className={`bi ${item.icon} me-2`} />
-                    {item.title}
-                  </span>
-                  <h3 className="h5">{item.title}</h3>
-                  <p>{item.text}</p>
-                  <span className="news-card-more">
-                    {item.cta}
-                    <i className="bi bi-arrow-right" />
-                  </span>
-                </article>
-              </Link>
+
+        {messages.length > 0 ? (
+          <div id="homeInfoCarousel" className="carousel slide home-carousel" data-bs-ride="carousel">
+            {messages.length > 1 && <div className="carousel-indicators">{messages.map((message, index) => <button key={message.id} type="button" data-bs-target="#homeInfoCarousel" data-bs-slide-to={index} className={index === 0 ? 'active' : ''} aria-current={index === 0 ? 'true' : undefined} aria-label={`${index + 1}. hír`} />)}</div>}
+            <div className="carousel-inner">
+              {messages.map((message, index) => (
+                <div className={`carousel-item ${index === 0 ? 'active' : ''}`} key={message.id}>
+                  <Link className="home-carousel-link" to={`/hirek/${message.id}`}>
+                    <article className="home-carousel-card">
+                      <span className="home-card-tag" style={getCategoryBadgeStyle(message.typeHex)}>{message.type || 'Hír'}</span>
+                      <h3>{message.title}</h3>
+                      <p>{excerpt(message.text)}</p>
+                      <span className="home-message-time"><i className="bi bi-calendar3" /><span><strong>Közzétéve:</strong> {message.start ? new Date(message.start).toLocaleString('hu-HU') : 'most'}<br /><strong>Lejárat:</strong> {message.end ? new Date(message.end).toLocaleString('hu-HU') : 'nincs lejárat'}</span></span>
+                      <span className="home-read-more">Tovább olvasom <i className="bi bi-arrow-right" /></span>
+                    </article>
+                  </Link>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="container py-4 pb-5">
-        <div className="home-section-heading">
-          <span className="home-kicker">Friss hírek</span>
-          <h2>Aktuális közlemények</h2>
-        </div>
-
-        {error && <div className="alert alert-danger">{error}</div>}
-        {loading ? (
-          <div className="alert alert-info">Hírek betöltése...</div>
-        ) : featuredMessages.length > 0 ? (
-          <div className="row g-3">
-            {featuredMessages.map((message) => (
-              <div className="col-md-6 col-xl-4" key={message.id}>
-                <Link className="news-card-link" to={`/hirek/${message.id}`}>
-                  <article className="news-card h-100">
-                    <div className="d-flex justify-content-between align-items-start gap-2">
-                      <span className="home-card-tag news-card-tag" style={getCategoryBadgeStyle(message.typeHex)}>
-                        {message.type || 'Hír'}
-                      </span>
-                      {message.start && (
-                        <time className="small text-muted">
-                          {new Date(message.start).toLocaleDateString('hu-HU')}
-                        </time>
-                      )}
-                    </div>
-                    <h3 className="h5">{message.title || 'Közlemény'}</h3>
-                    <p>{excerpt(message.text)}</p>
-                    <span className="news-card-more">
-                      Tovább olvasom
-                      <i className="bi bi-arrow-right" />
-                    </span>
-                  </article>
-                </Link>
-              </div>
-            ))}
+            {messages.length > 1 && <><button className="carousel-control-prev" type="button" data-bs-target="#homeInfoCarousel" data-bs-slide="prev"><span className="carousel-control-prev-icon" aria-hidden="true" /><span className="visually-hidden">Előző</span></button><button className="carousel-control-next" type="button" data-bs-target="#homeInfoCarousel" data-bs-slide="next"><span className="carousel-control-next-icon" aria-hidden="true" /><span className="visually-hidden">Következő</span></button></>}
           </div>
-        ) : (
-          <div className="home-news-empty">
-            <i className="bi bi-newspaper" />
-            <h2 className="h5 mt-3">Jelenleg nincs aktív hír</h2>
-            <p className="mb-0 text-muted">Nézz vissza később az új közleményekért.</p>
-          </div>
-        )}
+        ) : <div className="home-news-empty">Jelenleg nincs közzétett hír.</div>}
+        <div className="text-end mt-3"><Link className="btn btn-outline-dark" to="/hirek">Összes hír</Link></div>
       </section>
     </main>
   )
