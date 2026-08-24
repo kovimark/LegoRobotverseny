@@ -9,6 +9,7 @@ export default function ConfirmModal({
   confirmVariant = 'danger',
   requiredText = '',
   requiredTextLabel,
+  requiredCheckboxLabel = '',
   busy = false,
   onConfirm,
   onClose
@@ -16,10 +17,12 @@ export default function ConfirmModal({
   const titleId = useId()
   const descriptionId = useId()
   const [typedText, setTypedText] = useState('')
+  const [checkboxChecked, setCheckboxChecked] = useState(false)
 
   useEffect(() => {
     if (!open) return undefined
     setTypedText('')
+    setCheckboxChecked(false)
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const handleKeyDown = (event) => {
@@ -33,7 +36,9 @@ export default function ConfirmModal({
   }, [open, busy, onClose])
 
   if (!open) return null
-  const canConfirm = !busy && (!requiredText || typedText === requiredText)
+  const isTextConfirmed = !requiredText || typedText === requiredText
+  const isCheckboxConfirmed = !requiredCheckboxLabel || checkboxChecked
+  const canConfirm = !busy && isTextConfirmed && isCheckboxConfirmed
 
   return (
     <>
@@ -59,6 +64,20 @@ export default function ConfirmModal({
                     autoComplete="off"
                     onChange={(event) => setTypedText(event.target.value)}
                   />
+                </div>
+              )}
+              {requiredCheckboxLabel && (
+                <div className="form-check mt-3">
+                  <input
+                    id={`${titleId}-checkbox-confirmation`}
+                    className="form-check-input"
+                    type="checkbox"
+                    checked={checkboxChecked}
+                    onChange={(event) => setCheckboxChecked(event.target.checked)}
+                  />
+                  <label className="form-check-label" htmlFor={`${titleId}-checkbox-confirmation`}>
+                    {requiredCheckboxLabel}
+                  </label>
                 </div>
               )}
             </div>

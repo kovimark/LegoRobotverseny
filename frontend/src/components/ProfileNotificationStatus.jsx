@@ -36,7 +36,10 @@ export default function ProfileNotificationStatus({ user }) {
     if (!response.ok) throw new Error('Nem sikerült betölteni a felhasználó csapatait.')
     const teams = await response.json()
     return Array.isArray(teams)
-      ? [...new Set(teams.map((team) => team.id).filter((id) => id !== null && id !== undefined))]
+      ? [...new Set(teams
+        .filter((team) => team && typeof team === 'object')
+        .map((team) => team.id)
+        .filter((id) => id !== null && id !== undefined))]
       : []
   }
 

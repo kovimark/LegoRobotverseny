@@ -126,7 +126,10 @@ function App() {
         if (!response.ok) return;
         const teams = await response.json();
         const teamIds = Array.isArray(teams)
-          ? [...new Set(teams.map((team) => team.id).filter((id) => id !== null && id !== undefined))]
+          ? [...new Set(teams
+            .filter((team) => team && typeof team === 'object')
+            .map((team) => team.id)
+            .filter((id) => id !== null && id !== undefined))]
           : [];
         if (!controller.signal.aborted && teamIds.length > 0) await subscribeTeamsToPush(teamIds);
       } catch (error) {
@@ -239,4 +242,3 @@ function App() {
 }
 
 export default App;
-

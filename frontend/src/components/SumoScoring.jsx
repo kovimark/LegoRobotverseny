@@ -74,7 +74,8 @@ const getTeamName = (team, index) => team.teamName || team.team_name || `Csapat 
 const normalizeTeam = (team, index) => ({
   id: team.id ?? `${getTeamName(team, index)}-${index}`,
   name: getTeamName(team, index),
-  category: Number(team.category) === 1 ? 1 : 0
+  category: Number(team.category) === 1 ? 1 : 0,
+  isDisqualified: Boolean(team.isDisqualified)
 })
 
 const normalizeGroupStanding = (standing, index) => ({
@@ -433,6 +434,7 @@ export default function SumoScoring() {
   const [openMatches, setOpenMatches] = useState({})
   const [actionMessage, setActionMessage] = useState(null)
   const [matchToDelete, setMatchToDelete] = useState(null)
+  const eligibleTeams = useMemo(() => teams.filter((team) => !team.isDisqualified), [teams])
 
   useEffect(() => {
     const applyConfiguration = (configuration) => {
@@ -553,20 +555,24 @@ export default function SumoScoring() {
 
   const groupRoundCount = useMemo(() => buildRoundGroups(groupStageMatches).length, [groupStageMatches])
   const bonusRoundTeams = useMemo(() => {
-    const matchCounts = new Map(teams.map((team) => [team.name, 0]))
+    const matchCounts = new Map(eligibleTeams.map((team) => [team.name, 0]))
     groupStageMatches.forEach((match) => {
-      matchCounts.set(match.team1Name, (matchCounts.get(match.team1Name) || 0) + 1)
-      matchCounts.set(match.team2Name, (matchCounts.get(match.team2Name) || 0) + 1)
+      if (matchCounts.has(match.team1Name)) {
+        matchCounts.set(match.team1Name, (matchCounts.get(match.team1Name) || 0) + 1)
+      }
+      if (matchCounts.has(match.team2Name)) {
+        matchCounts.set(match.team2Name, (matchCounts.get(match.team2Name) || 0) + 1)
+      }
     })
     const pools = ageGroupBreakdown
-      ? [0, 1].map((category) => teams.filter((team) => team.category === category))
-      : [teams]
+      ? [0, 1].map((category) => eligibleTeams.filter((team) => team.category === category))
+      : [eligibleTeams]
     return pools.flatMap((pool) => {
       if (pool.length < 2) return []
       const maximum = Math.max(...pool.map((team) => matchCounts.get(team.name) || 0))
       return pool.filter((team) => (matchCounts.get(team.name) || 0) < maximum)
     })
-  }, [ageGroupBreakdown, groupStageMatches, teams])
+  }, [ageGroupBreakdown, groupStageMatches, eligibleTeams])
   const latestGroupRoundNumber = useMemo(() => groupStageMatches.reduce((latest, match) => Math.max(latest, Number(match.table) || 0), 0), [groupStageMatches])
   const latestGroupRoundComplete = latestGroupRoundNumber === 0 || groupStageMatches
     .filter((match) => Number(match.table) === latestGroupRoundNumber)
@@ -673,7 +679,7 @@ export default function SumoScoring() {
   }
 
   const getCurrentRoundTeams = () => {
-    const sortedTeams = teams
+    const sortedTeams = eligibleTeams
       .map((team) => ({
         ...team,
         points: standingsByName.get(team.name)?.point ?? 0,
@@ -689,10 +695,10 @@ export default function SumoScoring() {
   }
 
   const generateKnockoutPairings = () => {
-    const teamByName = new Map(teams.map((team) => [team.name, team]))
+    const teamByName = new Map(eligibleTeams.map((team) => [team.name, team]))
     const knockoutMatches = matches.filter((match) => isKnockoutStage(getMatchStage(match)))
     const standingsByTeamName = new Map(groupStandings.map((item) => [item.team_name, item]))
-    const sortedTeams = teams.map((team) => ({
+    const sortedTeams = eligibleTeams.map((team) => ({
       ...team,
       points: standingsByTeamName.get(team.name)?.point ?? 0,
       matchesPlayed: standingsByTeamName.get(team.name)?.rounds ?? 0
@@ -855,8 +861,8 @@ export default function SumoScoring() {
   }
 
   const handleGenerateMatches = async (startKnockout = false, bonusRound = false) => {
-    if (!teams.length) {
-      setActionMessage({ type: 'danger', text: 'Előbb töltsd be a nevezett csapatokat.' })
+    if (!eligibleTeams.length) {
+      setActionMessage({ type: 'danger', text: 'Nincs legalább egy aktív (nem kizárt) csapat a sorsoláshoz.' })
       return
     }
 
@@ -1220,9 +1226,11 @@ export default function SumoScoring() {
 
       {loading && <div className="alert alert-secondary">Csapatok és meccsek betöltése...</div>}
       {error && <div className="alert alert-danger">{error}</div>}
-      {!loading && !error && teams.length === 0 && <div className="alert alert-secondary">Ebben a versenyszámban még nincs csapat.</div>}
+      {!loading && !error && eligibleTeams.length === 0 && (
+        <div className="alert alert-secondary">Nincs aktív (nem kizárt) csapat a szumó sorsoláshoz.</div>
+      )}
 
-      {!loading && !error && teams.length > 0 && (
+      {!loading && !error && eligibleTeams.length > 0 && (
         <>
           <div className="card shadow-sm team-card mb-4">
             <div className="card-body p-4">
@@ -1238,7 +1246,7 @@ export default function SumoScoring() {
                   type="button"
                   className="btn btn-primary px-4"
                   onClick={() => handleGenerateMatches(false)}
-                  disabled={!teams.length || isKnockoutComplete || isGroupGenerationLocked || (!isKnockoutView && !latestGroupRoundComplete)}
+                  disabled={!eligibleTeams.length || isKnockoutComplete || isGroupGenerationLocked || (!isKnockoutView && !latestGroupRoundComplete)}
                 >
                   {primaryActionLabel}
                 </button>
@@ -1258,7 +1266,7 @@ export default function SumoScoring() {
                     type="button"
                     className="btn btn-success px-4"
                     onClick={() => handleGenerateMatches(true)}
-                    disabled={!teams.length || isKnockoutComplete || !latestGroupRoundComplete}
+                    disabled={!eligibleTeams.length || isKnockoutComplete || !latestGroupRoundComplete}
                   >
                     Egyenes kiesés indítása
                   </button>

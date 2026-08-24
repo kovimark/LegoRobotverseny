@@ -39,8 +39,9 @@ export default function MyTeamsPage({ user }) {
 
         // Handle both single team and array of teams
         const teamsArray = Array.isArray(teamsData) ? teamsData : [teamsData]
+        const validTeams = teamsArray.filter((team) => team && typeof team === 'object')
 
-        setTeams(teamsArray)
+        setTeams(validTeams)
       } catch (requestError) {
         if (requestError.name !== 'AbortError') setError(requestError.message)
       } finally {
@@ -65,7 +66,10 @@ export default function MyTeamsPage({ user }) {
     }
     try {
       setPushLoading(true)
-      await subscribeTeamsToPush(teams.map((team) => team.id))
+      const teamIds = [...new Set(teams
+        .map((team) => team?.id)
+        .filter((id) => id !== null && id !== undefined))]
+      await subscribeTeamsToPush(teamIds)
       window.localStorage.removeItem('robotverseny_push_disabled')
       setPushEnabled(true)
       setPushFeedback({ type: 'success', text: 'Az értesítések sikeresen bekapcsolva ezen az eszközön.' })

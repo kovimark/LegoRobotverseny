@@ -1,23 +1,96 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import FloatingFeedback from '../components/FloatingFeedback'
 import AgeGroupBadge from '../components/AgeGroupBadge'
-
-const editableTeamFields = [
-  'teamName',
-  'schoolName',
-  'category',
-  'group',
-  'teamMember1Name',
-  'teamMember1Email',
-  'teamMember1Class',
-  'teamMember2Name',
-  'teamMember2Email',
-  'teamMember2Class',
-  'teamCoach1',
-  'teamCoach1Email'
-]
+import ConfirmModal from '../components/ConfirmModal'
 
 const API_BASE_URL = 'https://legocompetition.runasp.net'
+
+const normalizeMembers = (team) => {
+  if (!team) {
+    return []
+  }
+
+  if (Array.isArray(team.members) && team.members.length > 0) {
+    return team.members.map((member, index) => ({
+      id: `${team.id || team.teamName || 'team'}-member-${index}`,
+      name: member?.name || '',
+      email: member?.email || '',
+      className: member?.className ?? null,
+      isCoach: Boolean(member?.isCoach)
+    }))
+  }
+
+  return [
+    { id: `${team.id || team.teamName || 'team'}-legacy-1`, name: team.teamMember1Name || '', email: team.teamMember1Email || '', className: team.teamMember1Class ?? null, isCoach: false },
+    { id: `${team.id || team.teamName || 'team'}-legacy-2`, name: team.teamMember2Name || '', email: team.teamMember2Email || '', className: team.teamMember2Class ?? null, isCoach: false },
+    { id: `${team.id || team.teamName || 'team'}-legacy-c1`, name: team.teamCoach1 || '', email: team.teamCoach1Email || '', className: null, isCoach: true }
+  ].filter((member) => member.name || member.email || member.className)
+}
+
+const normalizeTeam = (team) => {
+  const normalizedMembers = normalizeMembers(team)
+  const competitors = normalizedMembers.filter((member) => !member.isCoach)
+  const coaches = normalizedMembers.filter((member) => member.isCoach)
+
+  return {
+    ...team,
+    members: normalizedMembers,
+    teamMember1Name: team.teamMember1Name ?? competitors[0]?.name ?? null,
+    teamMember1Email: team.teamMember1Email ?? competitors[0]?.email ?? null,
+    teamMember1Class: team.teamMember1Class ?? competitors[0]?.className ?? null,
+    teamMember2Name: team.teamMember2Name ?? competitors[1]?.name ?? null,
+    teamMember2Email: team.teamMember2Email ?? competitors[1]?.email ?? null,
+    teamMember2Class: team.teamMember2Class ?? competitors[1]?.className ?? null,
+    teamCoach1: team.teamCoach1 ?? coaches[0]?.name ?? null,
+    teamCoach1Email: team.teamCoach1Email ?? coaches[0]?.email ?? null
+  }
+}
+
+const normalizeOptionalText = (value, { lowercase = false } = {}) => {
+  if (value === null || value === undefined) {
+    return null
+  }
+
+  const trimmedValue = typeof value === 'string' ? value.trim() : String(value).trim()
+  if (!trimmedValue) {
+    return null
+  }
+
+  return lowercase ? trimmedValue.toLowerCase() : trimmedValue
+}
+
+const normalizeOptionalClassValue = (value) => {
+  if (value === '' || value === null || value === undefined) {
+    return 0
+  }
+
+  const numericValue = Number(value)
+  return Number.isInteger(numericValue) ? numericValue : 0
+}
+
+const readApiError = async (response, fallbackMessage) => {
+  const errorText = await response.text()
+
+  try {
+    const errorData = JSON.parse(errorText)
+    return Object.values(errorData.errors || {}).flat().join(' ') || errorData.title || errorText || fallbackMessage
+  } catch {
+    return errorText || fallbackMessage
+  }
+}
+
+const getMemberRoleLabel = (members, memberIndex) => {
+  const member = members[memberIndex]
+  if (!member) {
+    return 'Csapattag'
+  }
+  if (member.isCoach) {
+    const coachIndex = members.slice(0, memberIndex + 1).filter((current) => current.isCoach).length
+    return `Felkészítő ${coachIndex}`
+  }
+  const competitorIndex = members.slice(0, memberIndex + 1).filter((current) => !current.isCoach).length
+  return `${competitorIndex}. versenyző`
+}
 
 export default function AdminPage() {
   const [teams, setTeams] = useState([])
@@ -26,6 +99,7 @@ export default function AdminPage() {
   const [openTeamId, setOpenTeamId] = useState(null)
   const [actionMessage, setActionMessage] = useState(null)
   const [teamToDelete, setTeamToDelete] = useState(null)
+  const [teamToDisqualify, setTeamToDisqualify] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [teamToEdit, setTeamToEdit] = useState(null)
   const [editErrors, setEditErrors] = useState({})
@@ -46,7 +120,7 @@ export default function AdminPage() {
       }
 
       const data = await response.json()
-      setTeams(Array.isArray(data) ? data : [])
+      setTeams(Array.isArray(data) ? data.map(normalizeTeam) : [])
       setError('')
     } catch (err) {
       setError(err.message)
@@ -86,6 +160,7 @@ export default function AdminPage() {
   const filteredTeams = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLocaleLowerCase('hu-HU')
     const matches = teams.filter((team) => {
+      const normalizedMembers = normalizeMembers(team)
       const searchableValues = [
         team.teamName,
         team.schoolName,
@@ -96,7 +171,8 @@ export default function AdminPage() {
         team.teamMember2Name,
         team.teamMember2Email,
         team.teamCoach1,
-        team.teamCoach1Email
+        team.teamCoach1Email,
+        ...normalizedMembers.flatMap((member) => [member.name, member.email, member.className, member.isCoach ? 'edző' : 'versenyző'])
       ].filter((value) => value !== null && value !== undefined && value !== '')
       const matchesSearch = !normalizedSearch || searchableValues.some(
         (value) => String(value).toLocaleLowerCase('hu-HU').includes(normalizedSearch)
@@ -150,14 +226,14 @@ export default function AdminPage() {
     }
   }
 
-  const handleDisqualify = async (team) => {
-    if (!team) {
+  const handleDisqualify = async () => {
+    if (!teamToDisqualify) {
       return
     }
 
     try {
-      setDisqualifying(team.id)
-      const response = await fetch(`${API_BASE_URL}/api/Teams/disqualify/${team.id}`, {
+      setDisqualifying(teamToDisqualify.id)
+      const response = await fetch(`${API_BASE_URL}/api/Teams/disqualify/${teamToDisqualify.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -165,7 +241,7 @@ export default function AdminPage() {
       })
 
       if (!response.ok) {
-        throw new Error('A kizárás nem sikerült.')
+        throw new Error(await readApiError(response, 'A kizárás nem sikerült.'))
       }
 
       setActionMessage({ type: 'success', text: 'A csapat sikeresen kizárva.' })
@@ -173,6 +249,7 @@ export default function AdminPage() {
     } catch (err) {
       setActionMessage({ type: 'danger', text: err.message })
     } finally {
+      setTeamToDisqualify(null)
       setDisqualifying(null)
     }
   }
@@ -180,7 +257,7 @@ export default function AdminPage() {
   const startInlineEdit = async (team) => {
     setEditLoading(true)
     setEditErrors({})
-    setTeamToEdit({ ...team })
+    setTeamToEdit(normalizeTeam(team))
     setOpenTeamId(team.id)
 
     try {
@@ -193,7 +270,7 @@ export default function AdminPage() {
       }
 
       const data = await response.json()
-      setTeamToEdit(data)
+      setTeamToEdit(normalizeTeam(data))
     } catch (err) {
       setTeamToEdit(null)
       setActionMessage({ type: 'danger', text: err.message })
@@ -221,7 +298,7 @@ export default function AdminPage() {
     const validationErrors = {}
     ;['teamName', 'schoolName'].forEach((fieldName) => {
       const value = teamToEdit[fieldName]
-      if (value === '' || value === null || value === undefined) {
+      if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) {
         validationErrors[fieldName] = 'A mező kitöltése kötelező.'
       }
     })
@@ -232,18 +309,18 @@ export default function AdminPage() {
     }
 
     const payload = {
-      teamName: typeof teamToEdit.teamName === 'string' ? teamToEdit.teamName.trim() : teamToEdit.teamName,
-      schoolName: typeof teamToEdit.schoolName === 'string' ? teamToEdit.schoolName.trim() : teamToEdit.schoolName,
+      teamName: normalizeOptionalText(teamToEdit.teamName),
+      schoolName: normalizeOptionalText(teamToEdit.schoolName),
       category: Number(teamToEdit.category),
-      group: teamToEdit.group || '-',
-      teamMember1Name: teamToEdit.teamMember1Name || null,
-      teamMember1Email: teamToEdit.teamMember1Email || null,
-      teamMember1Class: teamToEdit.teamMember1Class ? Number(teamToEdit.teamMember1Class) : null,
-      teamMember2Name: teamToEdit.teamMember2Name || null,
-      teamMember2Email: teamToEdit.teamMember2Email || null,
-      teamMember2Class: teamToEdit.teamMember2Class ? Number(teamToEdit.teamMember2Class) : null,
-      teamCoach1: teamToEdit.teamCoach1 || null,
-      teamCoach1Email: teamToEdit.teamCoach1Email || null
+      group: normalizeOptionalText(teamToEdit.group) || '-',
+      teamMember1Name: normalizeOptionalText(teamToEdit.teamMember1Name),
+      teamMember1Email: normalizeOptionalText(teamToEdit.teamMember1Email, { lowercase: true }),
+      teamMember1Class: normalizeOptionalClassValue(teamToEdit.teamMember1Class),
+      teamMember2Name: normalizeOptionalText(teamToEdit.teamMember2Name),
+      teamMember2Email: normalizeOptionalText(teamToEdit.teamMember2Email, { lowercase: true }),
+      teamMember2Class: normalizeOptionalClassValue(teamToEdit.teamMember2Class),
+      teamCoach1: normalizeOptionalText(teamToEdit.teamCoach1),
+      teamCoach1Email: normalizeOptionalText(teamToEdit.teamCoach1Email, { lowercase: true })
     }
 
     try {
@@ -258,8 +335,7 @@ export default function AdminPage() {
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(errorText || 'A csapat adatainak mentése nem sikerült.')
+        throw new Error(await readApiError(response, 'A csapat adatainak mentése nem sikerült.'))
       }
 
       setTeams((previousTeams) => previousTeams.map((team) => (
@@ -357,6 +433,7 @@ export default function AdminPage() {
         <div className="col-lg-12 d-flex flex-column gap-3">
           {filteredTeams.map((team) => {
           const isOpen = openTeamId === team.id
+          const teamMembers = normalizeMembers(team)
 
           return (
             <div key={team.id} className="card shadow-sm team-card overflow-hidden">
@@ -395,7 +472,7 @@ export default function AdminPage() {
                     borderColor: team.isDisqualified ? 'var(--gray)' : 'var(--red)',
                     color: 'var(--white)'
                   }}
-                  onClick={() => handleDisqualify(team)}
+                  onClick={() => setTeamToDisqualify(team)}
                   disabled={disqualifying === team.id || team.isDisqualified}
                 >
                   {disqualifying === team.id ? 'Kizárás...' : team.isDisqualified ? 'Kizárva' : 'Kizárás'}
@@ -637,53 +714,23 @@ export default function AdminPage() {
                         {team.group && <span className="badge text-bg-dark mt-2">{team.group} csoport</span>}
                       </section>
                     </div>
-                    <div className="col-md-6 col-xl-3">
-                      <section className="team-info-box h-100">
-                        <h3 className="team-info-title">1. versenyző</h3>
-                        <div className="team-info-meta">
-                          {team.teamMember1Name ? (
-                            <>
-                              <div className="fw-semibold">{team.teamMember1Name}</div>
-                              <div className="text-muted">{team.teamMember1Email || '-'}</div>
-                              <div className="text-muted">{team.teamMember1Class ? `${team.teamMember1Class}. osztály` : '-'}</div>
-                            </>
-                          ) : (
-                            <div className="text-muted">-</div>
-                          )}
-                        </div>
-                      </section>
-                    </div>
-                    <div className="col-md-6 col-xl-3">
-                      <section className="team-info-box h-100">
-                        <h3 className="team-info-title">2. versenyző</h3>
-                        <div className="team-info-meta">
-                          {team.teamMember2Name ? (
-                            <>
-                              <div className="fw-semibold">{team.teamMember2Name}</div>
-                              <div className="text-muted">{team.teamMember2Email || '-'}</div>
-                              <div className="text-muted">{team.teamMember2Class ? `${team.teamMember2Class}. osztály` : '-'}</div>
-                            </>
-                          ) : (
-                            <div className="text-muted">-</div>
-                          )}
-                        </div>
-                      </section>
-                    </div>
-                    <div className="col-md-6 col-xl-3">
-                      <section className="team-info-box h-100">
-                        <h3 className="team-info-title">Felkészítő tanár</h3>
-                        <div className="team-info-meta">
-                          {team.teamCoach1 ? (
-                            <>
-                              <div className="fw-semibold">{team.teamCoach1}</div>
-                              <div className="text-muted">{team.teamCoach1Email || '-'}</div>
-                            </>
-                          ) : (
-                            <div className="text-muted">-</div>
-                          )}
-                        </div>
-                      </section>
-                    </div>
+                    {teamMembers.map((member, memberIndex) => (
+                      <div className="col-md-6 col-xl-3" key={member.id}>
+                        <section className="team-info-box h-100">
+                          <h3 className="team-info-title">{getMemberRoleLabel(teamMembers, memberIndex)}</h3>
+                          <div className="team-info-meta">
+                            <div className="fw-semibold">{member.name || '-'}</div>
+                            <div className="text-muted">{member.email || '-'}</div>
+                            <div className="text-muted">{member.className ? `${member.className}. osztály` : '-'}</div>
+                          </div>
+                        </section>
+                      </div>
+                    ))}
+                    {teamMembers.length === 0 && (
+                      <div className="col-12">
+                        <div className="alert alert-secondary mb-0">Nincsenek csapattag adatok.</div>
+                      </div>
+                    )}
                   </div>
                   <div className="d-flex justify-content-end mt-3">
                     <button
@@ -734,6 +781,29 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={Boolean(teamToDisqualify)}
+        title="Csapat kizárása"
+        confirmLabel="Csapat kizárása"
+        confirmVariant="danger"
+        requiredText="KIZÁROM A CSAPATOT"
+        requiredTextLabel={<>A folytatáshoz írd be pontosan: <strong>KIZÁROM A CSAPATOT</strong></>}
+        requiredCheckboxLabel="Megerősítem, hogy a csapatot ki akarom zárni a versenyből."
+        busy={Boolean(teamToDisqualify && disqualifying === teamToDisqualify.id)}
+        onClose={() => setTeamToDisqualify(null)}
+        onConfirm={handleDisqualify}
+      >
+        <p className="mb-2">
+          Biztosan ki akarod zárni ezt a csapatot a versenyből?
+        </p>
+        <p className="fw-semibold mb-2">
+          {teamToDisqualify?.teamName || (teamToDisqualify ? `Csapat #${teamToDisqualify.id}` : '')}
+        </p>
+        <p className="mb-0 text-muted">
+          Csak a szöveg pontos beírása és a jelölőnégyzet kipipálása után lehet folytatni.
+        </p>
+      </ConfirmModal>
 
     </div>
   )

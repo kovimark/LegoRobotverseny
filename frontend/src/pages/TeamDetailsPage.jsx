@@ -1,19 +1,72 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import FloatingFeedback from '../components/FloatingFeedback'
+import ConfirmModal from '../components/ConfirmModal'
+
+const API_BASE_URL = 'https://legocompetition.runasp.net'
+
+const readApiError = async (response, fallbackMessage) => {
+  const errorText = await response.text()
+
+  try {
+    const errorData = JSON.parse(errorText)
+    return Object.values(errorData.errors || {}).flat().join(' ') || errorData.title || errorText || fallbackMessage
+  } catch {
+    return errorText || fallbackMessage
+  }
+}
+
+const normalizeMembers = (team) => {
+  if (!team) {
+    return []
+  }
+
+  const membersFromApi = Array.isArray(team.members)
+    ? team.members.map((member, index) => ({
+      id: `${team.id || team.teamName || 'team'}-member-${index}`,
+      name: member?.name || '',
+      email: member?.email || '',
+      className: member?.className ?? null,
+      isCoach: Boolean(member?.isCoach)
+    }))
+    : []
+
+  if (membersFromApi.length > 0) {
+    const competitors = membersFromApi
+      .filter((member) => !member.isCoach)
+      .map((member, index) => ({ ...member, roleLabel: `${index + 1}. versenyző` }))
+    const coaches = membersFromApi
+      .filter((member) => member.isCoach)
+      .map((member, index) => ({ ...member, roleLabel: `Felkészítő ${index + 1}` }))
+    return [...competitors, ...coaches]
+  }
+
+  const fallbackMembers = [
+    { name: team.teamMember1Name, email: team.teamMember1Email, className: team.teamMember1Class, isCoach: false, roleLabel: '1. versenyző' },
+    { name: team.teamMember2Name, email: team.teamMember2Email, className: team.teamMember2Class, isCoach: false, roleLabel: '2. versenyző' },
+    { name: team.teamCoach1, email: team.teamCoach1Email, className: null, isCoach: true, roleLabel: 'Felkészítő 1' }
+  ]
+
+  return fallbackMembers
+    .filter((member) => member.name || member.email || member.className)
+    .map((member, index) => ({ ...member, id: `${team.id || team.teamName || 'team'}-fallback-${index}` }))
+}
 
 export default function TeamDetailsPage({ userRole, userPrivilege }) {
   const { teamName } = useParams()
   const decodedTeamName = decodeURIComponent(teamName || '')
   const isAdmin = userRole === 'admin' || Number(userPrivilege) === 1
-  const [teamData, setTeamData] = useState(null)
+  const [teamInfo, setTeamInfo] = useState(null)
+  const [pointsData, setPointsData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [pointSaving, setPointSaving] = useState(false)
   const [disqualifying, setDisqualifying] = useState(false)
+  const [disqualifyModalOpen, setDisqualifyModalOpen] = useState(false)
   const [teamId, setTeamId] = useState(null)
   const [pointEdit, setPointEdit] = useState({ operation: 'add', amount: '', reason: '' })
   const [pointEditFeedback, setPointEditFeedback] = useState(null)
+  const teamMembers = normalizeMembers(teamInfo)
 
   // Load team data and set teamId
   useEffect(() => {
@@ -21,21 +74,40 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
       try {
         setLoading(true)
         setError('')
-        const response = await fetch(`https://legocompetition.runasp.net/api/Teams/teambyname/${encodeURIComponent(decodedTeamName)}`, {
+        const teamResponse = await fetch(`${API_BASE_URL}/api/Teams`, {
           headers: { accept: '*/*' }
         })
 
-        if (!response.ok) {
+        if (!teamResponse.ok) {
           throw new Error('A csapat adatainak betöltése nem sikerült.')
         }
 
-        const data = await response.json()
-        setTeamData(data)
+        const teams = await teamResponse.json()
+        const normalizedTeamName = decodedTeamName.trim().toLocaleLowerCase('hu-HU')
+        const team = Array.isArray(teams)
+          ? teams.find((currentTeam) => String(currentTeam?.teamName || '').trim().toLocaleLowerCase('hu-HU') === normalizedTeamName)
+          : null
 
-        // Extract teamId from the response
-        if (data?.id) {
-          setTeamId(data.id)
+        if (!team) {
+          throw new Error(`A(z) "${decodedTeamName}" csapat nem található.`)
         }
+
+        setTeamInfo(team)
+
+        if (team?.id) {
+          setTeamId(team.id)
+        }
+
+        const pointsResponse = await fetch(`${API_BASE_URL}/api/Points/${encodeURIComponent(decodedTeamName)}`, {
+          headers: { accept: '*/*' }
+        })
+
+        if (!pointsResponse.ok) {
+          throw new Error('A pontadatok betöltése nem sikerült.')
+        }
+
+        const points = await pointsResponse.json()
+        setPointsData(points)
       } catch (err) {
         setError(err.message)
       } finally {
@@ -57,8 +129,8 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
     const amountNumber = Number(pointEdit.amount)
     const trimmedReason = pointEdit.reason.trim()
 
-    if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
-      setPointEditFeedback({ type: 'danger', text: 'Adj meg 0-nál nagyobb pontértéket.' })
+    if (!Number.isInteger(amountNumber) || amountNumber <= 0) {
+      setPointEditFeedback({ type: 'danger', text: 'Adj meg 0-nál nagyobb egész pontot.' })
       return
     }
 
@@ -71,9 +143,9 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
 
     try {
       setPointSaving(true)
-      const response = await fetch(`https://legocompetition.runasp.net/api/Points/${encodeURIComponent(decodedTeamName)}/${delta}`, {
+      const response = await fetch(`${API_BASE_URL}/api/Points/${encodeURIComponent(decodedTeamName)}/${delta}`, {
         method: 'PUT',
-        headers: { accept: '*/*', 'Content-Type': 'application/json' }
+        headers: { accept: '*/*' }
       })
 
       if (!response.ok) {
@@ -81,7 +153,7 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
         throw new Error(errorText || 'A pontmódosítás nem sikerült.')
       }
 
-      setTeamData((prev) => {
+      setPointsData((prev) => {
         if (!prev) return prev
         const currentAllPoint = Number(prev.allPoint ?? 0)
         return { ...prev, allPoint: currentAllPoint + delta }
@@ -89,7 +161,7 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
 
       setPointEditFeedback({
         type: 'success',
-        text: `Összesített pont: ${Math.abs(amountNumber)} pont ${pointEdit.operation === 'subtract' ? 'levonva' : 'hozzáadva'} (ok: ${trimmedReason}).`
+        text: `Összesített pont: ${amountNumber} pont ${pointEdit.operation === 'subtract' ? 'levonva' : 'hozzáadva'} (ok: ${trimmedReason}).`
       })
       setPointEdit((prev) => ({ ...prev, amount: '', reason: '' }))
     } catch (err) {
@@ -110,22 +182,18 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
       return
     }
 
-    const confirmed = window.confirm(`Biztos, hogy kizárod a(z) "${decodedTeamName}" csapatot a versenyből?`)
-    if (!confirmed) return
-
     try {
       setDisqualifying(true)
-      const response = await fetch(`https://legocompetition.runasp.net/api/Teams/disqualify/${teamId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/Teams/disqualify/${teamId}`, {
         method: 'PATCH',
         headers: { accept: '*/*' }
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(errorText || 'A kizárás nem sikerült.')
+        throw new Error(await readApiError(response, 'A kizárás nem sikerült.'))
       }
 
-      setTeamData((prev) => {
+      setTeamInfo((prev) => {
         if (!prev) return prev
         return { ...prev, isDisqualified: true }
       })
@@ -137,6 +205,7 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
     } catch (err) {
       setPointEditFeedback({ type: 'danger', text: err.message })
     } finally {
+      setDisqualifyModalOpen(false)
       setDisqualifying(false)
     }
   }
@@ -161,11 +230,11 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
                   {isAdmin && (
                     <button
                       type="button"
-                      className={`btn ${teamData?.isDisqualified ? 'btn-secondary' : 'btn-danger'}`}
-                      onClick={handleDisqualify}
-                      disabled={teamData?.isDisqualified || disqualifying}
+                      className={`btn ${teamInfo?.isDisqualified ? 'btn-secondary' : 'btn-danger'}`}
+                      onClick={() => setDisqualifyModalOpen(true)}
+                      disabled={teamInfo?.isDisqualified || disqualifying}
                     >
-                      {teamData?.isDisqualified ? 'Kizárva' : 'Kizárás'}
+                      {teamInfo?.isDisqualified ? 'Kizárva' : 'Kizárás'}
                     </button>
                   )}
                 </div>
@@ -180,40 +249,40 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
                   <div className="col-12 col-lg-6">
                     <div className="team-detail-section">
                       <h4 className="mb-3">Pontok és helyezések</h4>
-                      {teamData ? (
+                      {pointsData ? (
                         <div className="row g-3">
                           <div className="col-12 col-sm-6">
                             <div className="border rounded p-3 detail-stat">
                               <div className="detail-label">Vonalkövetés</div>
-                              <div className="fw-bold detail-value">{teamData.lineFollowPoint ?? 0} pont</div>
-                              <div className="text-muted">{teamData.lineFollowPosition ?? '-'} . hely</div>
+                              <div className="fw-bold detail-value">{pointsData.lineFollowPoint ?? 0} pont</div>
+                              <div className="text-muted">{pointsData.lineFollowPosition ?? '-'} . hely</div>
                             </div>
                           </div>
                           <div className="col-12 col-sm-6">
                             <div className="border rounded p-3 detail-stat">
                               <div className="detail-label">Hegymászás</div>
-                              <div className="fw-bold detail-value">{teamData.hillClimbPoint ?? 0} pont</div>
-                              <div className="text-muted">{teamData.hillClimbPosition ?? '-'} . hely</div>
+                              <div className="fw-bold detail-value">{pointsData.hillClimbPoint ?? 0} pont</div>
+                              <div className="text-muted">{pointsData.hillClimbPosition ?? '-'} . hely</div>
                             </div>
                           </div>
                           <div className="col-12 col-sm-6">
                             <div className="border rounded p-3 detail-stat">
                               <div className="detail-label">Szumó</div>
-                              <div className="fw-bold detail-value">{teamData.sumoPoint ?? 0} pont</div>
-                              <div className="text-muted">{teamData.sumoPosition ?? '-'} . hely</div>
+                              <div className="fw-bold detail-value">{pointsData.sumoPoint ?? 0} pont</div>
+                              <div className="text-muted">{pointsData.sumoPosition ?? '-'} . hely</div>
                             </div>
                           </div>
                           <div className="col-12 col-sm-6">
                             <div className="border rounded p-3 detail-stat">
                               <div className="detail-label">Kosárlabda</div>
-                              <div className="fw-bold detail-value">{teamData.basketballPoint ?? 0} pont</div>
-                              <div className="text-muted">{teamData.basketballPosition ?? '-'} . hely</div>
+                              <div className="fw-bold detail-value">{pointsData.basketballPoint ?? 0} pont</div>
+                              <div className="text-muted">{pointsData.basketballPosition ?? '-'} . hely</div>
                             </div>
                           </div>
                           <div className="col-12">
                             <div className="border rounded p-3 bg-light detail-stat detail-stat--highlight">
                               <div className="detail-label">Összes pont</div>
-                              <div className="fw-bold fs-4 detail-value">{teamData.allPoint ?? 0}</div>
+                              <div className="fw-bold fs-4 detail-value">{pointsData.allPoint ?? 0}</div>
                             </div>
                           </div>
                           {isAdmin && (
@@ -230,22 +299,31 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
                                         value={pointEdit.operation}
                                         onChange={(e) => setPointEdit((prev) => ({ ...prev, operation: e.target.value }))}
                                       >
-                                        <option value="add">Ponthozzáadás</option>
-                                        <option value="subtract">Pontlevonás</option>
+                                        <option value="add">Hozzáadás</option>
+                                        <option value="subtract">Levonás</option>
                                       </select>
                                     </div>
                                   </div>
-                                  <div className="col-12 col-md-6">
+                                  <div className="col-12">
                                     <label htmlFor="amountInput" className="form-label mb-1">Pont</label>
                                     <input
                                       id="amountInput"
                                       type="number"
                                       min="1"
                                       step="1"
+                                      inputMode="numeric"
+                                      onKeyDown={(event) => {
+                                        if (['-', '+', 'e', 'E', '.', ','].includes(event.key)) {
+                                          event.preventDefault()
+                                        }
+                                      }}
                                       className="form-control point-editor-input"
-                                      placeholder="Pl. 5"
+                                      placeholder="Pl. 3"
                                       value={pointEdit.amount}
-                                      onChange={(e) => setPointEdit((prev) => ({ ...prev, amount: e.target.value }))}
+                                      onChange={(e) => {
+                                        const sanitizedValue = e.target.value.replace(/[^0-9]/g, '')
+                                        setPointEdit((prev) => ({ ...prev, amount: sanitizedValue }))
+                                      }}
                                     />
                                   </div>
                                   <div className="col-12">
@@ -283,51 +361,43 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
                   <div className="col-12 col-lg-6">
                     <div className="team-detail-section">
                       <h4 className="mb-3">Csapat adatai</h4>
-                      {teamData?.team ? (
+                      {teamInfo ? (
                         <div className="row g-3">
                           <div className="col-12">
                             <div className="border rounded p-3 detail-stat">
                               <div className="detail-label">Csapat neve</div>
-                              <div className="fw-bold detail-value">{teamData.team.teamName}</div>
+                              <div className="fw-bold detail-value">{teamInfo.teamName || '–'}</div>
                             </div>
                           </div>
                           <div className="col-12">
                             <div className="border rounded p-3 detail-stat">
                               <div className="detail-label">Iskola</div>
-                              <div className="fw-semibold detail-value">{teamData.team.schoolName || '–'}</div>
+                              <div className="fw-semibold detail-value">{teamInfo.schoolName || '–'}</div>
                             </div>
                           </div>
                           <div className="col-12 col-sm-6">
                             <div className="border rounded p-3 detail-stat">
                               <div className="detail-label">Kategória</div>
                               <div className="fw-semibold detail-value">
-                                {teamData.team.category === 0 ? '0 - általános iskola' : teamData.team.category === 1 ? '1 - középiskola' : '–'}
+                                {teamInfo.category === 0 ? '0 - általános iskola' : teamInfo.category === 1 ? '1 - középiskola' : '–'}
                               </div>
                             </div>
                           </div>
-                          <div className="col-12 col-sm-6">
-                            <div className="border rounded p-3 detail-stat">
-                              <div className="detail-label">1. versenyző</div>
-                              <div className="fw-semibold detail-value">{teamData.team.teamMember1Name || '–'}</div>
-                              <div className="small text-muted detail-break">{teamData.team.teamMember1Email || '–'}</div>
-                              <div className="small text-muted">{teamData.team.teamMember1Class ? `${teamData.team.teamMember1Class}. osztály` : '–'}</div>
+                          {teamMembers.map((member) => (
+                            <div className="col-12 col-sm-6" key={member.id}>
+                              <div className="border rounded p-3 detail-stat">
+                                <div className="detail-label">{member.roleLabel}</div>
+                                <div className="fw-semibold detail-value">{member.name || '–'}</div>
+                                <div className="small text-muted detail-break">{member.email || '–'}</div>
+                                <div className="small text-muted">{member.className ? `${member.className}. osztály` : '–'}</div>
+                              </div>
                             </div>
-                          </div>
-                          <div className="col-12 col-sm-6">
-                            <div className="border rounded p-3 detail-stat">
-                              <div className="detail-label">2. versenyző</div>
-                              <div className="fw-semibold detail-value">{teamData.team.teamMember2Name || '–'}</div>
-                              <div className="small text-muted detail-break">{teamData.team.teamMember2Email || '–'}</div>
-                              <div className="small text-muted">{teamData.team.teamMember2Class ? `${teamData.team.teamMember2Class}. osztály` : '–'}</div>
+                          ))}
+                          {teamMembers.length === 0 && (
+                            <div className="col-12">
+                              <div className="alert alert-secondary mb-0">Nincsenek csapattag adatok.</div>
                             </div>
-                          </div>
-                          <div className="col-12 col-sm-6">
-                            <div className="border rounded p-3 detail-stat">
-                              <div className="detail-label">Edző 1</div>
-                              <div className="fw-semibold detail-value">{teamData.team.teamCoach1 || '–'}</div>
-                              <div className="small text-muted detail-break">{teamData.team.teamCoach1Email || '–'}</div>
-                            </div>
-                          </div>
+                          )}
                         </div>
                       ) : (
                         <div className="alert alert-secondary mb-0">A csapat adatai nem találhatók.</div>
@@ -340,6 +410,29 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        open={disqualifyModalOpen}
+        title="Csapat kizárása"
+        confirmLabel="Csapat kizárása"
+        confirmVariant="danger"
+        requiredText="KIZÁROM A CSAPATOT"
+        requiredTextLabel={<>A folytatáshoz írd be pontosan: <strong>KIZÁROM A CSAPATOT</strong></>}
+        requiredCheckboxLabel="Megerősítem, hogy a csapatot ki akarom zárni a versenyből."
+        busy={disqualifying}
+        onClose={() => setDisqualifyModalOpen(false)}
+        onConfirm={handleDisqualify}
+      >
+        <p className="mb-2">
+          Biztosan ki akarod zárni ezt a csapatot a versenyből?
+        </p>
+        <p className="fw-semibold mb-2">
+          {teamInfo?.teamName || decodedTeamName || (teamId ? `Csapat #${teamId}` : 'Kiválasztott csapat')}
+        </p>
+        <p className="mb-0 text-muted">
+          Csak a szöveg pontos beírása és a jelölőnégyzet kipipálása után lehet folytatni.
+        </p>
+      </ConfirmModal>
     </div>
   )
 }

@@ -18,7 +18,8 @@ export default function NotificationManagementPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        setTeams(await getNotificationTeams())
+        const loadedTeams = await getNotificationTeams()
+        setTeams(loadedTeams.filter((team) => team && typeof team === 'object' && team.id !== null && team.id !== undefined))
       } catch (error) {
         setFeedback({ type: 'danger', text: error.message })
       } finally {
