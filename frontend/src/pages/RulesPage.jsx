@@ -5,10 +5,7 @@ const HANDBOOK_DOWNLOAD_URL = `${process.env.PUBLIC_URL}/rulebook/Versenyzoi_Kez
 const TRACK_DOWNLOAD_URL = `${process.env.PUBLIC_URL}/Images/vonalkovetes.png`
 
 // === BEÉPÍTETT SZÖVEG (a .docx tartalma, formázó jelek nélkül) ===
-const HANDBOOK_TEXT = `Versenyzői kézikönyv
-
-2026
-
+const HANDBOOK_TEXT = `
 Jelen dokumentum a BRICKATHLON versenyen résztvevő versenyzőknek készült. Célja a verseny és versenyszámok bemutatása, kiemelve a legfontosabb információkat amiket egy versenyzőnek tudnia kell.
 
 Jelen dokumentum kiegészíti, de semmilyen esetben sem írja felül a BRICKATHLON hivatalos szabálykönyvét.
