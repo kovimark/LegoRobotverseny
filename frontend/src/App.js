@@ -37,7 +37,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [userPrivilege, setUserPrivilege] = useState(null);
-  const [userTeamId, setUserTeamId] = useState(null);
+  const [, setUserTeamId] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState('');
 

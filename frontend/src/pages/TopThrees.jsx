@@ -201,7 +201,7 @@ export default function TopThrees({ userPrivilege }) {
   }, [fetchData]);
 
   // Léptetés előre
-  const nextStep = () => {
+  const nextStep = useCallback(() => {
     if (isCombined) {
       if (!combinedData) return;
       const keys = Object.keys(combinedData);
@@ -218,10 +218,10 @@ export default function TopThrees({ userPrivilege }) {
       const maxStep = rankings.length;
       setRevealStep(prev => Math.min(prev + 1, maxStep));
     }
-  };
+  }, [isCombined, combinedData, currentSlide, rankings.length]);
 
   // Visszaléptetés
-  const prevStep = () => {
+  const prevStep = useCallback(() => {
     if (isCombined) {
       if (!combinedData) return;
       const keys = Object.keys(combinedData);
@@ -234,7 +234,7 @@ export default function TopThrees({ userPrivilege }) {
     } else {
       setRevealStep(prev => Math.max(prev - 1, 0));
     }
-  };
+  }, [isCombined, combinedData, currentSlide]);
 
   // Dia váltás összesített nézetben
   const goToSlide = (index) => {
