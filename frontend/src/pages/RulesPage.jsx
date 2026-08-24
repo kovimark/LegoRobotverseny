@@ -5,7 +5,8 @@ const HANDBOOK_DOWNLOAD_URL = `${process.env.PUBLIC_URL}/rulebook/Versenyzoi_Kez
 const TRACK_DOWNLOAD_URL = `${process.env.PUBLIC_URL}/Images/vonalkovetes.png`
 
 // === BEÉPÍTETT SZÖVEG (a .docx tartalma, formázó jelek nélkül) ===
-const HANDBOOK_TEXT = `
+const HANDBOOK_TEXT = `Versenyzői kézikönyv
+
 Jelen dokumentum a BRICKATHLON versenyen résztvevő versenyzőknek készült. Célja a verseny és versenyszámok bemutatása, kiemelve a legfontosabb információkat amiket egy versenyzőnek tudnia kell.
 
 Jelen dokumentum kiegészíti, de semmilyen esetben sem írja felül a BRICKATHLON hivatalos szabálykönyvét.
@@ -171,7 +172,7 @@ A verseny alatt gyűjts tombolajegyeket! Ezek nem adnak pontot a versenyben, és
 
 // === SZAKASZOK DEFINÍCIÓI ===
 const handbookSections = [
-  { id: 'intro', title: 'Általános tudnivalók', start: 'Versenyzői kézikönyv', end: 'Hegymászás' },
+  { id: 'intro', title: 'Általános tudnivalók', start: 'Jelen dokumentum a BRICKATHLON', end: 'Hegymászás' },
   { id: 'hill-climb', title: 'Hegymászás', start: 'Hegymászás', end: 'Kosárra dobás' },
   { id: 'basketball', title: 'Kosárra dobás', start: 'Kosárra dobás', end: 'Vonalkövetés' },
   { id: 'line-following', title: 'Vonalkövetés', start: 'Vonalkövetés', end: 'Szumó' },
