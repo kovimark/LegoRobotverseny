@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import FloatingFeedback from './FloatingFeedback'
 import CategorizedResultsStandings from './CategorizedResultsStandings'
 import AgeGroupBadge from './AgeGroupBadge'
+import { authFetch } from '../services/apiClient'
 import { getCompetitionConfig } from '../config/adminScoringConfig'
 import { loadSumoScheduleConfig, SUMO_CONFIG_CHANGED_EVENT } from '../services/sumoScheduleConfigApi'
 import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
@@ -462,7 +463,7 @@ export default function LineFollowingScoring() {
     }
 
     try {
-      const response = await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`, {
+      const response = await authFetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`, {
         method: 'POST',
         headers: {
           accept: '*/*',
@@ -565,7 +566,7 @@ export default function LineFollowingScoring() {
     }
 
     try {
-      const response = await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(result.teamName)}/${time}/${stage}`, {
+      const response = await authFetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(result.teamName)}/${time}/${stage}`, {
         method: 'DELETE',
         headers: {
           accept: '*/*'

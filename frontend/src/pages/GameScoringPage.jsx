@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import AgeGroupBadge from '../components/AgeGroupBadge'
 import FloatingFeedback from '../components/FloatingFeedback'
 import PrecisionStopwatch from '../components/PrecisionStopwatch'
 import { competitionTypes } from '../config/adminScoringConfig'
 import { judgeCompetitionByPrivilege } from '../config/privilegeConfig'
+import { authFetch } from '../services/apiClient'
+import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 import './GameScoringPage.css'
 
 const API_BASE = 'https://legocompetition.runasp.net/api'
@@ -203,12 +205,13 @@ const createBasketDraft = () => ({
 
 function StepperInput({ value, onChange, min = 0, max = undefined, step = 1, inputMode = 'numeric', integer = false, disabled = false }) {
   const normalize = (nextValue) => {
-    if (nextValue === '') return ''
+    if (nextValue === '' || nextValue === null || nextValue === undefined) return ''
     const parsed = integer ? Number.parseInt(nextValue, 10) : Number(nextValue)
-    if (!Number.isFinite(parsed)) return min
+    if (!Number.isFinite(parsed)) return min !== undefined ? min : ''
     const minLimited = min !== undefined ? Math.max(min, parsed) : parsed
     const limited = max !== undefined ? Math.min(max, minLimited) : minLimited
-    return integer ? Math.round(limited) : Number(limited.toFixed(3))
+    if (integer) return Math.round(limited)
+    return Number(limited.toFixed(3))
   }
 
   const currentNumber = Number(value)
@@ -217,7 +220,13 @@ function StepperInput({ value, onChange, min = 0, max = undefined, step = 1, inp
 
   const changeBy = (direction) => {
     const base = Number.isFinite(currentNumber) ? currentNumber : Number(min || 0)
-    onChange(normalize(base + direction * Number(step || 1)))
+    const stepSize = Number(step || 1)
+    const next = base + direction * stepSize
+    if (integer) {
+      onChange(Math.round(next))
+    } else {
+      onChange(Number(next.toFixed(3)))
+    }
   }
 
   return (
@@ -229,12 +238,17 @@ function StepperInput({ value, onChange, min = 0, max = undefined, step = 1, inp
         type="number"
         min={min}
         max={max}
-        step={step}
+        step={step < 1 ? 'any' : step}
         inputMode={inputMode}
         className="form-control"
-        value={value}
+        value={value ?? ''}
         disabled={disabled}
-        onChange={(event) => onChange(normalize(event.target.value))}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={(event) => {
+          if (event.target.value !== '') {
+            onChange(normalize(event.target.value))
+          }
+        }}
       />
       <button type="button" onClick={() => changeBy(1)} disabled={!canIncrease} aria-label="Növelés">
         <i className="bi bi-plus-lg" aria-hidden="true" />
@@ -263,12 +277,15 @@ function SearchPicker({
     const source = Array.isArray(options) ? options : []
 
     if (!normalizedQuery) {
-      return source.slice(0, 8)
+      return source.slice(0, 100)
     }
 
-    return source
-      .filter((item) => getOptionLabel(item).toLocaleLowerCase('hu-HU').includes(normalizedQuery))
-      .slice(0, 8)
+    const filtered = source.filter((item) => getOptionLabel(item).toLocaleLowerCase('hu-HU').includes(normalizedQuery))
+    if (filtered.length === 1 && getOptionLabel(filtered[0]).toLocaleLowerCase('hu-HU') === normalizedQuery) {
+      return source.slice(0, 100)
+    }
+
+    return filtered.slice(0, 100)
   }, [getOptionLabel, options, value])
 
   return (
@@ -282,13 +299,16 @@ function SearchPicker({
         placeholder={placeholder}
         autoComplete="off"
         disabled={disabled}
-        onFocus={() => setIsOpen(true)}
-        onBlur={() => window.setTimeout(() => setIsOpen(false), 120)}
+        onFocus={(event) => {
+          setIsOpen(true)
+          event.target.select?.()
+        }}
+        onBlur={() => window.setTimeout(() => setIsOpen(false), 150)}
         onChange={(event) => onChange(event.target.value)}
       />
 
       {isOpen && (
-        <div className="list-group search-picker-results shadow bg-white border rounded">
+        <div className="list-group search-picker-results shadow bg-white border rounded" style={{ maxHeight: '20rem', overflowY: 'auto', zIndex: 1050 }}>
           {filteredOptions.length > 0 ? filteredOptions.map((item) => {
             const optionValue = getOptionValue(item)
             return (
@@ -485,6 +505,8 @@ function GameBasketScoring() {
     }
 
     loadData()
+    window.addEventListener(DATA_REFRESH_EVENT, loadData)
+    return () => window.removeEventListener(DATA_REFRESH_EVENT, loadData)
   }, [])
 
   useEffect(() => {
@@ -492,6 +514,12 @@ function GameBasketScoring() {
     const timeoutId = window.setTimeout(() => setActionMessage(null), 5000)
     return () => window.clearTimeout(timeoutId)
   }, [actionMessage])
+
+  const handleResetForm = () => {
+    setSelectedTeamName('')
+    setTeamSearch('')
+    setDraft(createBasketDraft())
+  }
 
   const totalHits = Number(draft.hoop1) + Number(draft.hoop2) + Number(draft.hoop3) + Number(draft.hoop4) + Number(draft.hoop5)
 
@@ -504,33 +532,41 @@ function GameBasketScoring() {
       return
     }
 
-    if (totalHits <= 0 || totalHits > MAX_BASKET_HITS) {
-      setActionMessage({ type: 'danger', text: 'Összesen 1-5 találat adható meg. 5 találat után nem lehet további dobást rögzíteni.' })
-      return
-    }
-
-    if (!Number.isFinite(time) || time <= 0 || time > MAX_TIME_SECONDS) {
-      setActionMessage({ type: 'danger', text: 'Adj meg érvényes időt (0-120 mp).' })
+    if (totalHits > MAX_BASKET_HITS) {
+      setActionMessage({ type: 'danger', text: 'Összesen legfeljebb 5 érvényes találat adható meg. 5 találat után a futam véget ér.' })
       return
     }
 
     if (!Number.isInteger(throwNumber) || throwNumber < 1 || throwNumber > MAX_BASKET_ATTEMPTS) {
-      setActionMessage({ type: 'danger', text: 'A próbálkozás sorszáma 1-10 közötti egész lehet.' })
+      setActionMessage({ type: 'danger', text: 'Az összes dobás száma 1 és 10 közötti egész szám kell legyen.' })
+      return
+    }
+
+    if (throwNumber < totalHits) {
+      setActionMessage({
+        type: 'danger',
+        text: `Az összes dobás száma (${throwNumber}) nem lehet kevesebb a sikeres találatok számánál (${totalHits})!`
+      })
+      return
+    }
+
+    if (!Number.isFinite(time) || time <= 0 || time > MAX_TIME_SECONDS) {
+      setActionMessage({ type: 'danger', text: `Adj meg érvényes időt (0-${MAX_TIME_SECONDS} mp).` })
       return
     }
 
     setSaving(true)
     try {
-      const response = await fetch(`${API_BASE}/Basketball`, {
+      const response = await authFetch(`${API_BASE}/Basketball`, {
         method: 'PUT',
         headers: { accept: '*/*', 'Content-Type': 'application/json' },
         body: JSON.stringify({
           teamName: selectedTeamName,
-          hoop1: Number(draft.hoop1),
-          hoop2: Number(draft.hoop2),
-          hoop3: Number(draft.hoop3),
-          hoop4: Number(draft.hoop4),
-          hoop5: Number(draft.hoop5),
+          hoop1: Number(draft.hoop1 || 0),
+          hoop2: Number(draft.hoop2 || 0),
+          hoop3: Number(draft.hoop3 || 0),
+          hoop4: Number(draft.hoop4 || 0),
+          hoop5: Number(draft.hoop5 || 0),
           time,
           throwNumber
         })
@@ -541,10 +577,8 @@ function GameBasketScoring() {
         throw new Error(errorText || 'A mentés sikertelen volt.')
       }
 
-      setDraft(createBasketDraft())
-      setSelectedTeamName('')
-      setTeamSearch('')
-      setActionMessage({ type: 'success', text: 'Kosárra dobás eredmény rögzítve.' })
+      handleResetForm()
+      setActionMessage({ type: 'success', text: `"${selectedTeamName}" kosárra dobás eredménye sikeresen rögzítve!` })
     } catch (error) {
       setActionMessage({ type: 'danger', text: error.message })
     } finally {
@@ -560,8 +594,17 @@ function GameBasketScoring() {
     <section className="game-scoring-panel">
       <FloatingFeedback message={actionMessage} onClose={() => setActionMessage(null)} />
       <header className="game-scoring-panel__header">
-        <h3>Kosárra dobás</h3>
-        <p>Gyors felvitel, hangsúly az időn és a célzott dobásokon.</p>
+        <div className="d-flex justify-content-between align-items-center">
+          <div>
+            <h3>Kosárra dobás</h3>
+            <p>Maximum 10 dobásból legfeljebb 5 érvényes találat érhető el. 5 találat után a futam lezárul.</p>
+          </div>
+          {selectedTeamName && (
+            <button type="button" className="btn btn-outline-secondary btn-sm" onClick={handleResetForm}>
+              Új csapat
+            </button>
+          )}
+        </div>
       </header>
 
       {loading ? <div className="alert alert-secondary">Csapatok betöltése...</div> : (
@@ -575,7 +618,13 @@ function GameBasketScoring() {
                 onChange={(nextValue) => {
                   setTeamSearch(nextValue)
                   const exactMatch = teamNames.find((name) => name === nextValue)
-                  setSelectedTeamName(exactMatch || '')
+                  if (exactMatch) {
+                    setSelectedTeamName(exactMatch)
+                    setDraft(createBasketDraft())
+                  } else {
+                    setSelectedTeamName('')
+                    setDraft(createBasketDraft())
+                  }
                 }}
                 options={teamNames}
                 placeholder="Kezdd el írni a csapat nevét..."
@@ -588,10 +637,10 @@ function GameBasketScoring() {
               )}
             </div>
             <div className="col-12 col-lg-3">
-              <label className="form-label">Próbálkozás sorszáma</label>
+              <label className="form-label">Összes dobás száma (max 10)</label>
               <StepperInput
                 value={draft.throwNumber}
-                min={1}
+                min={Math.max(1, totalHits)}
                 max={MAX_BASKET_ATTEMPTS}
                 step={1}
                 integer
@@ -599,8 +648,10 @@ function GameBasketScoring() {
               />
             </div>
             <div className="col-12 col-lg-3">
-              <label className="form-label">Összes találat</label>
-              <div className="game-scoring-counter">{totalHits} / {MAX_BASKET_HITS}</div>
+              <label className="form-label">Érvényes találatok</label>
+              <div className={`game-scoring-counter ${totalHits === 5 ? 'text-success fw-bold' : ''}`}>
+                {totalHits} / {MAX_BASKET_HITS} {totalHits === 5 ? '✓ (Kész)' : ''}
+              </div>
             </div>
           </div>
 
@@ -618,8 +669,11 @@ function GameBasketScoring() {
                     const nextDraft = { ...draft, [`hoop${hoop}`]: value }
                     const nextTotal = Number(nextDraft.hoop1) + Number(nextDraft.hoop2) + Number(nextDraft.hoop3) + Number(nextDraft.hoop4) + Number(nextDraft.hoop5)
                     if (nextTotal > MAX_BASKET_HITS) {
-                      setActionMessage({ type: 'danger', text: 'Maximum 5 találat adható meg összesen.' })
+                      setActionMessage({ type: 'danger', text: 'Maximum 5 érvényes találat adható meg összesen. 5 találat után a dobások lezárulnak.' })
                       return
+                    }
+                    if (nextDraft.throwNumber && Number(nextDraft.throwNumber) < nextTotal) {
+                      nextDraft.throwNumber = nextTotal
                     }
                     setDraft(nextDraft)
                   }}
@@ -646,8 +700,11 @@ function GameBasketScoring() {
             </div>
           </div>
 
-          <div className="d-flex justify-content-end mt-4">
-            <button type="button" className="btn btn-lg btn-warning game-scoring-save-btn" onClick={handleSave} disabled={saving}>
+          <div className="d-flex justify-content-end gap-2 mt-4">
+            <button type="button" className="btn btn-outline-secondary" onClick={handleResetForm} disabled={saving}>
+              Mégse
+            </button>
+            <button type="button" className="btn btn-lg btn-warning game-scoring-save-btn" onClick={handleSave} disabled={saving || !selectedTeamName}>
               {saving ? 'Mentés...' : 'Eredmény rögzítése'}
             </button>
           </div>
@@ -717,6 +774,8 @@ function GameLineFollowingScoring() {
     }
 
     loadData()
+    window.addEventListener(DATA_REFRESH_EVENT, loadData)
+    return () => window.removeEventListener(DATA_REFRESH_EVENT, loadData)
   }, [])
 
   useEffect(() => {
@@ -756,7 +815,7 @@ function GameLineFollowingScoring() {
     setSaving(true)
 
     try {
-      const response = await fetch(`${API_BASE}/LineFollowing`, {
+      const response = await authFetch(`${API_BASE}/LineFollowing`, {
         method: 'POST',
         headers: { accept: '*/*', 'Content-Type': 'application/json' },
         body: JSON.stringify({ teamName: selectedTeamName, time: parsedTime, tournamentStage: Number(stage) })
@@ -890,6 +949,8 @@ function GameHillClimbingScoring() {
     }
 
     loadData()
+    window.addEventListener(DATA_REFRESH_EVENT, loadData)
+    return () => window.removeEventListener(DATA_REFRESH_EVENT, loadData)
   }, [])
 
   useEffect(() => {
@@ -946,7 +1007,7 @@ function GameHillClimbingScoring() {
     setSaving(true)
 
     try {
-      const levelResponse = await fetch(`${API_BASE}/HillClimbing/${encodeURIComponent(selectedTeamName)}/${parsedLevel}/${apiTime}`, {
+      const levelResponse = await authFetch(`${API_BASE}/HillClimbing/${encodeURIComponent(selectedTeamName)}/${parsedLevel}/${apiTime}`, {
         method: 'PATCH'
       })
 
@@ -955,7 +1016,7 @@ function GameHillClimbingScoring() {
         throw new Error(errorText || 'A szint/idő mentés sikertelen volt.')
       }
 
-      const statusResponse = await fetch(`${API_BASE}/HillClimbing/${encodeURIComponent(selectedTeamName)}/${parsedEliminated}`, {
+      const statusResponse = await authFetch(`${API_BASE}/HillClimbing/${encodeURIComponent(selectedTeamName)}/${parsedEliminated}`, {
         method: 'PATCH'
       })
 
@@ -1066,15 +1127,64 @@ function GameHillClimbingScoring() {
   )
 }
 
+const buildPairKey = (team1Name, team2Name) => [team1Name, team2Name].sort((left, right) => left.localeCompare(right)).join('::')
+
+const hasResultHistory = (match) => {
+  const team1History = parseResultHistory(match.team1Result ?? match.team1result)
+  const team2History = parseResultHistory(match.team2Result ?? match.team2result)
+  return team1History.length > 0 || team2History.length > 0
+}
+
+const dedupeMatches = (rawMatches) => {
+  const byKey = new Map()
+
+  rawMatches.forEach((match) => {
+    const stage = normalizeTournamentStage(match.tournamentStage || match.tournament_stage || 'GS')
+    const t1 = match.team1Name || match.team1_name || ''
+    const t2 = match.team2Name || match.team2_name || ''
+    const table = Number(match.table ?? 0)
+    const key = `${stage}::${table}::${buildPairKey(t1, t2)}`
+    const existing = byKey.get(key)
+
+    if (!existing) {
+      byKey.set(key, match)
+      return
+    }
+
+    const existingHasResults = hasResultHistory(existing)
+    const incomingHasResults = hasResultHistory(match)
+
+    if (incomingHasResults && !existingHasResults) {
+      byKey.set(key, match)
+      return
+    }
+
+    if (incomingHasResults === existingHasResults) {
+      const existingPoints = Number(existing.team1Point ?? existing.team1_point ?? 0) + Number(existing.team2Point ?? existing.team2_point ?? 0)
+      const incomingPoints = Number(match.team1Point ?? match.team1_point ?? 0) + Number(match.team2Point ?? match.team2_point ?? 0)
+      if (incomingPoints >= existingPoints) {
+        byKey.set(key, match)
+      }
+    }
+  })
+
+  return Array.from(byKey.values())
+}
+
 function GameSumoScoring() {
   const [matches, setMatches] = useState([])
   const [allTeams, setAllTeams] = useState([])
   const [selectedMatchId, setSelectedMatchId] = useState('')
+  const [matchSearch, setMatchSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [actionMessage, setActionMessage] = useState(null)
-  const [matchSearch, setMatchSearch] = useState('')
   const [timerMode, setTimerMode] = useState('match')
+
+  const getMatchLabel = useCallback((match) => {
+    if (!match) return ''
+    return `${match.team1Name} vs ${match.team2Name} | #${match.table}. mérkőzés | ${STAGE_LABELS[match.stage] || match.stage}`
+  }, [])
 
   useEffect(() => {
     const loadMatches = async () => {
@@ -1090,13 +1200,14 @@ function GameSumoScoring() {
 
         const data = await response.json()
         const allTeamsData = allTeamsResponse.ok ? await allTeamsResponse.json() : []
-        const normalized = (Array.isArray(data) ? data : [data]).filter(Boolean).map((match, index) => {
+        const deduped = dedupeMatches(Array.isArray(data) ? data : [data])
+        const normalized = deduped.map((match, index) => {
           const stage = normalizeTournamentStage(match.tournamentStage || match.tournament_stage || 'GS')
           const team1Name = match.team1Name || match.team1_name || ''
           const team2Name = match.team2Name || match.team2_name || ''
-          const table = Number(match.table || 1)
+          const table = Number(match.table ?? 0) || (index + 1)
           return {
-            id: `${stage}:${table}:${team1Name}:${team2Name}:${index}`,
+            id: `${stage}::${table}::${team1Name}::${team2Name}::${index}`,
             stage,
             table,
             team1Name,
@@ -1107,12 +1218,18 @@ function GameSumoScoring() {
             team2Point: Number(match.team2Point || match.team2_point || 0)
           }
         }).filter((match) => match.team1Name && match.team2Name)
+          .sort((a, b) => (Number(a.table) || 0) - (Number(b.table) || 0))
 
         setMatches(normalized)
-  setAllTeams(Array.isArray(allTeamsData) ? allTeamsData : [])
-        setSelectedMatchId((current) => current || normalized[0]?.id || '')
-        if (normalized[0]) {
-          setMatchSearch(`${normalized[0].team1Name} vs ${normalized[0].team2Name} | ${STAGE_LABELS[normalized[0].stage] || normalized[0].stage} | ${normalized[0].table}. tábla`)
+        setAllTeams(Array.isArray(allTeamsData) ? allTeamsData : [])
+
+        if (normalized.length > 0) {
+          setSelectedMatchId((current) => {
+            const existing = normalized.find((m) => m.id === current)
+            const target = existing || normalized[0]
+            setMatchSearch(getMatchLabel(target))
+            return target.id
+          })
         }
       } catch (error) {
         setActionMessage({ type: 'danger', text: error.message })
@@ -1122,7 +1239,9 @@ function GameSumoScoring() {
     }
 
     loadMatches()
-  }, [])
+    window.addEventListener(DATA_REFRESH_EVENT, loadMatches)
+    return () => window.removeEventListener(DATA_REFRESH_EVENT, loadMatches)
+  }, [getMatchLabel])
 
   useEffect(() => {
     if (!actionMessage) return undefined
@@ -1130,16 +1249,9 @@ function GameSumoScoring() {
     return () => window.clearTimeout(timeoutId)
   }, [actionMessage])
 
-  const selectedMatch = useMemo(
-    () => matches.find((match) => match.id === selectedMatchId) || null,
-    [matches, selectedMatchId]
-  )
-
   const categoryByTeamName = useMemo(() => new Map(
     allTeams.map((team) => [team.teamName || team.team_name, Number(team.category) === 1 ? 1 : 0])
   ), [allTeams])
-
-  const getMatchLabel = (match) => `${match.team1Name} vs ${match.team2Name} | ${STAGE_LABELS[match.stage] || match.stage} | ${match.table}. tábla`
 
   const timerLabel = timerMode === 'match'
     ? 'Meccs (45 mp)'
@@ -1147,11 +1259,41 @@ function GameSumoScoring() {
       ? 'Időkérés (30 mp)'
       : 'Szünet (30 mp)'
 
-  const handleAddResult = async (outcome) => {
-    if (!selectedMatch) return
+  const GROUP_MATCH_RESULT_LIMIT = 3
+  const KNOCKOUT_WIN_POINTS = 6
 
-    if (selectedMatch.team1Point >= 6 || selectedMatch.team2Point >= 6) {
+  const selectedMatch = useMemo(() => {
+    if (selectedMatchId) {
+      const found = matches.find((match) => match.id === selectedMatchId)
+      if (found) return found
+    }
+    return matches[0] || null
+  }, [matches, selectedMatchId])
+
+  const isKnockoutMatch = selectedMatch && selectedMatch.stage !== 'GS'
+  const isKnockoutWinner = Boolean(
+    isKnockoutMatch && (selectedMatch.team1Point >= KNOCKOUT_WIN_POINTS || selectedMatch.team2Point >= KNOCKOUT_WIN_POINTS)
+  )
+  const knockoutWinnerName = isKnockoutWinner
+    ? selectedMatch.team1Point >= KNOCKOUT_WIN_POINTS
+      ? selectedMatch.team1Name
+      : selectedMatch.team2Name
+    : null
+  const isGroupLimitReached = Boolean(
+    selectedMatch && selectedMatch.stage === 'GS' && selectedMatch.team1History.length >= GROUP_MATCH_RESULT_LIMIT
+  )
+  const isMatchLocked = isKnockoutWinner || isGroupLimitReached
+
+  const handleAddResult = async (outcome) => {
+    if (!selectedMatch || saving) return
+
+    if (isKnockoutWinner) {
       setActionMessage({ type: 'info', text: 'A kieséses meccs már lezárult (6 pont elérve).' })
+      return
+    }
+
+    if (isGroupLimitReached) {
+      setActionMessage({ type: 'info', text: `Csoportköri meccsen legfeljebb ${GROUP_MATCH_RESULT_LIMIT} eredmény rögzíthető.` })
       return
     }
 
@@ -1180,7 +1322,7 @@ function GameSumoScoring() {
 
     setSaving(true)
     try {
-      let response = await fetch(`${API_BASE}/Sumo`, {
+      let response = await authFetch(`${API_BASE}/Sumo`, {
         method: 'PATCH',
         headers: { accept: '*/*', 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -1193,7 +1335,7 @@ function GameSumoScoring() {
           throw new Error(errorText || 'A szumó meccs frissítése sikertelen volt.')
         }
 
-        response = await fetch(`${API_BASE}/Sumo`, {
+        response = await authFetch(`${API_BASE}/Sumo`, {
           method: 'POST',
           headers: { accept: '*/*', 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -1224,12 +1366,70 @@ function GameSumoScoring() {
     }
   }
 
+  const handleDeleteRoundResult = async (resultIndex) => {
+    if (!selectedMatch || saving) return
+
+    const nextTeam1History = selectedMatch.team1History.filter((_, index) => index !== resultIndex)
+    const nextTeam2History = selectedMatch.team2History.filter((_, index) => index !== resultIndex)
+    const nextTeam1Point = calculateSumoPoints(nextTeam1History)
+    const nextTeam2Point = calculateSumoPoints(nextTeam2History)
+
+    const payload = {
+      team1Name: selectedMatch.team1Name,
+      team1_name: selectedMatch.team1Name,
+      team2Name: selectedMatch.team2Name,
+      team2_name: selectedMatch.team2Name,
+      team1Point: nextTeam1Point,
+      team1_point: nextTeam1Point,
+      team2Point: nextTeam2Point,
+      team2_point: nextTeam2Point,
+      table: selectedMatch.table,
+      tournamentStage: STAGE_API_VALUES[selectedMatch.stage] || 1,
+      tournament_stage: STAGE_API_VALUES[selectedMatch.stage] || 1,
+      team1Result: nextTeam1History.join(','),
+      team1result: nextTeam1History.join(','),
+      team2Result: nextTeam2History.join(','),
+      team2result: nextTeam2History.join(',')
+    }
+
+    setSaving(true)
+    try {
+      const response = await authFetch(`${API_BASE}/Sumo`, {
+        method: 'PATCH',
+        headers: { accept: '*/*', 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || 'A szumó kör törlése sikertelen volt.')
+      }
+
+      setMatches((prev) => prev.map((match) => (
+        match.id === selectedMatch.id
+          ? {
+              ...match,
+              team1History: nextTeam1History,
+              team2History: nextTeam2History,
+              team1Point: nextTeam1Point,
+              team2Point: nextTeam2Point
+            }
+          : match
+      )))
+      setActionMessage({ type: 'success', text: 'A kiválasztott kör törölve lett.' })
+    } catch (error) {
+      setActionMessage({ type: 'danger', text: error.message })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <section className="game-scoring-panel">
       <FloatingFeedback message={actionMessage} onClose={() => setActionMessage(null)} />
       <header className="game-scoring-panel__header">
         <h3>Szumó</h3>
-        <p>Válassz meccset, majd rögzíts egy új köreredményt egy kattintással.</p>
+        <p>Válassz mérkőzést a listából vagy keress rá, majd rögzíts eredményt.</p>
       </header>
 
       {loading ? <div className="alert alert-secondary">Meccsek betöltése...</div> : (
@@ -1275,68 +1475,150 @@ function GameSumoScoring() {
             />
           </div>
 
-          <div className="row g-3">
-            <div className="col-12">
-              <SearchPicker
-                id="sumo-match-search"
-                label="Aktív meccs keresése"
-                value={matchSearch}
-                onChange={(nextValue) => {
-                  setMatchSearch(nextValue)
-                  const exactMatch = matches.find((match) => getMatchLabel(match) === nextValue)
-                  setSelectedMatchId(exactMatch?.id || '')
-                }}
-                options={matches}
-                placeholder={matches.length === 0 ? 'Nincs meccs' : 'Keresés csapat vagy szakasz alapján...'}
-                getOptionValue={(match) => getMatchLabel(match)}
-                getOptionLabel={(match) => getMatchLabel(match)}
-                renderOption={(match) => (
-                  <>
+          <div className="card shadow-sm border mb-3 p-3 bg-light">
+            <SearchPicker
+              id="sumo-match-search"
+              label="Aktív mérkőzés kiválasztása"
+              value={matchSearch}
+              onChange={(nextValue) => {
+                setMatchSearch(nextValue)
+                const exactMatch = matches.find((match) => getMatchLabel(match) === nextValue)
+                if (exactMatch) {
+                  setSelectedMatchId(exactMatch.id)
+                }
+              }}
+              options={matches}
+              placeholder={matches.length === 0 ? 'Nincs elérhető meccs' : 'Keresés csapatnév, sorszám (#1, #2...) vagy szakasz alapján…'}
+              getOptionValue={(match) => getMatchLabel(match)}
+              getOptionLabel={(match) => getMatchLabel(match)}
+              renderOption={(match) => (
+                <div className="d-flex justify-content-between align-items-center w-100 py-1">
+                  <span className="text-start fw-semibold">
                     <AgeGroupBadge category={categoryByTeamName.get(match.team1Name)} className="me-2" />
                     {match.team1Name}
-                    <span className="mx-1">vs</span>
-                    <AgeGroupBadge category={categoryByTeamName.get(match.team2Name)} className="me-2" />
+                  </span>
+                  <span className="badge text-bg-light border mx-2">
+                    #{match.table}. mérkőzés · {STAGE_LABELS[match.stage] || match.stage}
+                  </span>
+                  <span className="text-end fw-semibold">
                     {match.team2Name}
-                    <span className="text-muted ms-2">| {STAGE_LABELS[match.stage] || match.stage} | {match.table}. tábla</span>
-                  </>
-                )}
-              />
-            </div>
+                    <AgeGroupBadge category={categoryByTeamName.get(match.team2Name)} className="ms-2" />
+                  </span>
+                </div>
+              )}
+            />
           </div>
 
+          {/* Aktív mérkőzés pontozó doboza */}
           {selectedMatch && (
-            <div className="game-sumo-versus mt-4">
-              <div className="game-sumo-versus__team">
-                <h4><AgeGroupBadge category={categoryByTeamName.get(selectedMatch.team1Name)} className="me-2" />{selectedMatch.team1Name}</h4>
-                <div className="game-sumo-versus__points">{selectedMatch.team1Point} pont</div>
-                <div className="small text-muted">{selectedMatch.team1History.join(', ') || 'nincs kör'}</div>
+            <div className="card shadow-sm border-2 border-dark rounded mb-3 bg-white p-3 p-md-4">
+              <div className="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                <span className="badge text-bg-dark fs-6">
+                  #{selectedMatch.table}. mérkőzés
+                </span>
+                <span className="fw-bold text-muted">
+                  {STAGE_LABELS[selectedMatch.stage] || selectedMatch.stage}
+                </span>
               </div>
-              <div className="game-sumo-versus__center">VS</div>
-              <div className="game-sumo-versus__team">
-                <h4><AgeGroupBadge category={categoryByTeamName.get(selectedMatch.team2Name)} className="me-2" />{selectedMatch.team2Name}</h4>
-                <div className="game-sumo-versus__points">{selectedMatch.team2Point} pont</div>
-                <div className="small text-muted">{selectedMatch.team2History.join(', ') || 'nincs kör'}</div>
+
+              <div className="game-sumo-versus">
+                <div className="game-sumo-versus__team text-start ps-3">
+                  <h4><AgeGroupBadge category={categoryByTeamName.get(selectedMatch.team1Name)} className="me-2" />{selectedMatch.team1Name}</h4>
+                  <div className="game-sumo-versus__points text-start">{selectedMatch.team1Point} pont</div>
+                  {selectedMatch.team1History.length > 0 ? (
+                    <div className="d-flex flex-wrap gap-1 justify-content-start mt-2">
+                      {selectedMatch.team1History.map((result, resultIndex) => (
+                        <button
+                          key={`team1-res-${resultIndex}`}
+                          type="button"
+                          className={`btn btn-sm sumo-history-chip ${result === 'W' ? 'sumo-history-chip--win' : result === 'L' ? 'sumo-history-chip--loss' : 'sumo-history-chip--draw'}`}
+                          onClick={() => handleDeleteRoundResult(resultIndex)}
+                          disabled={saving}
+                          title={`Kattints a(z) ${resultIndex + 1}. menet (${result}) törléséhez`}
+                          aria-label={`Törlés: ${result}`}
+                        >
+                          {result}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="small text-muted mt-2">Nincs még menet</div>
+                  )}
+                </div>
+                <div className="game-sumo-versus__center">
+                  <div className="fw-bold">VS</div>
+                  <div className="small text-muted mt-1 font-monospace">
+                    {selectedMatch.stage === 'GS' ? `${selectedMatch.team1History.length}/${GROUP_MATCH_RESULT_LIMIT}` : `${STAGE_LABELS[selectedMatch.stage] || selectedMatch.stage}`}
+                  </div>
+                </div>
+                <div className="game-sumo-versus__team text-end pe-3">
+                  <h4>{selectedMatch.team2Name}<AgeGroupBadge category={categoryByTeamName.get(selectedMatch.team2Name)} className="ms-2" /></h4>
+                  <div className="game-sumo-versus__points text-end">{selectedMatch.team2Point} pont</div>
+                  {selectedMatch.team2History.length > 0 ? (
+                    <div className="d-flex flex-wrap gap-1 justify-content-end mt-2">
+                      {selectedMatch.team2History.map((result, resultIndex) => (
+                        <button
+                          key={`team2-res-${resultIndex}`}
+                          type="button"
+                          className={`btn btn-sm sumo-history-chip ${result === 'W' ? 'sumo-history-chip--win' : result === 'L' ? 'sumo-history-chip--loss' : 'sumo-history-chip--draw'}`}
+                          onClick={() => handleDeleteRoundResult(resultIndex)}
+                          disabled={saving}
+                          title={`Kattints a(z) ${resultIndex + 1}. menet (${result}) törléséhez`}
+                          aria-label={`Törlés: ${result}`}
+                        >
+                          {result}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="small text-muted mt-2">Nincs még menet</div>
+                  )}
+                </div>
+              </div>
+              <div className="text-center text-muted small mt-2">
+                <i className="bi bi-info-circle me-1" />Törléshez kattints a csapatok alatti W, L vagy D jelölésre.
+              </div>
+
+              {isKnockoutWinner && (
+                <div className="alert alert-success py-2 mt-3 mb-0">
+                  <i className="bi bi-trophy-fill me-1" />Győztes: <strong>{knockoutWinnerName}</strong> ({KNOCKOUT_WIN_POINTS} pont elérve)
+                </div>
+              )}
+
+              {isGroupLimitReached && (
+                <div className="alert alert-info py-2 mt-3 mb-0">
+                  <i className="bi bi-info-circle me-1" />A csoportköri mérkőzés lezárult ({GROUP_MATCH_RESULT_LIMIT}/{GROUP_MATCH_RESULT_LIMIT} menet rögzítve).
+                </div>
+              )}
+
+              <div className="d-grid gap-2 mt-3">
+                <button
+                  type="button"
+                  className="btn btn-lg game-action-btn game-action-btn-win"
+                  onClick={() => handleAddResult('team1')}
+                  disabled={!selectedMatch || saving || isMatchLocked}
+                >
+                  {selectedMatch?.team1Name || 'Bal csapat'} nyer
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-lg game-action-btn game-action-btn-loss"
+                  onClick={() => handleAddResult('team2')}
+                  disabled={!selectedMatch || saving || isMatchLocked}
+                >
+                  {selectedMatch?.team2Name || 'Jobb csapat'} nyer
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-lg game-action-btn game-action-btn-draw"
+                  onClick={() => handleAddResult('draw')}
+                  disabled={!selectedMatch || saving || isMatchLocked}
+                >
+                  Döntetlen
+                </button>
               </div>
             </div>
           )}
-
-          <div className="row g-2 mt-3">
-            <div className="col-md-4 d-grid">
-              <button type="button" className="btn btn-lg game-action-btn game-action-btn-win" onClick={() => handleAddResult('team1')} disabled={!selectedMatch || saving}>
-                {selectedMatch?.team1Name || 'Bal csapat'} nyer
-              </button>
-            </div>
-            <div className="col-md-4 d-grid">
-              <button type="button" className="btn btn-lg game-action-btn game-action-btn-draw" onClick={() => handleAddResult('draw')} disabled={!selectedMatch || saving}>
-                Döntetlen
-              </button>
-            </div>
-            <div className="col-md-4 d-grid">
-              <button type="button" className="btn btn-lg game-action-btn game-action-btn-loss" onClick={() => handleAddResult('team2')} disabled={!selectedMatch || saving}>
-                {selectedMatch?.team2Name || 'Jobb csapat'} nyer
-              </button>
-            </div>
-          </div>
         </>
       )}
 <br /><br />

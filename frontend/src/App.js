@@ -9,6 +9,7 @@ import AdminPage from './pages/AdminPage';
 import AdminScoringPage from './pages/AdminScoringPage';
 import GameScoringPage from './pages/GameScoringPage';
 import CompetitionRegistration from './pages/CompetitionRegistration';
+import JudgeRegistration from './pages/JudgeRegistration';
 import RulesPage from './pages/RulesPage';
 import StandingsPage from './pages/StandingsPage';
 import TeamDetailsPage from './pages/TeamDetailsPage';
@@ -22,6 +23,7 @@ import NewsPage from './pages/NewsPage';
 import NewsDetailsPage from './pages/NewsDetailsPage';
 import NotificationManagementPage from './pages/NotificationManagementPage';
 import EmailManagementPage from './pages/EmailManagementPage';
+import JudgeApplicationsPage from './pages/JudgeApplicationsPage';
 import { auth, authPersistenceReady, googleProvider } from './firebase';
 import { isJudgePrivilege } from './config/privilegeConfig';
 import { subscribeTeamsToPush } from './services/notificationApi';
@@ -202,6 +204,8 @@ function App() {
         <Route path="/rolunk" element={<AboutPage />} />
         <Route path="/show" element={<ShowPage />} />
         <Route path="/versenyjelentkezes" element={<CompetitionRegistration user={user} />} />
+        <Route path="/birojelentkezes" element={<JudgeRegistration />} />
+        <Route path="/biro-jelentkezes" element={<JudgeRegistration />} />
         <Route path="/szabalyzat" element={<RulesPage />} />
         <Route path="/hirek" element={<NewsPage />} />
         <Route path="/hirek/:messageId" element={<NewsDetailsPage />} />
@@ -210,6 +214,7 @@ function App() {
         <Route path="/csapat/:teamName" element={<TeamDetailsPage userRole={userRole} userPrivilege={userPrivilege} />} />
         <Route path="/sajat-csapataim" element={user ? <MyTeamsPage user={user} /> : <LoginPage user={user} authLoading={authLoading} authError={authError} onGoogleSignIn={handleGoogleSignIn} onSignOut={handleSignOut} />} />
         <Route path="/admin" element={protectedAdminPage(userRole === 'admin' ? <AdminPage /> : <HomePage />)} />
+        <Route path="/admin/biro-jelentkezesek" element={protectedAdminPage(userRole === 'admin' ? <JudgeApplicationsPage /> : <HomePage />)} />
         <Route path="/admin/jogosultsagok" element={protectedAdminPage(userRole === 'admin' ? <PrivilegeManagementPage /> : <HomePage />)} />
         <Route path="/admin/uzenetek" element={protectedAdminPage(userRole === 'admin' ? <MessageManagementPage /> : <HomePage />)} />
         <Route path="/admin/ertesitesek" element={protectedAdminPage(userRole === 'admin' ? <NotificationManagementPage /> : <HomePage />)} />
@@ -233,7 +238,7 @@ function App() {
         />
         <Route path="/admin/eredmenyhirdetes" element={protectedAdminPage(userRole === 'admin' ? <TopThrees userPrivilege={userPrivilege} /> : <HomePage />)} />
       </Routes>
-      {!isFocusPage && <FloatingRefreshButton />}
+      {!isShowPage && <FloatingRefreshButton />}
       {!isFocusPage && <footer className="container py-4 mt-4 border-top text-center text-muted small">
         A LEGO® a LEGO Group védjegye. Ez egy független rendezvény és weboldal, amely nem áll kapcsolatban a LEGO Grouppal, és amelyet a LEGO Group nem szponzorál.
       </footer>}

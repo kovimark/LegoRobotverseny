@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import FloatingFeedback from '../components/FloatingFeedback'
 import AgeGroupBadge from '../components/AgeGroupBadge'
 import ConfirmModal from '../components/ConfirmModal'
+import { authFetch } from '../services/apiClient'
 
 const API_BASE_URL = 'https://legocompetition.runasp.net'
 
@@ -32,8 +33,14 @@ const normalizeTeam = (team) => {
   const competitors = normalizedMembers.filter((member) => !member.isCoach)
   const coaches = normalizedMembers.filter((member) => member.isCoach)
 
+  const rawGroup = team.group
+  const validGroup = (rawGroup && rawGroup !== '0' && rawGroup !== 0 && rawGroup !== '-' && String(rawGroup).toLowerCase() !== 'none')
+    ? String(rawGroup).trim().toUpperCase()
+    : null
+
   return {
     ...team,
+    group: validGroup,
     members: normalizedMembers,
     teamMember1Name: team.teamMember1Name ?? competitors[0]?.name ?? null,
     teamMember1Email: team.teamMember1Email ?? competitors[0]?.email ?? null,
@@ -209,7 +216,7 @@ export default function AdminPage() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/Teams/${teamToDelete.id}`, {
+      const response = await authFetch(`${API_BASE_URL}/api/Teams/${teamToDelete.id}`, {
         method: 'DELETE'
       })
 
@@ -233,7 +240,7 @@ export default function AdminPage() {
 
     try {
       setDisqualifying(teamToDisqualify.id)
-      const response = await fetch(`${API_BASE_URL}/api/Teams/disqualify/${teamToDisqualify.id}`, {
+      const response = await authFetch(`${API_BASE_URL}/api/Teams/disqualify/${teamToDisqualify.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -261,7 +268,7 @@ export default function AdminPage() {
     setOpenTeamId(team.id)
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/Teams/${team.id}`, {
+      const response = await authFetch(`${API_BASE_URL}/api/Teams/${team.id}`, {
         headers: { accept: '*/*' }
       })
 
@@ -325,7 +332,7 @@ export default function AdminPage() {
 
     try {
       setSaving(true)
-      const response = await fetch(`${API_BASE_URL}/api/Teams/${teamToEdit.id}`, {
+      const response = await authFetch(`${API_BASE_URL}/api/Teams/${teamToEdit.id}`, {
         method: 'PUT',
         headers: {
           accept: '*/*',
@@ -449,10 +456,10 @@ export default function AdminPage() {
                       <span className="d-block fw-bold fs-5">
                         <AgeGroupBadge category={team.category} className="me-2" />
                         {team.teamName || `Csapat #${team.id}`}
-                        {team.isDisqualified && <span className="badge text-bg-danger ms-2">Kizárva</span>}
+                        {Boolean(team.isDisqualified) && <span className="badge text-bg-danger ms-2">Kizárva</span>}
                       </span>
                       <span className="small opacity-75">{team.schoolName || 'Nincs megadott iskola'}</span>
-                      {team.group && <span className="badge text-bg-light border text-dark ms-2">{String(team.group).toUpperCase()} csoport</span>}
+                      {Boolean(team.group) && <span className="badge text-bg-light border text-dark ms-2">{team.group} csoport</span>}
                     </span>
                     <span className="fs-5" aria-hidden="true">{isOpen ? '▴' : '▾'}</span>
                   </span>
@@ -711,7 +718,7 @@ export default function AdminPage() {
                           {team.category === 0 ? 'Általános iskola' : team.category === 1 ? 'Középiskola' : '-'}
                         </div>
                         <div className="team-info-meta">{team.category === 0 ? '1–8. osztály' : team.category === 1 ? '9–13. osztály' : ''}</div>
-                        {team.group && <span className="badge text-bg-dark mt-2">{team.group} csoport</span>}
+                        {Boolean(team.group) && <span className="badge text-bg-dark mt-2">{team.group} csoport</span>}
                       </section>
                     </div>
                     {teamMembers.map((member, memberIndex) => (

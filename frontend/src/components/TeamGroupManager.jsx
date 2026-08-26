@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import ConfirmModal from './ConfirmModal'
 import FloatingFeedback from './FloatingFeedback'
+import { authFetch } from '../services/apiClient'
 
 const API_URL = 'https://legocompetition.runasp.net/api/Teams'
 const GROUP_OPTIONS = Array.from({ length: 26 }, (_, index) => String.fromCharCode(65 + index))
@@ -68,7 +69,7 @@ export default function TeamGroupManager() {
     }
     try {
       setSavingId(team.id)
-      const response = await fetch(`${API_URL}/${team.id}`, {
+      const response = await authFetch(`${API_URL}/${team.id}`, {
         method: 'PUT',
         headers: { accept: '*/*', 'Content-Type': 'application/json' },
         body: JSON.stringify(toUpdatePayload(team, group))

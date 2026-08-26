@@ -115,6 +115,9 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                                     <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/pontozas-jatek" onClick={() => setIsProfileOpen(false)}>
                                         <i className="bi bi-controller" aria-hidden="true" /><span>Játékos pontozás</span>
                                     </Link>
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/biro-jelentkezesek" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-person-lines-fill" aria-hidden="true" /><span>Bírói jelentkezések</span>
+                                    </Link>
                                     <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/jogosultsagok" onClick={() => setIsProfileOpen(false)}>
                                         <i className="bi bi-person-lock" aria-hidden="true" /><span>E-mailek és jogosultságok kezelése</span>
                                     </Link>

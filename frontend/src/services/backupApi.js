@@ -5,17 +5,18 @@ import {
   modifyCompetitionPhase,
   modifySettings
 } from './sumoScheduleConfigApi'
+import { authFetch } from './apiClient'
 
 const API_URL = 'https://legocompetition.runasp.net/api'
 
 const fetchJson = async (path) => {
-  const response = await fetch(`${API_URL}${path}`, { headers: { accept: '*/*' } })
+  const response = await authFetch(`${API_URL}${path}`, { headers: { accept: '*/*' } })
   if (!response.ok) throw new Error((await response.text()) || `A mentéshez szükséges adat nem tölthető le: ${path}`)
   return response.json()
 }
 
 const postJson = async (path, body, method = 'POST') => {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await authFetch(`${API_URL}${path}`, {
     method,
     headers: { accept: '*/*', 'Content-Type': 'application/json' },
     body: JSON.stringify(body)

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import FloatingFeedback from '../components/FloatingFeedback'
 import ConfirmModal from '../components/ConfirmModal'
+import { authFetch } from '../services/apiClient'
 
 const API_BASE_URL = 'https://legocompetition.runasp.net'
 
@@ -143,7 +144,7 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
 
     try {
       setPointSaving(true)
-      const response = await fetch(`${API_BASE_URL}/api/Points/${encodeURIComponent(decodedTeamName)}/${delta}`, {
+      const response = await authFetch(`${API_BASE_URL}/api/Points/${encodeURIComponent(decodedTeamName)}/${delta}`, {
         method: 'PUT',
         headers: { accept: '*/*' }
       })
@@ -184,7 +185,7 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
 
     try {
       setDisqualifying(true)
-      const response = await fetch(`${API_BASE_URL}/api/Teams/disqualify/${teamId}`, {
+      const response = await authFetch(`${API_BASE_URL}/api/Teams/disqualify/${teamId}`, {
         method: 'PATCH',
         headers: { accept: '*/*' }
       })

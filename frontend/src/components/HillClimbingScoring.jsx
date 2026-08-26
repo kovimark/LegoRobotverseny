@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import FloatingFeedback from './FloatingFeedback'
 import CategorizedResultsStandings from './CategorizedResultsStandings'
 import AgeGroupBadge from './AgeGroupBadge'
+import { authFetch } from '../services/apiClient'
 import { getCompetitionConfig } from '../config/adminScoringConfig'
 import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 
@@ -135,13 +136,13 @@ export default function HillClimbingScoring() {
       const hasRaceStateChange = raceStateValue !== currentRaceState
 
       if (hasLevelTimeChange) {
-        await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(teamName)}/${level}/${timeSpent}`, {
+        await authFetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(teamName)}/${level}/${timeSpent}`, {
           method: 'PATCH'
         })
       }
 
       if (hasRaceStateChange) {
-        await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(teamName)}/${raceStateValue}`, {
+        await authFetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(teamName)}/${raceStateValue}`, {
           method: 'PATCH'
         })
       }

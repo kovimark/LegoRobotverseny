@@ -20,6 +20,7 @@ export default function OverallStandings() {
   const [error, setError] = useState('')
   const [sortConfig, setSortConfig] = useState({ key: 'allPoint', direction: 'desc' })
   const [showByCategory, setShowByCategory] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
     const loadStandings = async () => {
@@ -60,7 +61,12 @@ export default function OverallStandings() {
     })
   }
 
-  const sortedStandings = [...standings].sort((a, b) => {
+  const normalizedSearch = searchTerm.trim().toLocaleLowerCase('hu-HU')
+  const filteredStandings = normalizedSearch
+    ? standings.filter((team) => String(team.teamName || '').toLocaleLowerCase('hu-HU').includes(normalizedSearch))
+    : standings
+
+  const sortedStandings = [...filteredStandings].sort((a, b) => {
     const direction = sortConfig.direction === 'asc' ? 1 : -1
     const aValue = a[sortConfig.key]
     const bValue = b[sortConfig.key]
@@ -89,14 +95,36 @@ export default function OverallStandings() {
       {!loading && !error && standings.length > 0 && (
         <div className="card shadow-sm team-card no-hover-card">
           <div className="card-body p-3 p-md-4">
-            <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div className="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
               <div>
                 <h4 className="mb-1">Összesített eredmények</h4>
                 <p className="text-muted mb-0 small">Kattints egy csapat nevére a részletes adatok megnyitásához.</p>
               </div>
-              <div className="form-check form-switch">
-                <input id="overall-category-view" className="form-check-input" type="checkbox" role="switch" checked={showByCategory} onChange={(event) => setShowByCategory(event.target.checked)} />
-                <label className="form-check-label" htmlFor="overall-category-view">Korosztály szerinti bontás</label>
+              <div className="d-flex align-items-center gap-3 flex-wrap">
+                <div className="input-group" style={{ maxWidth: '18rem' }}>
+                  <span className="input-group-text"><i className="bi bi-search" /></span>
+                  <input
+                    type="search"
+                    className="form-control form-control-sm"
+                    placeholder="Csapat keresése…"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                  />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-secondary"
+                      onClick={() => setSearchTerm('')}
+                      aria-label="Keresés törlése"
+                    >
+                      <i className="bi bi-x-lg" />
+                    </button>
+                  )}
+                </div>
+                <div className="form-check form-switch mb-0">
+                  <input id="overall-category-view" className="form-check-input" type="checkbox" role="switch" checked={showByCategory} onChange={(event) => setShowByCategory(event.target.checked)} />
+                  <label className="form-check-label small" htmlFor="overall-category-view">Korosztály szerinti bontás</label>
+                </div>
               </div>
             </div>
             <div className="d-grid gap-4">

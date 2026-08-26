@@ -44,7 +44,7 @@ export default function PrecisionStopwatch({
           setRunning(false)
           offsetRef.current = initialMs
           if (onCapture) {
-            onCapture(0)
+            onCapture(formatElapsed(0))
           }
           if (onFinished) {
             onFinished()
@@ -82,6 +82,8 @@ export default function PrecisionStopwatch({
 
     if (mode === 'countdown') {
       offsetRef.current = clampToZero(initialMs - elapsedMs)
+    } else {
+      offsetRef.current = elapsedMs
     }
 
     setRunning(true)
@@ -89,17 +91,25 @@ export default function PrecisionStopwatch({
 
   const handleStop = () => {
     if (!running) return
-    const capturedMs = elapsedMs
+    const now = performance.now()
     setRunning(false)
 
     if (mode === 'countdown') {
-      offsetRef.current = clampToZero(initialMs - capturedMs)
+      const elapsedSinceStart = now - startRef.current + offsetRef.current
+      const remaining = clampToZero(initialMs - elapsedSinceStart)
+      setElapsedMs(remaining)
+      offsetRef.current = clampToZero(initialMs - remaining)
+      if (onCapture) {
+        onCapture(formatElapsed(remaining))
+      }
     } else {
-      offsetRef.current = capturedMs
-    }
-
-    if (onCapture) {
-      onCapture(Number(formatElapsed(capturedMs)))
+      const exactElapsed = Math.max(0, now - startRef.current + offsetRef.current)
+      setElapsedMs(exactElapsed)
+      offsetRef.current = exactElapsed
+      const formatted = formatElapsed(exactElapsed)
+      if (onCapture) {
+        onCapture(formatted)
+      }
     }
   }
 

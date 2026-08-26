@@ -45,6 +45,9 @@ export default function HomePage() {
             <Link className="btn btn-primary px-4 py-2" to="/versenyjelentkezes">
               Jelentkezés
             </Link>
+            <Link className="btn btn-outline-primary px-4 py-2" to="/birojelentkezes">
+              Bírói jelentkezés
+            </Link>
             <Link className="btn btn-theme-secondary px-4 py-2" to="/szabalyzat">
               Szabályzat
             </Link>

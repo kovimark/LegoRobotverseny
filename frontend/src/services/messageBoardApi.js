@@ -1,8 +1,10 @@
+import { authFetch } from './apiClient'
+
 const API_URL = 'https://legocompetition.runasp.net/api/Message'
 export const MESSAGE_BOARD_CHANGED_EVENT = 'messageBoardChanged'
 
 const request = async (path, options = {}) => {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await authFetch(`${API_URL}${path}`, {
     headers: { accept: '*/*', ...(options.body ? { 'Content-Type': 'application/json' } : {}) },
     ...options
   })

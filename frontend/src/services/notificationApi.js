@@ -1,3 +1,5 @@
+import { authFetch } from './apiClient'
+
 const API_URL = 'https://legocompetition.runasp.net/api'
 
 const readResponse = async (response) => {
@@ -13,7 +15,7 @@ const readResponse = async (response) => {
 }
 
 export const getNotificationTeams = async () => {
-  const response = await fetch(`${API_URL}/Teams`, { headers: { accept: '*/*' } })
+  const response = await authFetch(`${API_URL}/Teams`, { headers: { accept: '*/*' } })
   const text = await response.text()
   if (!response.ok) throw new Error(text || `A csapatok betöltése sikertelen (${response.status}).`)
   const data = text ? JSON.parse(text) : []
@@ -21,7 +23,7 @@ export const getNotificationTeams = async () => {
 }
 
 export const sendNotificationToTeam = async (teamId, notification) => {
-  const response = await fetch(`${API_URL}/Notification/send-to-team/${encodeURIComponent(teamId)}`, {
+  const response = await authFetch(`${API_URL}/Notification/send-to-team/${encodeURIComponent(teamId)}`, {
     method: 'POST',
     headers: {
       accept: '*/*',
@@ -33,6 +35,41 @@ export const sendNotificationToTeam = async (teamId, notification) => {
     })
   })
   return readResponse(response)
+}
+
+export const sendNotificationToEmail = async (email, notification, teamIdFallback = null) => {
+  const cleanEmail = String(email || '').trim().toLowerCase()
+  if (!cleanEmail) throw new Error('Érvénytelen e-mail-cím.')
+
+  try {
+    const response = await authFetch(`${API_URL}/Notification/send-to-email/${encodeURIComponent(cleanEmail)}`, {
+      method: 'POST',
+      headers: {
+        accept: '*/*',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        title: notification.title,
+        message: notification.message
+      })
+    })
+
+    if (response.ok) {
+      return readResponse(response)
+    }
+
+    if (response.status !== 404 && response.status !== 405 && response.status !== 501) {
+      return readResponse(response)
+    }
+  } catch (error) {
+    // If network or endpoint not found, fall back to teamId if available
+  }
+
+  if (teamIdFallback) {
+    return sendNotificationToTeam(teamIdFallback, notification)
+  }
+
+  throw new Error(`A(z) ${cleanEmail} címre nem sikerült elküldeni az értesítést.`)
 }
 
 const urlBase64ToUint8Array = (base64String) => {
@@ -78,7 +115,7 @@ export const subscribeTeamsToPush = async (teamIds) => {
   }
 
   for (const teamId of teamIds) {
-    const response = await fetch(`${API_URL}/Notification/subscribe`, {
+    const response = await authFetch(`${API_URL}/Notification/subscribe`, {
       method: 'POST',
       headers: { accept: '*/*', 'Content-Type': 'application/json' },
       body: JSON.stringify({ teamId, ...subscriptionData })

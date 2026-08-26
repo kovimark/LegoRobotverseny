@@ -7,6 +7,7 @@ import AgeGroupBadge from '../components/AgeGroupBadge'
 
 export default function MyTeamsPage({ user }) {
   const [teams, setTeams] = useState([])
+  const [sumoMatches, setSumoMatches] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [pushEnabled, setPushEnabled] = useState(false)
@@ -26,22 +27,30 @@ export default function MyTeamsPage({ user }) {
         setLoading(true)
         setError('')
 
-        const teamsResponse = await fetch(
-          `https://legocompetition.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`,
-          { headers: { accept: '*/*' }, signal: controller.signal }
-        )
+        const [teamsResponse, matchesResponse] = await Promise.allSettled([
+          fetch(
+            `https://legocompetition.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`,
+            { headers: { accept: '*/*' }, signal: controller.signal }
+          ),
+          fetch(
+            'https://legocompetition.runasp.net/api/Sumo/matches',
+            { headers: { accept: '*/*' }, signal: controller.signal }
+          )
+        ])
 
-        if (!teamsResponse.ok) {
+        if (teamsResponse.status === 'fulfilled' && teamsResponse.value.ok) {
+          const teamsData = await teamsResponse.value.json()
+          const teamsArray = Array.isArray(teamsData) ? teamsData : [teamsData]
+          const validTeams = teamsArray.filter((team) => team && typeof team === 'object')
+          setTeams(validTeams)
+        } else {
           throw new Error('Nem sikerült betölteni a csapataidat.')
         }
 
-        const teamsData = await teamsResponse.json()
-
-        // Handle both single team and array of teams
-        const teamsArray = Array.isArray(teamsData) ? teamsData : [teamsData]
-        const validTeams = teamsArray.filter((team) => team && typeof team === 'object')
-
-        setTeams(validTeams)
+        if (matchesResponse.status === 'fulfilled' && matchesResponse.value.ok) {
+          const matchesData = await matchesResponse.value.json()
+          setSumoMatches(Array.isArray(matchesData) ? matchesData : [])
+        }
       } catch (requestError) {
         if (requestError.name !== 'AbortError') setError(requestError.message)
       } finally {
@@ -243,6 +252,65 @@ export default function MyTeamsPage({ user }) {
                     </div>
                   )}
                 </div>
+
+                {/* Szumó mérkőzések sorszáma és állása a csapatnak */}
+                {(() => {
+                  const currentTeamName = team.teamName || ''
+                  const teamMatches = sumoMatches.filter((m) => {
+                    const t1 = m.team1Name || m.team1_name || ''
+                    const t2 = m.team2Name || m.team2_name || ''
+                    return t1.toLowerCase() === currentTeamName.toLowerCase() || t2.toLowerCase() === currentTeamName.toLowerCase()
+                  }).sort((a, b) => (Number(a.table) || 0) - (Number(b.table) || 0))
+
+                  if (teamMatches.length === 0) return null
+
+                  return (
+                    <div className="mt-4 pt-3 border-top">
+                      <div className="d-flex align-items-center justify-content-between mb-3">
+                        <h4 className="team-info-title mb-0">
+                          <i className="bi bi-record-circle text-danger me-2" />
+                          Szumó mérkőzések ({teamMatches.length})
+                        </h4>
+                        <span className="small text-muted">Sorszámozott menetrend</span>
+                      </div>
+                      <div className="row g-2">
+                        {teamMatches.map((m, mIdx) => {
+                          const isTeam1 = (m.team1Name || m.team1_name || '').toLowerCase() === currentTeamName.toLowerCase()
+                          const opponentName = isTeam1 ? (m.team2Name || m.team2_name) : (m.team1Name || m.team1_name)
+                          const myResult = isTeam1 ? (m.team1Result || m.team1result || '') : (m.team2Result || m.team2result || '')
+                          const oppResult = isTeam1 ? (m.team2Result || m.team2result || '') : (m.team1Result || m.team1result || '')
+                          const isFinished = Boolean(myResult)
+
+                          return (
+                            <div className="col-12 col-md-6 col-lg-4" key={`my-match-${m.id || mIdx}`}>
+                              <div className={`p-3 rounded border ${isFinished ? 'bg-light' : 'bg-warning-subtle border-warning'}`}>
+                                <div className="d-flex justify-content-between align-items-center mb-1">
+                                  <span className="badge text-bg-dark">
+                                    #{m.table || mIdx + 1}. mérkőzés
+                                  </span>
+                                  <span className="small text-muted">
+                                    {isFinished ? 'Lejátszva' : 'Következik'}
+                                  </span>
+                                </div>
+                                <div className="fw-bold text-truncate mt-1">
+                                  vs. {opponentName}
+                                </div>
+                                {isFinished && (
+                                  <div className="small mt-2 d-flex align-items-center gap-2">
+                                    <span>Eredmény:</span>
+                                    <span className="badge bg-secondary-subtle text-dark border">
+                                      {myResult} - {oppResult}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 <div className="d-flex flex-wrap justify-content-end gap-2 mt-3">
                   <Link className="btn btn-outline-primary" to="/allasok">Összesített állás</Link>

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import FloatingFeedback from './FloatingFeedback'
 import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
+import { authFetch } from '../services/apiClient'
 
 const API_URL = 'https://legocompetition.runasp.net/api/TieBreaker'
 
@@ -97,7 +98,7 @@ export default function TieBreakerManager({ competitionId, competitionLabel = 'V
   const submitResolution = async (tieBreakerId, rankedTeamNames) => {
     try {
       setSavingId(tieBreakerId)
-      const response = await fetch(`${API_URL}/resolve`, {
+      const response = await authFetch(`${API_URL}/resolve`, {
         method: 'POST',
         headers: { accept: '*/*', 'Content-Type': 'application/json' },
         body: JSON.stringify({ tieBreakerId, rankedTeamNames })

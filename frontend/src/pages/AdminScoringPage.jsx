@@ -96,18 +96,16 @@ export default function AdminScoringPage({ userPrivilege }) {
 
       {!canAccessActiveCompetition ? (
         <div className="alert alert-danger">Ehhez a versenyszámhoz nincs pontozási jogosultságod.</div>
-      ) : !activeCompetition ? (
-        <div className="alert alert-info">Válassz egy versenyszámot a kezdéshez.</div>
+      ) : !activeCompetition || activeCompetition.slug === 'osszesitett' ? (
+        <OverallStandings userPrivilege={userPrivilege} />
       ) : activeCompetition.slug === 'kosarra-dobas' ? (
-        <BasketThrowScoring />
+        <BasketThrowScoring userPrivilege={userPrivilege} />
       ) : activeCompetition.slug === 'vonalkovetes' ? (
-        <LineFollowingScoring />
+        <LineFollowingScoring userPrivilege={userPrivilege} />
       ) : activeCompetition.slug === 'szumo' ? (
-        <SumoScoring />
+        <SumoScoring userPrivilege={userPrivilege} />
       ) : activeCompetition.slug === 'hegymaszas' ? (
-        <HillClimbingScoring />
-      ) : activeCompetition.slug === 'osszesitett' ? (
-        <OverallStandings />
+        <HillClimbingScoring userPrivilege={userPrivilege} />
       ) : (
         <div className="alert alert-info">
           A(z) <strong>{activeCompetition.label}</strong> versenyszámhoz még nincs megvalósított pontozási logika.

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import FloatingFeedback from '../components/FloatingFeedback'
 
 export default function CompetitionRegistration({ user }) {
@@ -104,12 +105,12 @@ export default function CompetitionRegistration({ user }) {
       { key: 'teamCoach1Email', label: 'Az 1. felkészítő tanár email címe' }
     ]
 
-    ;['teamMember1Class', 'teamMember2Class'].forEach((fieldName) => {
-      const value = Number(formData[fieldName])
-      if (formData[fieldName] !== '' && (!Number.isInteger(value) || value < 1 || value > 13)) {
-        validationErrors[fieldName] = 'Az osztály csak 1 és 13 közötti egész szám lehet.'
-      }
-    })
+      ;['teamMember1Class', 'teamMember2Class'].forEach((fieldName) => {
+        const value = Number(formData[fieldName])
+        if (formData[fieldName] !== '' && (!Number.isInteger(value) || value < 1 || value > 13)) {
+          validationErrors[fieldName] = 'Az osztály csak 1 és 13 közötti egész szám lehet.'
+        }
+      })
 
     const normalizedEmails = emailFields.reduce((acc, field) => {
       const value = typeof formData[field.key] === 'string' ? formData[field.key].trim().toLowerCase() : ''
@@ -150,7 +151,7 @@ export default function CompetitionRegistration({ user }) {
         teamName: formData.teamName.trim(),
         teamMember1Name: formData.teamMember1Name.trim(),
         teamMember1Class: Number(formData.teamMember1Class),
-        teamMember1Email: formData.teamMember1Email.trim().toLowerCase(),
+        teamMember1Email: (user?.email || formData.teamMember1Email).trim().toLowerCase(),
         teamMember2Name: formData.teamMember2Name.trim(),
         teamMember2Class: Number(formData.teamMember2Class),
         teamMember2Email: formData.teamMember2Email.trim().toLowerCase(),
@@ -211,6 +212,28 @@ export default function CompetitionRegistration({ user }) {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (!user || !user.email) {
+    return (
+      <div className="container py-5">
+        <div className="card shadow-sm border-0 mx-auto text-center p-4 p-md-5 bg-white text-dark rounded-4" style={{ maxWidth: '560px' }}>
+          <div className="mb-3 text-warning">
+            <i className="bi bi-shield-lock fs-1" />
+          </div>
+          <h2 className="h4 fw-bold mb-3">Bejelentkezés szükséges</h2>
+          <p className="text-muted mb-4">
+            A versenyre való jelentkezéshez előbb be kell jelentkezned a Google-fiókoddal!
+          </p>
+          <div>
+            <Link to="/bejelentkezes" className="btn btn-primary btn-lg px-4">
+              <i className="bi bi-google me-2" />
+              Bejelentkezés
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -275,20 +298,20 @@ export default function CompetitionRegistration({ user }) {
 
               <div className="col-md-6">
                 <div className="mb-3">
-                  <label htmlFor="teamMember1Email" className="form-label">1. versenyző email</label>
+                  <label htmlFor="teamMember1Email" className="form-label d-flex justify-content-between align-items-center">
+                    <span>1. versenyző email (bejelentkezett fiók)</span>
+                  </label>
                   <div className="position-relative">
                     <input
                       type="email"
-                      className={`form-control pe-4 ${errors.teamMember1Email ? 'border-danger' : ''}`}
+                      className="form-control bg-secondary-subtle text-dark fw-semibold"
                       id="teamMember1Email"
                       name="teamMember1Email"
-                      value={formData.teamMember1Email}
-                      onChange={handleChange}
-                      disabled={isSubmitting}
+                      value={user?.email || formData.teamMember1Email}
+                      disabled
+                      readOnly
                     />
-                    {requiredMark}
                   </div>
-                  {errors.teamMember1Email && <div className="text-danger small mt-1">{errors.teamMember1Email}</div>}
                 </div>
               </div>
 
@@ -407,22 +430,6 @@ export default function CompetitionRegistration({ user }) {
                     {requiredMark}
                   </div>
                   {errors.teamCoach1Email && <div className="text-danger small mt-1">{errors.teamCoach1Email}</div>}
-                </div>
-              </div>
-
-              <div className="col-md-6">
-                <div className="mb-3">
-                  <label htmlFor="group" className="form-label">Csoport (opcionális)</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="group"
-                    name="group"
-                    value={formData.group}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    placeholder="pl. A"
-                  />
                 </div>
               </div>
             </div>

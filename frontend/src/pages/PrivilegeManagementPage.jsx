@@ -2,20 +2,22 @@ import React, { useEffect, useState } from 'react'
 import { getPrivilegeLabel, privilegeOptions } from '../config/privilegeConfig'
 import ConfirmModal from '../components/ConfirmModal'
 import FloatingFeedback from '../components/FloatingFeedback'
+import { authFetch } from '../services/apiClient'
 
 const API_URL = 'https://legocompetition.runasp.net/api/Privilege'
 const TEAMS_API_URL = 'https://legocompetition.runasp.net/api/Teams'
 
 export default function PrivilegeManagementPage() {
+  const queryEmail = new URLSearchParams(window.location.search).get('email') || ''
   const [privileges, setPrivileges] = useState([])
   const [teams, setTeams] = useState([])
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState(null)
-  const [newEmail, setNewEmail] = useState('')
+  const [newEmail, setNewEmail] = useState(queryEmail)
   const [newRole, setNewRole] = useState(0)
   const [newTeamId, setNewTeamId] = useState('')
   const [savingId, setSavingId] = useState(null)
-  const [searchTerm, setSearchTerm] = useState('')
+  const [searchTerm, setSearchTerm] = useState(queryEmail)
   const [deleteTarget, setDeleteTarget] = useState(null)
 
   const normalizedSearch = searchTerm.trim().toLowerCase()
@@ -81,7 +83,7 @@ export default function PrivilegeManagementPage() {
 
     try {
       setSavingId(privilege.id || 'new')
-      const response = await fetch(API_URL, {
+      const response = await authFetch(API_URL, {
         method: isNewPrivilege ? 'POST' : 'PUT',
         headers: { accept: '*/*', 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -110,7 +112,7 @@ export default function PrivilegeManagementPage() {
   const deletePrivilege = async (privilege) => {
     try {
       setSavingId(privilege.id)
-      const response = await fetch(`${API_URL}/${encodeURIComponent(privilege.emailAddress)}`, {
+      const response = await authFetch(`${API_URL}/${encodeURIComponent(privilege.emailAddress)}`, {
         method: 'DELETE',
         headers: { accept: '*/*' }
       })
@@ -160,26 +162,27 @@ export default function PrivilegeManagementPage() {
       <section className="team-info-box mb-4">
         <h3 className="h5 mb-3">Új e-mail-cím hozzáadása</h3>
         <div className="row g-3 align-items-end">
-          <div className="col-lg-6">
+          <div className="col-12 col-md-6 col-lg-4 col-xl-4">
             <label className="form-label" htmlFor="new-privilege-email">E-mail-cím</label>
-            <input id="new-privilege-email" type="email" className="form-control" value={newEmail} onChange={(event) => setNewEmail(event.target.value)} />
+            <input id="new-privilege-email" type="email" className="form-control" placeholder="pelda@iskola.hu" value={newEmail} onChange={(event) => setNewEmail(event.target.value)} />
           </div>
-          <div className="col-lg-3">
+          <div className="col-12 col-sm-6 col-md-3 col-lg-3 col-xl-3">
             <label className="form-label" htmlFor="new-privilege-role">Jogosultság</label>
             <select id="new-privilege-role" className="form-select" value={newRole} onChange={(event) => setNewRole(Number(event.target.value))}>
               {privilegeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </div>
-          <div className="col-lg-2">
+          <div className="col-12 col-sm-6 col-md-3 col-lg-3 col-xl-3">
             <label className="form-label" htmlFor="new-privilege-team">Csapat</label>
             <select id="new-privilege-team" className="form-select" value={newTeamId} onChange={(event) => setNewTeamId(event.target.value)}>
               <option value="">Nincs</option>
               {teams.map((team) => <option key={team.id} value={team.id}>{team.teamName}</option>)}
             </select>
           </div>
-          <div className="col-lg-1">
-            <button type="button" className="btn btn-primary w-100" disabled={savingId === 'new'} onClick={() => savePrivilege({ id: 0, emailAddress: newEmail, privilege1: newRole, name: null, class: null, isCoach: null, teamId: newTeamId || null })}>
-              Hozzáadás
+          <div className="col-12 col-md-12 col-lg-2 col-xl-2">
+            <button type="button" className="btn btn-primary w-100 text-nowrap d-flex align-items-center justify-content-center" disabled={savingId === 'new'} onClick={() => savePrivilege({ id: 0, emailAddress: newEmail, privilege1: newRole, name: null, class: null, isCoach: null, teamId: newTeamId || null })}>
+              <i className="bi bi-plus-lg me-1" />
+              <span>Hozzáadás</span>
             </button>
           </div>
         </div>

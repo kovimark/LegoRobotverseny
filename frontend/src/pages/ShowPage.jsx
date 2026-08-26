@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getAllCompetitionPhases, getAllSettings } from '../services/sumoScheduleConfigApi'
 
 const API = 'https://legocompetition.runasp.net/api'
-const SLIDE_SECONDS = 12
+const SLIDE_SECONDS = 20
 const SLIDE_OPTIONS = [
   { id: 'overview', label: 'Verseny állapota és menetrend', icon: 'bi-clock-history' },
   { id: 'overall', label: 'Összesített állás', icon: 'bi-trophy-fill' },
@@ -22,7 +22,7 @@ const DETAIL_OPTIONS = {
   hill: [{ id: 'category', label: 'Korosztály' }, { id: 'level', label: 'Teljesített szint' }, { id: 'time', label: 'Felhasznált idő' }],
   basketball: [{ id: 'category', label: 'Korosztály' }, { id: 'points', label: 'Pontszám' }, { id: 'time', label: 'Felhasznált idő' }],
   sumo: [{ id: 'category', label: 'Korosztály' }, { id: 'points', label: 'Pontszám' }, { id: 'wins', label: 'Győzelmek' }],
-  matches: [{ id: 'table', label: 'Asztalszám' }, { id: 'status', label: 'Állapot' }, { id: 'results', label: 'Meneteredmények' }]
+  matches: [{ id: 'table', label: 'Mérkőzés sorszáma' }, { id: 'status', label: 'Állapot' }, { id: 'results', label: 'Meneteredmények' }]
 }
 const defaultDetails = Object.fromEntries(Object.entries(DETAIL_OPTIONS).map(([id, options]) => [id, options.map((option) => option.id)]))
 const storedDetails = () => {
@@ -83,6 +83,187 @@ function ProjectionTable({ rows, columns, empty = 'Még nincs megjeleníthető e
 }
 
 const CombinedStandingsNotice = () => <div className="show-combined-notice"><i className="bi bi-info-circle-fill" /><span>A megjelenített sorrend a korosztályok <strong>összevont állása</strong>, nem korosztályonként bontott rangsor.</span></div>
+
+const SUMO_STAGE_LABELS = {
+  1: 'Alapszakasz',
+  2: 'Legjobb 16',
+  3: 'Negyeddöntő',
+  4: 'Elődöntő',
+  5: 'Bronzmérkőzés',
+  6: 'Döntő',
+  GS: 'Alapszakasz',
+  RO16: 'Legjobb 16',
+  QF: 'Negyeddöntő',
+  SF: 'Elődöntő',
+  BM: 'Bronzmérkőzés',
+  F: 'Döntő'
+}
+
+const getMatchStageName = (stage) => SUMO_STAGE_LABELS[stage] || SUMO_STAGE_LABELS[String(stage).toUpperCase()] || 'Alapszakasz'
+
+const getSumoScore = (resultsStr) => {
+  if (!resultsStr) return 0
+  const parts = String(resultsStr).split(',')
+  return parts.reduce((acc, curr) => {
+    const trimmed = curr.trim().toUpperCase()
+    if (trimmed === 'W') return acc + 3
+    if (trimmed === 'D') return acc + 1
+    return acc
+  }, 0)
+}
+
+const renderResultChips = (resultsStr, alignRight = false) => {
+  if (!resultsStr) return null
+  const list = String(resultsStr).split(',').map((r) => r.trim().toUpperCase()).filter(Boolean)
+  if (!list.length) return null
+  return (
+    <div className={`d-flex flex-wrap gap-1 align-items-center mt-1 ${alignRight ? 'justify-content-end' : 'justify-content-start'}`}>
+      {list.map((r, idx) => (
+        <span
+          key={idx}
+          className={`sumo-history-chip ${r === 'W' ? 'sumo-history-chip--win' : r === 'L' ? 'sumo-history-chip--loss' : 'sumo-history-chip--draw'}`}
+        >
+          {r}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function easeInOutQuad(x) {
+  return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2
+}
+
+const getStageOrder = (stage) => {
+  const s = String(stage || '').toUpperCase()
+  if (s === '6' || s === 'F') return 6
+  if (s === '5' || s === 'BM') return 5
+  if (s === '4' || s === 'SF') return 4
+  if (s === '3' || s === 'QF') return 3
+  if (s === '2' || s === 'RO16') return 2
+  return 1
+}
+
+function SumoMatchesSlide({
+  activeSumoStageName,
+  matches,
+  hasDetail
+}) {
+  const gridRef = useRef(null)
+  const matchesKey = useMemo(() => {
+    return matches.map((m) => `${m.table}-${m.result1}-${m.result2}`).join('|')
+  }, [matches])
+
+  useEffect(() => {
+    const el = gridRef.current
+    if (!el) return
+
+    let animationFrameId
+    const startTime = performance.now()
+    const topPause = 3000
+    const scrollDownDuration = 6000
+    const bottomPause = 3000
+    const scrollUpDuration = 6000
+    const cycleDuration = topPause + scrollDownDuration + bottomPause + scrollUpDuration
+
+    const t1 = topPause
+    const t2 = t1 + scrollDownDuration
+    const t3 = t2 + bottomPause
+    const t4 = cycleDuration
+
+    const tick = (now) => {
+      if (!el) return
+      const maxScroll = Math.max(0, el.scrollHeight - el.clientHeight)
+      if (maxScroll > 15) {
+        const elapsed = (now - startTime) % cycleDuration
+
+        if (elapsed < t1) {
+          el.scrollTop = 0
+        } else if (elapsed < t2) {
+          const progress = Math.min(1, Math.max(0, (elapsed - t1) / scrollDownDuration))
+          el.scrollTop = easeInOutQuad(progress) * maxScroll
+        } else if (elapsed < t3) {
+          el.scrollTop = maxScroll
+        } else if (elapsed < t4) {
+          const progress = Math.min(1, Math.max(0, (elapsed - t3) / scrollUpDuration))
+          el.scrollTop = (1 - easeInOutQuad(progress)) * maxScroll
+        } else {
+          el.scrollTop = 0
+        }
+      } else {
+        el.scrollTop = 0
+      }
+
+      animationFrameId = requestAnimationFrame(tick)
+    }
+
+    animationFrameId = requestAnimationFrame(tick)
+
+    return () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId)
+    }
+  }, [matchesKey])
+
+  return (
+    <section className="show-slide" key="matches">
+      <div className="show-slide-title">
+        <span>Szumó · {activeSumoStageName}</span>
+        <h2>Mérkőzések — {activeSumoStageName}</h2>
+      </div>
+      <div className="show-match-grid" ref={gridRef}>
+        {matches.length ? (
+          matches.map((match, index) => {
+            const score1 = getSumoScore(match.result1)
+            const score2 = getSumoScore(match.result2)
+            const hasPlayed = Boolean(match.result1 || match.result2)
+            const isTeam1Winning = hasPlayed && score1 > score2
+            const isTeam2Winning = hasPlayed && score2 > score1
+            const stageName = getMatchStageName(match.stage)
+            const matchGradientClass = isTeam1Winning
+              ? 'gradient-team1-win'
+              : isTeam2Winning
+                ? 'gradient-team2-win'
+                : ''
+
+            return (
+              <article className={`${match.result1 ? 'finished' : 'upcoming'} ${matchGradientClass}`} key={`${match.team1}-${match.team2}-${index}`}>
+                <div className="show-match-card-header">
+                  <div className="show-match-header-left">
+                    {hasDetail('matches', 'status') && <span>{match.result1 ? 'Lejátszva' : 'Következik'}</span>}
+                    <span className="show-match-stage-tag">{stageName}</span>
+                  </div>
+                  {hasDetail('matches', 'table') && <strong>{match.table ? `#${match.table}. mérkőzés` : 'Mérkőzés'}</strong>}
+                </div>
+                <div className="show-match-card-body">
+                  <div className="show-match-side show-match-left">
+                    <b title={match.team1}>
+                      {match.team1}
+                      {isTeam1Winning && <i className="bi bi-trophy-fill ms-2 show-winner-icon" />}
+                    </b>
+                    {hasDetail('matches', 'results') && renderResultChips(match.result1, false)}
+                  </div>
+                  <span className="show-match-vs">VS</span>
+                  <div className="show-match-side show-match-right">
+                    <b title={match.team2}>
+                      {isTeam2Winning && <i className="bi bi-trophy-fill me-2 show-winner-icon" />}
+                      {match.team2}
+                    </b>
+                    {hasDetail('matches', 'results') && renderResultChips(match.result2, true)}
+                  </div>
+                </div>
+              </article>
+            )
+          })
+        ) : (
+          <div className="show-empty">
+            <i className="bi bi-calendar2-event" />
+            <span>Még nincs kisorsolt szumómérkőzés.</span>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
 
 export default function ShowPage() {
   const [now, setNow] = useState(new Date())
@@ -167,7 +348,34 @@ export default function ShowPage() {
   const hill = useMemo(() => [...data.hill].map((item) => ({ name: teamName(item), category: withCategory(teamName(item)), level: number(item.completed_level, item.completedLevel), time: number(item.time_spent_on_level, item.timeSpentOnLevel, item.time) })).sort((a, b) => b.level - a.level || a.time - b.time).slice(0, 6), [data.hill, withCategory])
   const basketball = useMemo(() => [...data.basketball].map((item) => ({ name: teamName(item), category: withCategory(teamName(item)), points: number(item.points, item.point), time: number(item.time) })).sort((a, b) => b.points - a.points || a.time - b.time).slice(0, 6), [data.basketball, withCategory])
   const sumo = useMemo(() => [...data.sumo].map((item) => ({ name: teamName(item), category: withCategory(teamName(item)), points: number(item.points, item.point, item.team_point, item.teamPoint), wins: number(item.wins, item.win) })).sort((a, b) => b.points - a.points || b.wins - a.wins).slice(0, 8), [data.sumo, withCategory])
-  const matches = useMemo(() => [...data.matches].map((item) => ({ team1: item.team1_name || item.team1Name, team2: item.team2_name || item.team2Name, table: item.table, result1: item.team1result || item.team1Result || '', result2: item.team2result || item.team2Result || '', stage: item.tournamentStage })).sort((a, b) => Number(Boolean(a.result1)) - Number(Boolean(b.result1))).slice(0, 8), [data.matches])
+  const activeSumoStageOrder = useMemo(() => {
+    if (!data.matches || !data.matches.length) return 1
+    return Math.max(...data.matches.map((m) => getStageOrder(m.tournamentStage || m.tournament_stage || m.stage)))
+  }, [data.matches])
+
+  const activeSumoStageName = useMemo(() => {
+    return SUMO_STAGE_LABELS[activeSumoStageOrder] || 'Alapszakasz'
+  }, [activeSumoStageOrder])
+
+  const matches = useMemo(() => {
+    if (!data.matches || !data.matches.length) return []
+    const all = [...data.matches].map((item) => ({
+      team1: item.team1_name || item.team1Name,
+      team2: item.team2_name || item.team2Name,
+      table: Number(item.table || 0),
+      result1: item.team1result || item.team1Result || '',
+      result2: item.team2result || item.team2Result || '',
+      stage: item.tournamentStage || item.tournament_stage || item.stage
+    })).sort((a, b) => (Number(a.table) || 0) - (Number(b.table) || 0))
+
+    if (activeSumoStageOrder > 1) {
+      return all.filter((m) => getStageOrder(m.stage) === activeSumoStageOrder)
+    }
+
+    const teamCount = data.teams.length || 16
+    const halfCount = Math.max(1, Math.ceil(teamCount / 2))
+    return all.filter((m) => getStageOrder(m.stage) === 1).slice(-halfCount)
+  }, [data.matches, data.teams.length, activeSumoStageOrder])
   const activeName = phaseName(schedule.selected) || 'Nincs aktív szakasz'
   const hasDetail = (slideId, detailId) => selectedDetails[slideId]?.includes(detailId)
   const ageBadge = (row, slideId) => hasDetail(slideId, 'category') ? <b className={`show-age age-${row.category}`}>{categoryLabel(row.category)}</b> : null
@@ -186,7 +394,14 @@ export default function ShowPage() {
     hill: resultSlide('hill', 'Versenyszám', 'Hegymászás', hill, [hasDetail('hill', 'level') && { key: 'level', label: 'Szint', render: (row) => row.level }, hasDetail('hill', 'time') && { key: 'time', label: 'Idő', render: (row) => `${row.time.toFixed(3)} s` }]),
     basketball: resultSlide('basketball', 'Versenyszám', 'Kosárra dobás', basketball, [hasDetail('basketball', 'points') && { key: 'points', label: 'Pont', render: (row) => row.points }, hasDetail('basketball', 'time') && { key: 'time', label: 'Idő', render: (row) => `${row.time.toFixed(3)} s` }]),
     sumo: resultSlide('sumo', 'Versenyszám', 'Szumó tabella', sumo, [hasDetail('sumo', 'points') && { key: 'points', label: 'Pont', render: (row) => row.points }, hasDetail('sumo', 'wins') && { key: 'wins', label: 'Győzelem', render: (row) => row.wins }]),
-    matches: <section className="show-slide" key="matches"><div className="show-slide-title"><span>Szumó</span><h2>Mérkőzések</h2></div><div className="show-match-grid">{matches.length ? matches.map((match, index) => <article className={match.result1 ? 'finished' : 'upcoming'} key={`${match.team1}-${match.team2}-${index}`}><div>{hasDetail('matches', 'status') && <span>{match.result1 ? 'Lejátszva' : 'Következik'}</span>}{hasDetail('matches', 'table') && <strong>{match.table ? `${match.table}. asztal` : 'Asztal hamarosan'}</strong>}</div><p><b>{match.team1}</b><span>VS</span><b>{match.team2}</b></p>{hasDetail('matches', 'results') && match.result1 && <small>{match.result1} · {match.result2}</small>}</article>) : <div className="show-empty"><i className="bi bi-calendar2-event" /><span>Még nincs kisorsolt szumómérkőzés.</span></div>}</div></section>
+    matches: (
+      <SumoMatchesSlide
+        key="matches"
+        activeSumoStageName={activeSumoStageName}
+        matches={matches}
+        hasDetail={hasDetail}
+      />
+    )
   }
   const slides = selectedSlideIds.map((id) => slideMap[id]).filter(Boolean)
 
@@ -259,17 +474,17 @@ export default function ShowPage() {
   const configuredOptions = [...selectedSlideIds.map((id) => SLIDE_OPTIONS.find((option) => option.id === id)).filter(Boolean), ...SLIDE_OPTIONS.filter((option) => !selectedSlideIds.includes(option.id))]
 
   if (!started) return <main className="show-setup-page"><div className="show-setup-shell">
-    <header className="show-setup-header"><div><span className="show-logo-mark" /><div><span>Kivetítő beállítása</span><h1>Mit szeretnétek megjeleníteni?</h1><p>Válaszd ki a diákat, állítsd be a sorrendjüket és az eredménytáblák részleteit.</p></div></div><button type="button" className="btn btn-outline-light" onClick={() => { window.location.href = '/' }}><i className="bi bi-arrow-left me-2" />Vissza a főoldalra</button></header>
+    <header className="show-setup-header"><div><img src="/Images/Logokicsi.png" alt="Brickathlon" className="show-logo-img" /><div><span>Brickathlon · Kivetítő beállítása</span><h1>Mit szeretnétek megjeleníteni?</h1><p>Válaszd ki a diákat, állítsd be a sorrendjüket és az eredménytáblák részleteit.</p></div></div><button type="button" className="btn btn-outline-light" onClick={() => { window.location.href = '/' }}><i className="bi bi-arrow-left me-2" />Vissza a főoldalra</button></header>
     <section className="show-config-transfer"><div><h2>Beállítások mentése</h2><p>A kiválasztott diák, sorrend és részletek másik gépre is átvihetők.</p></div><div><button type="button" className="btn btn-outline-light" onClick={exportProjectionConfig}><i className="bi bi-download me-2" />Exportálás</button><button type="button" className="btn btn-outline-light" onClick={() => configFileInputRef.current?.click()}><i className="bi bi-upload me-2" />Feltöltés</button><input ref={configFileInputRef} className="visually-hidden" type="file" accept="application/json,.json" onChange={importProjectionConfig} /></div>{configMessage && <div className={`show-config-message ${configMessage.type}`} role="status"><i className={`bi bi-${configMessage.type === 'success' ? 'check-circle-fill' : 'exclamation-triangle-fill'}`} />{configMessage.text}<button type="button" className="btn-close btn-close-white" aria-label="Bezárás" onClick={() => setConfigMessage(null)} /></div>}</section>
     <section className="show-setup-list">{configuredOptions.map((option) => { const enabled = selectedSlideIds.includes(option.id); const selectedIndex = selectedSlideIds.indexOf(option.id); return <article className={`show-setup-item ${enabled ? 'enabled' : ''}`} key={option.id}><div className="show-setup-main-row"><label className="show-setup-check"><input type="checkbox" checked={enabled} onChange={() => toggleSlide(option.id)} /><i className={`bi ${option.icon}`} /><span>{option.label}</span></label>{enabled && <div className="show-order-controls"><span>{selectedIndex + 1}. dia</span><button type="button" disabled={selectedIndex === 0} onClick={() => moveSlide(selectedIndex, -1)} aria-label="Feljebb"><i className="bi bi-arrow-up" /></button><button type="button" disabled={selectedIndex === selectedSlideIds.length - 1} onClick={() => moveSlide(selectedIndex, 1)} aria-label="Lejjebb"><i className="bi bi-arrow-down" /></button></div>}</div>{enabled && DETAIL_OPTIONS[option.id]?.length > 0 && <details className="show-detail-options"><summary><i className="bi bi-sliders me-2" />Megjelenített részletek</summary><div>{DETAIL_OPTIONS[option.id].map((detail) => <label key={detail.id}><input type="checkbox" checked={hasDetail(option.id, detail.id)} onChange={() => toggleDetail(option.id, detail.id)} />{detail.label}</label>)}</div></details>}</article> })}</section>
     <footer className="show-setup-actions"><label><input type="checkbox" checked={fullscreenOnStart} onChange={(event) => setFullscreenOnStart(event.target.checked)} />Indítás teljes képernyőn</label><div><span>{selectedSlideIds.length} dia kiválasztva</span><button type="button" className="btn btn-warning btn-lg" onClick={startProjection}><i className="bi bi-play-fill me-2" />Vetítés indítása</button></div></footer>
   </div></main>
 
-  if (loading) return <main className="show-page show-loading"><div className="show-logo-mark" /><h1>Kivetítő betöltése</h1><div className="spinner-border" /></main>
+  if (loading) return <main className="show-page show-loading"><img src="/Images/Logokicsi.png" alt="Brickathlon" className="show-logo-img show-loading-logo" /><h1>Kivetítő betöltése</h1><div className="spinner-border text-warning" /></main>
 
   return <main className="show-page">
-    <header className="show-header"><div className="show-brand"><span className="show-logo-mark" /><div><strong>Robotverseny</strong><small>Élő kivetítő</small></div></div><div className="show-header-phase"><span>Most zajlik</span><strong>{activeName}</strong></div><time><strong>{now.toLocaleTimeString('hu-HU')}</strong><small>{now.toLocaleDateString('hu-HU', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}</small></time></header>
+    <header className="show-header"><div className="show-brand"><img src="/Images/Logokicsi.png" alt="Brickathlon" className="show-logo-img" /><div><strong>Brickathlon</strong><small>Élő kivetítő</small></div></div><div className="show-header-phase"><span>Most zajlik</span><strong>{activeName}</strong></div><time><strong>{now.toLocaleTimeString('hu-HU')}</strong><small>{now.toLocaleDateString('hu-HU', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}</small></time></header>
     <div className="show-stage">{slides[slide]}</div>
-    <footer className="show-footer"><div key={`${slide}-${paused}`} className={`show-auto-progress ${paused ? 'paused' : ''}`} /><div className="show-dots">{slides.map((_, index) => <button key={index} className={slide === index ? 'active' : ''} aria-label={`${index + 1}. nézet`} onClick={() => setSlide(index)} />)}</div><div className="show-live-status"><span className={connectionError ? 'warning' : 'online'} />{connectionError ? 'Részleges adatkapcsolat' : 'Élő adatok'} · frissítve: {lastUpdated?.toLocaleTimeString('hu-HU') || '–'}</div><div className="show-controls"><button onClick={() => setPaused((value) => !value)} title={paused ? 'Automatikus váltás folytatása' : 'Automatikus váltás szüneteltetése'}><i className={`bi bi-${paused ? 'play-fill' : 'pause-fill'}`} /></button><button onClick={() => setSlide((current) => (current + 1) % slides.length)} title="Következő nézet"><i className="bi bi-skip-forward-fill" /></button><button onClick={() => document.documentElement.requestFullscreen?.()} title="Teljes képernyő"><i className="bi bi-fullscreen" /></button><button className="show-exit-control" onClick={exitProjection} title="Kilépés a vetítésből"><i className="bi bi-x-lg" /><span>Vissza</span></button></div></footer>
+    <footer className="show-footer"><div key={`${slide}-${paused}`} className={`show-auto-progress ${paused ? 'paused' : ''}`} style={{ animationDuration: `${SLIDE_SECONDS}s` }} /><div className="show-dots">{slides.map((_, index) => <button key={index} className={slide === index ? 'active' : ''} aria-label={`${index + 1}. nézet`} onClick={() => setSlide(index)} />)}</div><div className="show-live-status"><span className={connectionError ? 'warning' : 'online'} />{connectionError ? 'Részleges adatkapcsolat' : 'Élő adatok'} · frissítve: {lastUpdated?.toLocaleTimeString('hu-HU') || '–'}</div><div className="show-controls"><button onClick={() => setPaused((value) => !value)} title={paused ? 'Automatikus váltás folytatása' : 'Automatikus váltás szüneteltetése'}><i className={`bi bi-${paused ? 'play-fill' : 'pause-fill'}`} /></button><button onClick={() => setSlide((current) => (current + 1) % slides.length)} title="Következő nézet"><i className="bi bi-skip-forward-fill" /></button><button onClick={() => document.documentElement.requestFullscreen?.()} title="Teljes képernyő"><i className="bi bi-fullscreen" /></button><button className="show-exit-control" onClick={exitProjection} title="Kilépés a vetítésből"><i className="bi bi-x-lg" /><span>Vissza</span></button></div></footer>
   </main>
 }
