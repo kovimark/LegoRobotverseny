@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
 import FloatingFeedback from '../components/FloatingFeedback'
-import { getNotificationTeams, getNotificationPrivileges, getAllNotifications, sendNotificationToTeam, sendNotificationToEmail } from '../services/notificationApi'
+import { getNotificationTeams, getNotificationPrivileges, getAllNotifications, sendNotificationToEmail, sendNotificationToPerson } from '../services/notificationApi'
 import { getPrivilegeLabel } from '../config/privilegeConfig'
 import AgeGroupBadge from '../components/AgeGroupBadge'
 
@@ -109,7 +109,7 @@ const contactsFromTeamsAndPrivileges = (teams = [], privileges = []) => {
 export default function NotificationManagementPage() {
   const [recipientMode, setRecipientMode] = useState('teams') // 'teams' | 'emails'
   const [teams, setTeams] = useState([])
-  const [, setPrivileges] = useState([])
+  const [privileges, setPrivileges] = useState([])
   const [contacts, setContacts] = useState([])
   const [selectedTeamIds, setSelectedTeamIds] = useState([])
   const [selectedContactKeys, setSelectedContactKeys] = useState([])
@@ -192,25 +192,26 @@ export default function NotificationManagementPage() {
   }, [contacts, search])
 
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams])
+  const privilegeById = useMemo(() => new Map(privileges.map((p) => [p.id, p])), [privileges])
 
   const filteredSentNotifications = useMemo(() => {
     const term = sentSearch.trim().toLocaleLowerCase('hu-HU')
     if (!term) return sentNotifications
     return sentNotifications.filter((n) => {
-      const p = n.privilege || {}
-      const teamName = p.teamId ? (teamById.get(p.teamId)?.teamName || `Csapat #${p.teamId}`) : 'Egyéni címzett'
-      const roleName = getPrivilegeLabel(p.privilege1)
+      const priv = n.privilege || privilegeById.get(n.privilegeId) || {}
+      const teamName = priv.teamId ? (teamById.get(priv.teamId)?.teamName || `Csapat #${priv.teamId}`) : 'Egyéni címzett'
+      const roleName = getPrivilegeLabel(priv.privilege1) || (priv.isCoach ? 'Felkészítő' : 'Versenyző')
       return [
         n.title,
         n.text,
         n.message,
-        p.name,
-        p.emailAddress,
+        priv.name,
+        priv.emailAddress,
         teamName,
         roleName
       ].some((val) => String(val || '').toLocaleLowerCase('hu-HU').includes(term))
     })
-  }, [sentNotifications, sentSearch, teamById])
+  }, [sentNotifications, sentSearch, privilegeById, teamById])
 
   // Team mode selections
   const selectedTeams = useMemo(() => teams.filter((team) => selectedTeamIds.includes(team.id)), [teams, selectedTeamIds])
@@ -234,11 +235,26 @@ export default function NotificationManagementPage() {
 
   const allEmailTargets = useMemo(() => {
     const combined = [
-      ...selectedContacts.map((c) => ({ email: c.email, name: c.name, teamName: c.teamName, teamId: c.teamId })),
-      ...manualTargets.map((m) => ({ email: m.email, name: m.name, teamName: m.teamName || 'Egyedi címzett', teamId: null }))
+      ...selectedContacts.map((c) => ({
+        email: c.email,
+        name: c.name,
+        teamName: c.teamName,
+        teamId: c.teamId,
+        privilegeId: c.privilegeId
+      })),
+      ...manualTargets.map((m) => {
+        const matchedPriv = privileges.find((p) => String(p.emailAddress || p.email || '').trim().toLowerCase() === m.email.toLowerCase())
+        return {
+          email: m.email,
+          name: m.name,
+          teamName: m.teamName || 'Egyedi címzett',
+          teamId: matchedPriv?.teamId || null,
+          privilegeId: matchedPriv?.id || null
+        }
+      })
     ]
     return Array.from(new Map(combined.map((item) => [item.email.toLowerCase(), item])).values())
-  }, [selectedContacts, manualTargets])
+  }, [selectedContacts, manualTargets, privileges])
 
   const toggleContact = (contact) => {
     const key = contactKey(contact)
@@ -297,52 +313,91 @@ export default function NotificationManagementPage() {
   const send = async () => {
     try {
       setSending(true)
-      const failures = []
       const notificationPayload = { title: title.trim(), message: message.trim() }
+      const successfulRecipients = []
+      const failedRecipients = []
 
+      // Gather targets: all individuals to send to
+      let targets = []
       if (recipientMode === 'teams') {
-        for (const team of selectedTeams) {
-          try {
-            await sendNotificationToTeam(team.id, notificationPayload)
-          } catch (error) {
-            failures.push(`${team.teamName || `#${team.id}`}: ${error.message}`)
+        selectedTeams.forEach((team) => {
+          const members = privileges.filter((p) => Number(p.teamId) === Number(team.id))
+          if (members.length > 0) {
+            members.forEach((m) => {
+              targets.push({
+                privilegeId: m.id,
+                email: m.emailAddress || m.email,
+                name: m.name || m.emailAddress || `Csapattag (#${m.id})`,
+                teamName: team.teamName || `Csapat #${team.id}`
+              })
+            })
+          } else {
+            failedRecipients.push(`${team.teamName || `#${team.id}`}: Nem találhatók regisztrált tagok a csapathoz.`)
           }
-        }
-        setConfirmOpen(false)
-        if (failures.length > 0) {
-          setFeedback({
-            type: 'danger',
-            text: `${selectedTeams.length - failures.length} értesítés elküldve, ${failures.length} sikertelen. ${failures.join(' | ')}`
-          })
-        } else {
-          setFeedback({ type: 'success', text: `Az értesítés ${selectedTeams.length} csapatnak sikeresen elküldve.` })
-          setTitle('')
-          setMessage('')
-          setSelectedTeamIds([])
-        }
+        })
       } else {
-        // Email mode
-        for (const target of allEmailTargets) {
-          try {
-            await sendNotificationToEmail(target.email, notificationPayload, target.teamId)
-          } catch (error) {
-            failures.push(`${target.name || target.email}: ${error.message}`)
-          }
+        targets = allEmailTargets.map((t) => ({
+          privilegeId: t.privilegeId || privileges.find((p) => String(p.emailAddress || p.email || '').trim().toLowerCase() === String(t.email || '').trim().toLowerCase())?.id || null,
+          email: t.email,
+          name: t.name || t.email,
+          teamName: t.teamName || 'Egyéni címzett'
+        }))
+      }
+
+      // Deduplicate targets by privilegeId or email
+      const uniqueTargets = []
+      const seen = new Set()
+      targets.forEach((t) => {
+        const key = t.privilegeId ? `id:${t.privilegeId}` : `email:${String(t.email || '').toLowerCase()}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          uniqueTargets.push(t)
         }
-        setConfirmOpen(false)
-        if (failures.length > 0) {
-          setFeedback({
-            type: 'danger',
-            text: `${allEmailTargets.length - failures.length} értesítés elküldve, ${failures.length} sikertelen. ${failures.join(' | ')}`
-          })
-        } else {
-          setFeedback({ type: 'success', text: `Az értesítés ${allEmailTargets.length} címzettnek sikeresen elküldve.` })
-          setTitle('')
-          setMessage('')
-          setSelectedContactKeys([])
-          setManualTargets([])
+      })
+
+      // Send to each person individually
+      for (const target of uniqueTargets) {
+        try {
+          if (target.privilegeId) {
+            await sendNotificationToPerson(target.privilegeId, notificationPayload)
+            successfulRecipients.push(target.name || target.email)
+          } else {
+            await sendNotificationToEmail(target.email, notificationPayload)
+            successfulRecipients.push(target.name || target.email)
+          }
+        } catch (error) {
+          const errMsg = error.message.includes('Nincs feliratkozott eszköz')
+            ? 'Nincs feliratkozott eszköz (még nem kapcsolta be az értesítéseket a profiljában)'
+            : error.message
+          failedRecipients.push(`${target.name} (${target.teamName}): ${errMsg}`)
         }
       }
+
+      setConfirmOpen(false)
+
+      if (successfulRecipients.length > 0 && failedRecipients.length === 0) {
+        setFeedback({
+          type: 'success',
+          text: `Az értesítés sikeresen elküldve mind a(z) ${successfulRecipients.length} címzettnek.`
+        })
+        setTitle('')
+        setMessage('')
+        if (recipientMode === 'teams') setSelectedTeamIds([])
+        else { setSelectedContactKeys([]); setManualTargets([]) }
+      } else if (successfulRecipients.length > 0 && failedRecipients.length > 0) {
+        setFeedback({
+          type: 'warning',
+          text: `${successfulRecipients.length} értesítés sikeresen elküldve. ${failedRecipients.length} nem érhető el: ${failedRecipients.join(' | ')}`
+        })
+        setTitle('')
+        setMessage('')
+      } else {
+        setFeedback({
+          type: 'danger',
+          text: `Nem sikerült elküldeni az értesítéseket (${failedRecipients.length} sikertelen): ${failedRecipients.join(' | ')}`
+        })
+      }
+
       await refreshSentNotifications()
     } finally {
       setSending(false)
@@ -611,9 +666,9 @@ export default function NotificationManagementPage() {
                 </thead>
                 <tbody>
                   {filteredSentNotifications.map((item, idx) => {
-                    const priv = item.privilege || {}
+                    const priv = item.privilege || privilegeById.get(item.privilegeId) || {}
                     const teamName = priv.teamId ? (teamById.get(priv.teamId)?.teamName || `Csapat #${priv.teamId}`) : 'Egyéni címzett'
-                    const roleName = getPrivilegeLabel(priv.privilege1)
+                    const roleName = getPrivilegeLabel(priv.privilege1) || (priv.isCoach ? 'Felkészítő' : 'Versenyző')
 
                     return (
                       <tr key={item.id || idx}>
@@ -627,8 +682,8 @@ export default function NotificationManagementPage() {
                           </span>
                         </td>
                         <td>
-                          <strong className="d-block">{priv.name || priv.emailAddress || 'Ismeretlen'}</strong>
-                          <span className="small text-muted">{priv.emailAddress}</span>
+                          <strong className="d-block">{priv.name || priv.emailAddress || (item.privilegeId ? `Felhasználó #${item.privilegeId}` : 'Mindenki')}</strong>
+                          {priv.emailAddress && <span className="small text-muted">{priv.emailAddress}</span>}
                         </td>
                         <td>
                           <span className="badge text-bg-light border text-dark me-1">{teamName}</span>
