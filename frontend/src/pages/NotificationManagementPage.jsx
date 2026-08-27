@@ -107,16 +107,15 @@ const contactsFromTeamsAndPrivileges = (teams = [], privileges = []) => {
 }
 
 export default function NotificationManagementPage() {
-  const [recipientMode, setRecipientMode] = useState('teams') // 'teams' | 'emails'
   const [teams, setTeams] = useState([])
   const [privileges, setPrivileges] = useState([])
   const [contacts, setContacts] = useState([])
-  const [selectedTeamIds, setSelectedTeamIds] = useState([])
   const [selectedContactKeys, setSelectedContactKeys] = useState([])
   const [manualTargets, setManualTargets] = useState([])
   const [manualEmail, setManualEmail] = useState('')
   const [manualName, setManualName] = useState('')
   const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState('all') // 'all' | 'contestant' | 'coach' | 'admin' | 'judge' | 'individual'
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(true)
@@ -164,35 +163,28 @@ export default function NotificationManagementPage() {
     load()
   }, [])
 
-  // Filtered lists based on search
-  const filteredTeams = useMemo(() => {
-    const term = search.trim().toLocaleLowerCase('hu-HU')
-    if (!term) return teams
-    return teams.filter((team) => {
-      const memberValues = Array.isArray(team.members)
-        ? team.members.flatMap((m) => [m.name, m.email])
-        : []
-      return [
-        team.teamName,
-        team.schoolName,
-        team.teamMember1Email,
-        team.teamMember2Email,
-        team.teamCoach1Email,
-        ...memberValues
-      ].some((value) => String(value || '').toLocaleLowerCase('hu-HU').includes(term))
-    })
-  }, [search, teams])
-
-  const filteredContacts = useMemo(() => {
-    const term = search.trim().toLocaleLowerCase('hu-HU')
-    if (!term) return contacts
-    return contacts.filter((contact) =>
-      [contact.email, contact.teamName, contact.name, contact.role]
-        .some((value) => String(value || '').toLocaleLowerCase('hu-HU').includes(term)))
-  }, [contacts, search])
-
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams])
   const privilegeById = useMemo(() => new Map(privileges.map((p) => [p.id, p])), [privileges])
+
+  // Filtered contacts based on search and roleFilter
+  const filteredContacts = useMemo(() => {
+    const term = search.trim().toLocaleLowerCase('hu-HU')
+    return contacts.filter((contact) => {
+      // 1. Text search
+      const matchesSearch = !term || [contact.email, contact.teamName, contact.name, contact.role]
+        .some((value) => String(value || '').toLocaleLowerCase('hu-HU').includes(term))
+      if (!matchesSearch) return false
+
+      // 2. Role filter
+      if (roleFilter === 'contestant') return contact.role.includes('versenyző') || contact.role.includes('Versenyző')
+      if (roleFilter === 'coach') return contact.role.includes('Felkészítő')
+      if (roleFilter === 'admin') return contact.role.includes('Admin')
+      if (roleFilter === 'judge') return contact.role.includes('Bíró')
+      if (roleFilter === 'individual') return !contact.teamId
+
+      return true
+    })
+  }, [contacts, search, roleFilter])
 
   const filteredSentNotifications = useMemo(() => {
     const term = sentSearch.trim().toLocaleLowerCase('hu-HU')
@@ -213,23 +205,7 @@ export default function NotificationManagementPage() {
     })
   }, [sentNotifications, sentSearch, privilegeById, teamById])
 
-  // Team mode selections
-  const selectedTeams = useMemo(() => teams.filter((team) => selectedTeamIds.includes(team.id)), [teams, selectedTeamIds])
-  const allFilteredTeamsSelected = filteredTeams.length > 0 && filteredTeams.every((team) => selectedTeamIds.includes(team.id))
-
-  const toggleTeam = (teamId) => {
-    setSelectedTeamIds((current) =>
-      current.includes(teamId) ? current.filter((id) => id !== teamId) : [...current, teamId])
-  }
-
-  const toggleFilteredTeams = () => {
-    const filteredIds = filteredTeams.map((team) => team.id)
-    setSelectedTeamIds((current) => allFilteredTeamsSelected
-      ? current.filter((id) => !filteredIds.includes(id))
-      : [...new Set([...current, ...filteredIds])])
-  }
-
-  // Email mode selections
+  // Selection helpers
   const selectedContacts = useMemo(() => contacts.filter((contact) => selectedContactKeys.includes(contactKey(contact))), [contacts, selectedContactKeys])
   const allFilteredContactsSelected = filteredContacts.length > 0 && filteredContacts.every((contact) => selectedContactKeys.includes(contactKey(contact)))
 
@@ -265,38 +241,44 @@ export default function NotificationManagementPage() {
   const toggleFilteredContacts = () => {
     const keys = filteredContacts.map(contactKey)
     setSelectedContactKeys((current) => allFilteredContactsSelected
-      ? current.filter((key) => !keys.includes(key))
+      ? current.filter((id) => !keys.includes(id))
       : [...new Set([...current, ...keys])])
   }
 
+  const selectTeamMembers = (teamId) => {
+    if (!teamId) return
+    const teamMembers = contacts.filter((c) => String(c.teamId) === String(teamId))
+    const teamKeys = teamMembers.map(contactKey)
+    setSelectedContactKeys((current) => [...new Set([...current, ...teamKeys])])
+    setFeedback({
+      type: 'success',
+      text: `${teamMembers.length} csapattag hozzáadva a kiválasztottakhoz.`
+    })
+  }
+
   const addManualTarget = () => {
-    const email = manualEmail.trim().toLowerCase()
-    const name = manualName.trim()
-    if (!emailPattern.test(email)) {
-      setFeedback({ type: 'danger', text: 'Kérjük, adj meg egy érvényes e-mail-címet.' })
+    const cleanEmail = manualEmail.trim().toLowerCase()
+    if (!cleanEmail || !emailPattern.test(cleanEmail)) {
+      setFeedback({ type: 'danger', text: 'Adj meg egy érvényes e-mail-címet.' })
       return
     }
-    if (manualTargets.some((target) => target.email === email)) {
-      setFeedback({ type: 'danger', text: 'Ez az e-mail-cím már hozzá lett adva az egyedi listához.' })
+    if (manualTargets.some((item) => item.email.toLowerCase() === cleanEmail)) {
+      setFeedback({ type: 'warning', text: 'Ez az e-mail-cím már szerepel a kézi címzettek között.' })
       return
     }
-    setManualTargets((current) => [...current, { email, name, teamName: name || 'Egyedi címzett' }])
+    setManualTargets((current) => [...current, { email: cleanEmail, name: manualName.trim(), teamName: 'Kézi címzett' }])
     setManualEmail('')
     setManualName('')
+    setFeedback({ type: 'success', text: `A(z) ${cleanEmail} cím hozzáadva a címzettekhez.` })
   }
 
-  const removeManualTarget = (emailToRemove) => {
-    setManualTargets((current) => current.filter((target) => target.email !== emailToRemove))
+  const removeManualTarget = (email) => {
+    setManualTargets((current) => current.filter((item) => item.email.toLowerCase() !== email.toLowerCase()))
   }
 
-  // Request send validation
-  const requestSend = () => {
-    if (recipientMode === 'teams' && selectedTeamIds.length === 0) {
-      setFeedback({ type: 'danger', text: 'Válassz ki legalább egy csapatot.' })
-      return
-    }
-    if (recipientMode === 'emails' && allEmailTargets.length === 0) {
-      setFeedback({ type: 'danger', text: 'Válassz ki vagy adj hozzá legalább egy e-mail-címet.' })
+  const openConfirm = () => {
+    if (allEmailTargets.length === 0) {
+      setFeedback({ type: 'danger', text: 'Válassz ki legalább egy címzett e-mail-címet.' })
       return
     }
     if (!title.trim()) {
@@ -317,34 +299,16 @@ export default function NotificationManagementPage() {
       const successfulRecipients = []
       const failedRecipients = []
 
-      // Gather targets: all individuals to send to
-      let targets = []
-      if (recipientMode === 'teams') {
-        selectedTeams.forEach((team) => {
-          const members = privileges.filter((p) => Number(p.teamId) === Number(team.id))
-          if (members.length > 0) {
-            members.forEach((m) => {
-              targets.push({
-                privilegeId: m.id,
-                email: m.emailAddress || m.email,
-                name: m.name || m.emailAddress || `Csapattag (#${m.id})`,
-                teamName: team.teamName || `Csapat #${team.id}`
-              })
-            })
-          } else {
-            failedRecipients.push(`${team.teamName || `#${team.id}`}: Nem találhatók regisztrált tagok a csapathoz.`)
-          }
-        })
-      } else {
-        targets = allEmailTargets.map((t) => ({
-          privilegeId: t.privilegeId || privileges.find((p) => String(p.emailAddress || p.email || '').trim().toLowerCase() === String(t.email || '').trim().toLowerCase())?.id || null,
-          email: t.email,
-          name: t.name || t.email,
-          teamName: t.teamName || 'Egyéni címzett'
-        }))
-      }
+      // Targets mapped from all selected emails
+      const targets = allEmailTargets.map((t) => ({
+        privilegeId: t.privilegeId || privileges.find((p) => String(p.emailAddress || p.email || '').trim().toLowerCase() === String(t.email || '').trim().toLowerCase())?.id || null,
+        email: t.email,
+        name: t.name || t.email,
+        teamName: t.teamName || 'Egyéni címzett',
+        teamId: t.teamId
+      }))
 
-      // Deduplicate targets by privilegeId or email
+      // Deduplicate targets
       const uniqueTargets = []
       const seen = new Set()
       targets.forEach((t) => {
@@ -357,19 +321,44 @@ export default function NotificationManagementPage() {
 
       // Send to each person individually
       for (const target of uniqueTargets) {
-        try {
-          if (target.privilegeId) {
+        let sent = false
+
+        // 1. Try sending to target's own privilegeId
+        if (target.privilegeId) {
+          try {
             await sendNotificationToPerson(target.privilegeId, notificationPayload)
             successfulRecipients.push(target.name || target.email)
-          } else {
+            sent = true
+          } catch (e) {
+            // If failed with 400 (no device) and person belongs to a team, try team fallback
+            if (target.teamId) {
+              const teamPrivs = privileges.filter((p) => Number(p.teamId) === Number(target.teamId) && p.id !== target.privilegeId)
+              for (const altPriv of teamPrivs) {
+                try {
+                  await sendNotificationToPerson(altPriv.id, notificationPayload)
+                  successfulRecipients.push(`${target.name || target.email} (csapat eszközön)`)
+                  sent = true
+                  break
+                } catch {
+                  // ignore
+                }
+              }
+            }
+          }
+        }
+
+        // 2. If not sent yet, try sendNotificationToEmail
+        if (!sent) {
+          try {
             await sendNotificationToEmail(target.email, notificationPayload)
             successfulRecipients.push(target.name || target.email)
+            sent = true
+          } catch (error) {
+            const errMsg = error.message.includes('Nincs feliratkozott eszköz')
+              ? 'Nincs feliratkozott eszköz (még nem kapcsolta be az értesítéseket a profiljában)'
+              : error.message
+            failedRecipients.push(`${target.name || target.email} (${target.teamName}): ${errMsg}`)
           }
-        } catch (error) {
-          const errMsg = error.message.includes('Nincs feliratkozott eszköz')
-            ? 'Nincs feliratkozott eszköz (még nem kapcsolta be az értesítéseket a profiljában)'
-            : error.message
-          failedRecipients.push(`${target.name} (${target.teamName}): ${errMsg}`)
         }
       }
 
@@ -382,12 +371,12 @@ export default function NotificationManagementPage() {
         })
         setTitle('')
         setMessage('')
-        if (recipientMode === 'teams') setSelectedTeamIds([])
-        else { setSelectedContactKeys([]); setManualTargets([]) }
+        setSelectedContactKeys([])
+        setManualTargets([])
       } else if (successfulRecipients.length > 0 && failedRecipients.length > 0) {
         setFeedback({
           type: 'warning',
-          text: `${successfulRecipients.length} értesítés sikeresen elküldve. ${failedRecipients.length} nem érhető el: ${failedRecipients.join(' | ')}`
+          text: `${successfulRecipients.length} értesítés sikeresen kiküldve. ${failedRecipients.length} nem érhető el: ${failedRecipients.join(' | ')}`
         })
         setTitle('')
         setMessage('')
@@ -406,245 +395,332 @@ export default function NotificationManagementPage() {
 
   return (
     <div className="container py-4">
-      <h2 className="mb-1">Értesítések küldése</h2>
-      <p className="text-muted mb-4">Küldj közvetlen push értesítést csapatonként vagy egyéni e-mail-címek szerint.</p>
       <FloatingFeedback message={feedback} onClose={() => setFeedback(null)} />
 
-      {/* Értesítés tartalma */}
-      <section className="card shadow-sm team-card no-hover-card mb-4">
-        <div className="card-body p-4">
-          <label className="form-label fw-semibold" htmlFor="notification-title">Értesítés címe</label>
-          <input
-            id="notification-title"
-            className="form-control mb-3"
-            maxLength="100"
-            placeholder="pl. Következő forduló vagy fontos tájékoztatás"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-          />
-          <label className="form-label fw-semibold" htmlFor="notification-message">Értesítés tartalma</label>
-          <textarea
-            id="notification-message"
-            className="form-control"
-            rows="4"
-            maxLength="500"
-            placeholder="Írd ide az értesítés szövegét…"
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-          />
-          <div className="d-flex justify-content-between mt-2">
-            <span className="form-text">A kiválasztott címzettek ezt az értesítést fogják megkapni a böngészőjükben.</span>
-            <span className="form-text">{message.length}/500</span>
-          </div>
+      {/* Fejléc */}
+      <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+          <span className="home-kicker">Adminisztráció</span>
+          <h1 className="h2 mb-1">Értesítések küldése</h1>
+          <p className="text-muted mb-0">
+            Közvetlen push értesítések küldése a regisztrált felhasználóknak és csapatoknak.
+          </p>
         </div>
-      </section>
+      </div>
 
-      {/* Címzettek kiválasztása mód */}
-      <section className="card shadow-sm team-card no-hover-card">
-        <div className="card-body p-4">
-          <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 pb-3 border-bottom">
-            <div>
-              <h3 className="h5 mb-1">Címzettek kiválasztása</h3>
-              <p className="text-muted small mb-0">Válaszd ki, hogy csapatok vagy egyéni e-mail-címek szerint szeretnél értesítést küldeni.</p>
-            </div>
-            <div className="btn-group" role="group" aria-label="Címzés módja">
-              <button
-                type="button"
-                className={`btn ${recipientMode === 'teams' ? 'btn-primary' : 'btn-outline-primary'}`}
-                onClick={() => { setRecipientMode('teams'); setSearch('') }}
-              >
-                <i className="bi bi-people-fill me-2" />
-                Csapatok szerint ({selectedTeamIds.length})
-              </button>
-              <button
-                type="button"
-                className={`btn ${recipientMode === 'emails' ? 'btn-primary' : 'btn-outline-primary'}`}
-                onClick={() => { setRecipientMode('emails'); setSearch('') }}
-              >
-                <i className="bi bi-envelope-fill me-2" />
-                E-mail-címek szerint ({allEmailTargets.length})
-              </button>
-            </div>
-          </div>
+      <div className="row g-4">
+        {/* Bal oldali oszlop: Címzettek kiválasztása */}
+        <div className="col-lg-7">
+          <section className="card border-0 shadow-sm h-100">
+            <div className="card-header bg-light border-0 py-3">
+              <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <strong className="fs-5">
+                  <i className="bi bi-people-fill text-primary me-2" aria-hidden="true" />
+                  Címzettek ({allEmailTargets.length} kiválasztva)
+                </strong>
 
-          {/* E-MAIL MÓD: Egyedi címzett hozzáadása */}
-          {recipientMode === 'emails' && (
-            <div className="card bg-light border-0 p-3 mb-4 rounded-3">
-              <h4 className="h6 fw-bold mb-2">
-                <i className="bi bi-person-plus-fill text-primary me-2" />
-                Egyedi e-mail-cím hozzáadása
-              </h4>
-              <div className="row g-2 align-items-end">
-                <div className="col-md-5">
-                  <label className="form-label small" htmlFor="manual-notif-email">E-mail-cím</label>
-                  <input
-                    id="manual-notif-email"
-                    type="email"
-                    className="form-control form-control-sm"
-                    placeholder="pelda@iskola.hu"
-                    value={manualEmail}
-                    onChange={(event) => setManualEmail(event.target.value)}
-                  />
+                {/* Csapat szerinti gyors kijelölés */}
+                <div className="d-flex align-items-center gap-2">
+                  <select
+                    className="form-select form-select-sm"
+                    style={{ maxWidth: '200px' }}
+                    value=""
+                    onChange={(e) => {
+                      selectTeamMembers(e.target.value)
+                      e.target.value = ''
+                    }}
+                  >
+                    <option value="" disabled>Csapat kijelölése…</option>
+                    {teams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.teamName || `Csapat #${t.id}`}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <div className="col-md-5">
-                  <label className="form-label small" htmlFor="manual-notif-name">Név / Megjegyzés (opcionális)</label>
-                  <input
-                    id="manual-notif-name"
-                    type="text"
-                    className="form-control form-control-sm"
-                    placeholder="pl. Versenybíró vagy Felkészítő"
-                    value={manualName}
-                    onChange={(event) => setManualName(event.target.value)}
-                  />
+              </div>
+            </div>
+
+            <div className="card-body p-3">
+              {/* Szerepkör szerinti szűrőgombok */}
+              <div className="d-flex flex-wrap gap-1 mb-3">
+                <button
+                  type="button"
+                  className={`btn btn-sm ${roleFilter === 'all' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                  onClick={() => setRoleFilter('all')}
+                >
+                  Összes ({contacts.length})
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${roleFilter === 'contestant' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                  onClick={() => setRoleFilter('contestant')}
+                >
+                  Versenyzők
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${roleFilter === 'coach' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                  onClick={() => setRoleFilter('coach')}
+                >
+                  Felkészítők
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${roleFilter === 'admin' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                  onClick={() => setRoleFilter('admin')}
+                >
+                  Adminok
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${roleFilter === 'individual' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                  onClick={() => setRoleFilter('individual')}
+                >
+                  Egyéni (nincs csapatban)
+                </button>
+              </div>
+
+              {/* Keresés és kijelölés vezérlők */}
+              <div className="row g-2 mb-3">
+                <div className="col-sm-8">
+                  <div className="input-group input-group-sm">
+                    <span className="input-group-text"><i className="bi bi-search" /></span>
+                    <input
+                      type="search"
+                      className="form-control"
+                      placeholder="Keresés név, e-mail, csapat vagy szerepkör szerint…"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                    {search && (
+                      <button type="button" className="btn btn-outline-secondary" onClick={() => setSearch('')}>
+                        Törlés
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="col-md-2">
+
+                <div className="col-sm-4 text-end">
                   <button
                     type="button"
                     className="btn btn-outline-primary btn-sm w-100"
-                    onClick={addManualTarget}
+                    disabled={filteredContacts.length === 0}
+                    onClick={toggleFilteredContacts}
                   >
-                    <i className="bi bi-plus-lg me-1" />
-                    Hozzáadás
+                    {allFilteredContactsSelected ? 'Kijelölés törlése' : 'Láthatók kijelölése'}
                   </button>
                 </div>
               </div>
 
-              {manualTargets.length > 0 && (
-                <div className="d-flex flex-wrap gap-2 mt-3 pt-2 border-top">
-                  {manualTargets.map((target) => (
-                    <span className="badge text-bg-light border text-dark p-2 d-flex align-items-center" key={target.email}>
-                      <i className="bi bi-envelope me-1 text-muted" />
-                      <strong>{target.email}</strong>
-                      {target.name && <span className="ms-1 text-muted">({target.name})</span>}
-                      <button
-                        type="button"
-                        className="btn-close ms-2"
-                        aria-label={`${target.email} eltávolítása`}
-                        onClick={() => removeManualTarget(target.email)}
-                      />
-                    </span>
-                  ))}
+              {/* Címzettek listája */}
+              {loading ? (
+                <div className="alert alert-info mb-0">Címzettek betöltése…</div>
+              ) : filteredContacts.length > 0 ? (
+                <div className="list-group list-group-flush border rounded" style={{ maxHeight: '380px', overflowY: 'auto' }}>
+                  {filteredContacts.map((contact) => {
+                    const key = contactKey(contact)
+                    const isSelected = selectedContactKeys.includes(key)
+
+                    return (
+                      <label
+                        key={key}
+                        className={`list-group-item list-group-item-action d-flex align-items-center gap-3 py-2 cursor-pointer ${isSelected ? 'list-group-item-primary' : ''}`}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <input
+                          type="checkbox"
+                          className="form-check-input flex-shrink-0 mt-0"
+                          checked={isSelected}
+                          onChange={() => toggleContact(contact)}
+                        />
+                        <div className="flex-grow-1 min-w-0">
+                          <div className="d-flex flex-wrap justify-content-between align-items-center gap-1">
+                            <strong className="text-truncate">{contact.name || contact.email}</strong>
+                            <span className="badge text-bg-light border text-secondary small">{contact.role}</span>
+                          </div>
+                          <div className="small text-muted text-truncate">{contact.email}</div>
+                          {contact.teamName && (
+                            <div className="small text-primary mt-1">
+                              <i className="bi bi-people me-1" />
+                              {contact.teamName}
+                              {contact.category && (
+                                <span className="ms-2">
+                                  <AgeGroupBadge ageGroup={contact.category} />
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="alert alert-secondary mb-0">
+                  {search ? 'Nincs a keresésnek megfelelő címzett.' : 'Nincsenek elérhető címzettek.'}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Keresőmező és tömeges kijelölés */}
-          <div className="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
-            <div className="flex-grow-1">
-              <label className="form-label fw-semibold" htmlFor="notification-search">
-                {recipientMode === 'teams' ? 'Csapatok keresése' : 'Regisztrált e-mail-címek keresése'}
-              </label>
-              <input
-                id="notification-search"
-                type="search"
-                className="form-control"
-                placeholder={recipientMode === 'teams' ? 'Csapat, iskola vagy e-mail…' : 'Név, csapat, e-mail vagy szerepkör…'}
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-            </div>
-            <button
-              type="button"
-              className="btn btn-outline-primary"
-              disabled={loading || (recipientMode === 'teams' ? filteredTeams.length === 0 : filteredContacts.length === 0)}
-              onClick={recipientMode === 'teams' ? toggleFilteredTeams : toggleFilteredContacts}
-            >
-              {(recipientMode === 'teams' ? allFilteredTeamsSelected : allFilteredContactsSelected)
-                ? 'Láthatók kijelölésének törlése'
-                : 'Összes látható kijelölése'}
-            </button>
-          </div>
+              {/* Kézi e-mail hozzáadás */}
+              <div className="mt-3 pt-3 border-top">
+                <label className="form-label small fw-bold mb-1">Egyedi e-mail-cím hozzáadása:</label>
+                <div className="row g-2">
+                  <div className="col-sm-6">
+                    <input
+                      type="email"
+                      className="form-control form-control-sm"
+                      placeholder="pelda@email.com"
+                      value={manualEmail}
+                      onChange={(e) => setManualEmail(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-sm-4">
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="Név (nem kötelező)"
+                      value={manualName}
+                      onChange={(e) => setManualName(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-sm-2">
+                    <button type="button" className="btn btn-outline-success btn-sm w-100" onClick={addManualTarget}>
+                      <i className="bi bi-plus-lg me-1" />Hozzáad
+                    </button>
+                  </div>
+                </div>
 
-          {/* Kijelölt elemek számlálója */}
-          <div className="mb-3 fw-semibold">
-            {recipientMode === 'teams'
-              ? `${selectedTeamIds.length} csapat kijelölve`
-              : `${allEmailTargets.length} e-mail-cím kijelölve`}
-          </div>
-
-          {/* Lista megjelenítése */}
-          {loading ? (
-            <div className="alert alert-info mb-0">Betöltés…</div>
-          ) : recipientMode === 'teams' ? (
-            <div className="notification-team-grid">
-              {filteredTeams.map((team) => (
-                <label className={`notification-team-option ${selectedTeamIds.includes(team.id) ? 'selected' : ''}`} key={team.id}>
-                  <input type="checkbox" checked={selectedTeamIds.includes(team.id)} onChange={() => toggleTeam(team.id)} />
-                  <span>
-                    <strong><AgeGroupBadge category={team.category} className="me-2" />{team.teamName || `Csapat #${team.id}`}</strong>
-                    <small>{team.schoolName || 'Nincs megadott iskola'}</small>
-                  </span>
-                </label>
-              ))}
-              {filteredTeams.length === 0 && <div className="alert alert-secondary mb-0">Nincs a keresésnek megfelelő csapat.</div>}
+                {manualTargets.length > 0 && (
+                  <div className="d-flex flex-wrap gap-1 mt-2">
+                    {manualTargets.map((m) => (
+                      <span key={m.email} className="badge text-bg-info text-dark d-flex align-items-center gap-1">
+                        {m.name ? `${m.name} (${m.email})` : m.email}
+                        <button
+                          type="button"
+                          className="btn-close btn-close-white"
+                          style={{ fontSize: '0.65rem' }}
+                          aria-label="Törlés"
+                          onClick={() => removeManualTarget(m.email)}
+                        />
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          ) : (
-            <div className="notification-team-grid">
-              {filteredContacts.map((contact) => {
-                const key = contactKey(contact)
-                const isSelected = selectedContactKeys.includes(key)
-                return (
-                  <label className={`notification-team-option ${isSelected ? 'selected' : ''}`} key={key}>
-                    <input type="checkbox" checked={isSelected} onChange={() => toggleContact(contact)} />
-                    <span>
-                      <strong>
-                        {contact.category !== null && contact.category !== undefined && (
-                          <AgeGroupBadge category={contact.category} className="me-2" />
-                        )}
-                        {contact.name || contact.email}
-                      </strong>
-                      <small>
-                        <span className="text-primary fw-semibold">{contact.email}</span>
-                        {' · '}
-                        {contact.teamName ? contact.teamName : <span className="text-muted">Egyéni (nincs csapatban)</span>}
-                        {' · '}
-                        <span className="badge text-bg-light border text-dark ms-1">{contact.role}</span>
-                      </small>
-                    </span>
-                  </label>
-                )
-              })}
-              {filteredContacts.length === 0 && <div className="alert alert-secondary mb-0">Nincs a keresésnek megfelelő e-mail-cím.</div>}
-            </div>
-          )}
-
-          <div className="text-end mt-4">
-            <button type="button" className="btn btn-primary btn-lg" disabled={sending || loading} onClick={requestSend}>
-              <i className="bi bi-send-fill me-2" />
-              Értesítés küldése
-            </button>
-          </div>
+          </section>
         </div>
-      </section>
 
-      {/* Elküldött értesítések listája */}
-      <section className="card shadow-sm team-card no-hover-card mt-4">
-        <div className="card-body p-4">
-          <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3 pb-3 border-bottom">
-            <div>
-              <h2 className="h5 mb-1 d-flex align-items-center gap-2">
-                <i className="bi bi-clock-history text-primary" />
-                <span>Elküldött értesítések előzményei</span>
-                <span className="badge text-bg-secondary">{sentNotifications.length}</span>
-              </h2>
-              <p className="text-muted small mb-0">Az eddig kiküldött összes értesítés és a hozzájuk tartozó címzettek listája.</p>
+        {/* Jobb oldali oszlop: Értesítés összeállítása és küldése */}
+        <div className="col-lg-5">
+          <section className="card border-0 shadow-sm h-100">
+            <div className="card-header bg-light border-0 py-3">
+              <strong className="fs-5">
+                <i className="bi bi-send-fill text-primary me-2" aria-hidden="true" />
+                Értesítés összeállítása
+              </strong>
             </div>
-            <button
-              type="button"
-              className="btn btn-outline-secondary btn-sm"
-              disabled={loadingSent}
-              onClick={refreshSentNotifications}
-            >
-              <i className={`bi bi-arrow-clockwise me-1 ${loadingSent ? 'spin-animation' : ''}`} />
-              Frissítés
-            </button>
+
+            <div className="card-body p-3 d-flex flex-column">
+              {/* Címzettek összesítő sáv */}
+              <div className="alert alert-light border mb-3 py-2 px-3">
+                <div className="d-flex justify-content-between align-items-center">
+                  <span className="small text-muted">Kiválasztott címzettek:</span>
+                  <strong className="badge text-bg-primary">{allEmailTargets.length} fő / e-mail</strong>
+                </div>
+                {allEmailTargets.length > 0 && (
+                  <div className="small text-truncate mt-1 text-secondary">
+                    {allEmailTargets.slice(0, 4).map((t) => t.name || t.email).join(', ')}
+                    {allEmailTargets.length > 4 && ` és további ${allEmailTargets.length - 4} címzett…`}
+                  </div>
+                )}
+              </div>
+
+              {/* Értesítés űrlap */}
+              <div className="mb-3">
+                <label className="form-label fw-bold small" htmlFor="notif-title">
+                  Értesítés címe <span className="text-danger">*</span>
+                </label>
+                <input
+                  id="notif-title"
+                  type="text"
+                  className="form-control"
+                  placeholder="pl. Fontos tájékoztatás / Következő meccs"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  maxLength={100}
+                />
+              </div>
+
+              <div className="mb-3 flex-grow-1">
+                <label className="form-label fw-bold small" htmlFor="notif-msg">
+                  Értesítés üzenete <span className="text-danger">*</span>
+                </label>
+                <textarea
+                  id="notif-msg"
+                  className="form-control"
+                  rows={5}
+                  placeholder="Írd be az értesítés szövegét, ami megjelenik a címzettek telefonján vagy böngészőjében…"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  maxLength={500}
+                />
+                <div className="form-text text-end small">{message.length}/500 karakter</div>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-primary w-100 py-2 fw-bold"
+                disabled={sending || allEmailTargets.length === 0 || !title.trim() || !message.trim()}
+                onClick={openConfirm}
+              >
+                {sending ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
+                    Küldés folyamatban…
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-send-fill me-2" />
+                    Értesítés küldése ({allEmailTargets.length} címzettnek)
+                  </>
+                )}
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      {/* Elküldött értesítések előzményei */}
+      <section className="card border-0 shadow-sm mt-4">
+        <div className="card-header bg-light border-0 py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div>
+            <strong className="fs-5">
+              <i className="bi bi-clock-history text-primary me-2" aria-hidden="true" />
+              Elküldött értesítések előzményei
+            </strong>
+            <span className="badge text-bg-secondary ms-2">{sentNotifications.length}</span>
+            <p className="text-muted small mb-0">Az eddig kiküldött összes értesítés és a hozzájuk tartozó címzettek listája.</p>
           </div>
 
+          <button
+            type="button"
+            className="btn btn-outline-secondary btn-sm"
+            disabled={loadingSent}
+            onClick={refreshSentNotifications}
+          >
+            <i className={`bi bi-arrow-clockwise me-1 ${loadingSent ? 'spin-animation' : ''}`} />
+            Frissítés
+          </button>
+        </div>
+
+        <div className="card-body p-3">
+          {/* Előzmények kereső */}
           <div className="mb-3">
             <input
               type="search"
-              className="form-control"
+              className="form-control form-control-sm"
               placeholder="Keresés az elküldött értesítésekben (cím, tartalom, címzett, csapat, szerepkör)…"
               value={sentSearch}
               onChange={(e) => setSentSearch(e.target.value)}
@@ -714,11 +790,7 @@ export default function NotificationManagementPage() {
       >
         <p>
           Biztosan elküldöd ezt az értesítést{' '}
-          <strong>
-            {recipientMode === 'teams'
-              ? `${selectedTeams.length} csapatnak`
-              : `${allEmailTargets.length} e-mail-címre`}
-          </strong>?
+          <strong>{allEmailTargets.length} e-mail címzettnek</strong>?
         </p>
         <div className="border rounded p-3 bg-light">
           <strong className="d-block mb-2 text-primary">{title}</strong>
