@@ -93,8 +93,39 @@ const getUniqueAdvancingEntries = (roundEntries, advancingCount) => {
     })
 
   return Array.from(entriesByTeam.values())
-    .sort((a, b) => a.bestTime - b.bestTime || a.team.team_name.localeCompare(b.team.team_name))
+    .sort((a, b) => a.bestTime - b.bestTime || a.team.team_name.localeCompare(b.team.team_name, 'hu'))
     .slice(0, advancingCount)
+}
+
+const getAdvancingEntriesForRound = (round, roundEntries, groupAdvance, categoryByTeamName) => {
+  const rankedEntries = getUniqueAdvancingEntries(roundEntries, Number.MAX_SAFE_INTEGER)
+  const isGroupStage = getStageValueFromRoundId(round.id) === 1
+
+  if (isGroupStage) {
+    if (Number(groupAdvance?.ageGroupBreakdown) === 1) {
+      return [0, 1].flatMap((category) => rankedEntries
+        .filter((entry) => categoryByTeamName.get(entry.team.team_name) === category)
+        .slice(0, category === 0 ? groupAdvance.psGroupAdvance : groupAdvance.hsGroupAdvance))
+    }
+    return rankedEntries.slice(0, groupAdvance?.allGroupAdvance ?? Number.MAX_SAFE_INTEGER)
+  }
+
+  // After group stage (Legjobb 16, Negyeddöntő, stb.):
+  // Mindkét korcsoportból ugyanannyi (felezett) csapatnak kell továbbjutnia!
+  const psEntries = rankedEntries.filter((entry) => categoryByTeamName.get(entry.team.team_name) === 0)
+  const hsEntries = rankedEntries.filter((entry) => categoryByTeamName.get(entry.team.team_name) === 1)
+
+  if (psEntries.length > 0 && hsEntries.length > 0) {
+    const psAdvCount = Math.max(1, Math.ceil(psEntries.length / 2))
+    const hsAdvCount = Math.max(1, Math.ceil(hsEntries.length / 2))
+    return [
+      ...psEntries.slice(0, psAdvCount),
+      ...hsEntries.slice(0, hsAdvCount)
+    ]
+  }
+
+  const uniqueTeamCount = new Set(round.teams.map((team) => team.team_name)).size
+  return getUniqueAdvancingEntries(roundEntries, Math.max(1, Math.ceil(uniqueTeamCount / 2)))
 }
 
 const createCurrentStagePlaceholderRound = (results, teamNames, storedStage) => {
@@ -196,7 +227,8 @@ export default function LineFollowingScoring() {
   const [roundResults, setRoundResults] = useState({})
   const [openEntries, setOpenEntries] = useState({})
   const [actionMessage, setActionMessage] = useState(null)
-  const [sortBy, setSortBy] = useState('name')
+  const [sortField, setSortField] = useState('name')
+  const [sortDirection, setSortDirection] = useState('asc')
   const [resultSearchTerm, setResultSearchTerm] = useState('')
   const [selectedResultTeam, setSelectedResultTeam] = useState(null)
   const [resultTime, setResultTime] = useState('')
@@ -310,23 +342,36 @@ export default function LineFollowingScoring() {
     const sorted = [...items]
 
     sorted.sort((a, b) => {
-      const aName = (a.team_name || '').toLowerCase()
-      const bName = (b.team_name || '').toLowerCase()
+      const aName = a.team_name || ''
+      const bName = b.team_name || ''
 
-      if (sortBy === 'time' && roundId) {
+      if (sortField === 'time' && roundId) {
         const aDraft = getRoundDraft(roundDrafts, roundId, getResultKey(a))
         const bDraft = getRoundDraft(roundDrafts, roundId, getResultKey(b))
         const aSaved = getRoundSavedResult(roundResults, roundId, getResultKey(a))
         const bSaved = getRoundSavedResult(roundResults, roundId, getResultKey(b))
         const aBest = getBestTime(aDraft.firstTime || aSaved?.firstTime || '', aDraft.secondTime || aSaved?.secondTime || '')
         const bBest = getBestTime(bDraft.firstTime || bSaved?.firstTime || '', bDraft.secondTime || bSaved?.secondTime || '')
-        const aSortValue = aBest === '' ? Number.POSITIVE_INFINITY : aBest
-        const bSortValue = bBest === '' ? Number.POSITIVE_INFINITY : bBest
 
-        return aSortValue - bSortValue || aName.localeCompare(bName)
+        const aHasTime = aBest !== '' && Number.isFinite(aBest)
+        const bHasTime = bBest !== '' && Number.isFinite(bBest)
+
+        if (!aHasTime && !bHasTime) {
+          return sortDirection === 'desc' ? bName.localeCompare(aName, 'hu') : aName.localeCompare(bName, 'hu')
+        }
+        if (!aHasTime) return 1
+        if (!bHasTime) return -1
+
+        if (sortDirection === 'desc') {
+          return (bBest - aBest) || bName.localeCompare(aName, 'hu')
+        }
+        return (aBest - bBest) || aName.localeCompare(bName, 'hu')
       }
 
-      return aName.localeCompare(bName)
+      if (sortDirection === 'desc') {
+        return bName.localeCompare(aName, 'hu')
+      }
+      return aName.localeCompare(bName, 'hu')
     })
 
     return sorted
@@ -658,20 +703,34 @@ export default function LineFollowingScoring() {
     isQualifier: qualifierNames.has(entry.team.team_name)
   }))
 
+  const sortedLineStandings = [...lineStandings].sort((a, b) => {
+    const aName = a.teamName || ''
+    const bName = b.teamName || ''
+
+    if (sortField === 'name') {
+      return sortDirection === 'desc'
+        ? bName.localeCompare(aName, 'hu')
+        : aName.localeCompare(bName, 'hu')
+    }
+
+    const aTime = a.time === '' ? Number.POSITIVE_INFINITY : Number(a.time)
+    const bTime = b.time === '' ? Number.POSITIVE_INFINITY : Number(b.time)
+
+    if (sortDirection === 'desc') {
+      const aVal = a.time === '' ? Number.NEGATIVE_INFINITY : Number(a.time)
+      const bVal = b.time === '' ? Number.NEGATIVE_INFINITY : Number(b.time)
+      return (bVal - aVal) || bName.localeCompare(aName, 'hu')
+    }
+
+    return (aTime - bTime) || aName.localeCompare(bName, 'hu')
+  })
+
   const createNextRound = async (round) => {
     const roundEntries = getRoundEntries(round)
-    const rankedEntries = getUniqueAdvancingEntries(roundEntries, Number.MAX_SAFE_INTEGER)
-    const isGroupStage = getStageValueFromRoundId(round.id) === 1
-    const advancingEntries = isGroupStage
-      ? Number(groupAdvance.ageGroupBreakdown) === 1
-        ? [0, 1].flatMap((category) => rankedEntries
-          .filter((entry) => categoryByTeamName.get(entry.team.team_name) === category)
-          .slice(0, category === 0 ? groupAdvance.psGroupAdvance : groupAdvance.hsGroupAdvance))
-        : rankedEntries.slice(0, groupAdvance.allGroupAdvance)
-      : getUniqueAdvancingEntries(roundEntries, getAdvancingCount(new Set(round.teams.map((team) => team.team_name)).size))
+    const advancingEntries = getAdvancingEntriesForRound(round, roundEntries, groupAdvance, categoryByTeamName)
     const advancingTeamNames = advancingEntries.map((entry) => entry.team.team_name)
 
-    if (advancingTeamNames.length < MIN_FINAL_TEAMS) {
+    if (advancingTeamNames.length < 2) {
       return
     }
 
@@ -715,7 +774,7 @@ export default function LineFollowingScoring() {
           id: `round-${nextStage}`,
           label: nextStageConfig?.label || `${nextStage}. kör`,
           teams: [],
-          advancingCount: getAdvancingCount(nextTeamNames.length)
+          advancingCount: nextTeamNames.length
         }
         const hasNextRound = prev.some((existingRound) => existingRound.id === nextRound.id)
 
@@ -814,7 +873,7 @@ export default function LineFollowingScoring() {
           </div>
 
           {currentResultStage === 1 ? (
-            <CategorizedResultsStandings title={`Vonalkövetés csoportköri tabellája – ${Number(groupAdvance.ageGroupBreakdown) === 1 ? `Á: top ${groupAdvance.psGroupAdvance}, K: top ${groupAdvance.hsGroupAdvance}` : `top ${groupAdvance.allGroupAdvance}`}`} rows={lineStandings} getKey={(result) => result.teamName} columns={[{ key: 'team', label: 'Csapat', render: (result) => result.teamName }, { key: 'category', label: 'Korosztály', render: (result) => result.category === 1 ? 'Középiskolás' : 'Általános iskolás' }, { key: 'time', label: 'Legjobb idő', align: 'end', render: (result) => `${result.time} s` }, { key: 'qualifier', label: 'Továbbjutás', render: (result) => result.isQualifier ? <span className="badge text-bg-success">Továbbjutó</span> : '-' }]} />
+            <CategorizedResultsStandings title={`Vonalkövetés csoportköri tabellája – ${Number(groupAdvance.ageGroupBreakdown) === 1 ? `Á: top ${groupAdvance.psGroupAdvance}, K: top ${groupAdvance.hsGroupAdvance}` : `top ${groupAdvance.allGroupAdvance}`}`} rows={sortedLineStandings} getKey={(result) => result.teamName} columns={[{ key: 'team', label: 'Csapat', render: (result) => result.teamName }, { key: 'category', label: 'Korosztály', render: (result) => result.category === 1 ? 'Középiskolás' : 'Általános iskolás' }, { key: 'time', label: 'Legjobb idő', align: 'end', render: (result) => `${result.time} s` }, { key: 'qualifier', label: 'Továbbjutás', render: (result) => result.isQualifier ? <span className="badge text-bg-success">Továbbjutó</span> : '-' }]} />
           ) : (
             <section className="card shadow-sm team-card no-hover-card mb-4">
               <div className="card-body p-3 p-md-4">
@@ -840,16 +899,41 @@ export default function LineFollowingScoring() {
             />
           </div>
 
-          <div className="d-flex justify-content-end mb-3">
-          <div className="btn-group" role="group" aria-label="Rendezés">
-            <button type="button" className={`btn btn-sm ${sortBy === 'name' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setSortBy('name')}>
-              Név szerint
-            </button>
-            <button type="button" className={`btn btn-sm ${sortBy === 'time' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setSortBy('time')}>
-              Idő szerint
-            </button>
+          <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <span className="text-muted small">Próbálkozások rendezése:</span>
+            <div className="btn-group" role="group" aria-label="Rendezés">
+              <button
+                type="button"
+                className={`btn btn-sm ${sortField === 'name' ? 'btn-primary' : 'btn-outline-primary'}`}
+                onClick={() => {
+                  if (sortField === 'name') {
+                    setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+                  } else {
+                    setSortField('name')
+                    setSortDirection('asc')
+                  }
+                }}
+              >
+                <i className={`bi ${sortField === 'name' ? (sortDirection === 'asc' ? 'bi-sort-alpha-down' : 'bi-sort-alpha-up-alt') : 'bi-sort-alpha-down'} me-1`} />
+                Név szerint {sortField === 'name' ? (sortDirection === 'asc' ? '(A → Z ↑)' : '(Z → A ↓)') : ''}
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${sortField === 'time' ? 'btn-primary' : 'btn-outline-primary'}`}
+                onClick={() => {
+                  if (sortField === 'time') {
+                    setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+                  } else {
+                    setSortField('time')
+                    setSortDirection('asc')
+                  }
+                }}
+              >
+                <i className={`bi ${sortField === 'time' ? (sortDirection === 'asc' ? 'bi-sort-numeric-down' : 'bi-sort-numeric-up-alt') : 'bi-sort-numeric-down'} me-1`} />
+                Idő szerint {sortField === 'time' ? (sortDirection === 'asc' ? '(növekvő ↑)' : '(csökkenő ↓)') : ''}
+              </button>
+            </div>
           </div>
-        </div>
         </>
       )}
 
@@ -871,16 +955,8 @@ export default function LineFollowingScoring() {
             : roundEntries
           const uniqueRoundTeamNames = Array.from(new Set(round.teams.map((team) => team.team_name)))
           const uniqueRoundTeamCount = uniqueRoundTeamNames.length
-          const rankedRoundEntries = getUniqueAdvancingEntries(roundEntries, Number.MAX_SAFE_INTEGER)
           const isGroupStageRound = getStageValueFromRoundId(round.id) === 1
-          const automaticAdvancingCount = getAdvancingCount(uniqueRoundTeamCount)
-          const advancingTeams = isGroupStageRound
-            ? Number(groupAdvance.ageGroupBreakdown) === 1
-              ? [0, 1].flatMap((category) => rankedRoundEntries
-                .filter((entry) => categoryByTeamName.get(entry.team.team_name) === category)
-                .slice(0, category === 0 ? groupAdvance.psGroupAdvance : groupAdvance.hsGroupAdvance))
-              : rankedRoundEntries.slice(0, groupAdvance.allGroupAdvance)
-            : getUniqueAdvancingEntries(roundEntries, automaticAdvancingCount)
+          const advancingTeams = getAdvancingEntriesForRound(round, roundEntries, groupAdvance, categoryByTeamName)
           const roundComplete = uniqueRoundTeamNames.every((teamName) => roundEntries.some((entry) => entry.team.team_name === teamName && entry.bestTime !== ''))
           const isFinalRound = uniqueRoundTeamCount <= MIN_FINAL_TEAMS
           const isRoundClosed = closedRoundIds.includes(round.id)
@@ -1042,7 +1118,18 @@ export default function LineFollowingScoring() {
 
                   {canAdvance && (
                     <div className="line-advancement-actions">
-                      <div className="text-end"><div className="fw-semibold">{isGroupStageRound ? Number(groupAdvance.ageGroupBreakdown) === 1 ? `Általános: ${groupAdvance.psGroupAdvance}, középiskolás: ${groupAdvance.hsGroupAdvance}` : `Továbbjutók: ${groupAdvance.allGroupAdvance}` : `Továbbjutók: ${automaticAdvancingCount}`}</div><div className="small text-muted">{isGroupStageRound ? 'A versenybeállításokban megadott létszám.' : 'A következő forduló automatikus létszáma.'}</div></div>
+                      <div className="text-end">
+                        <div className="fw-semibold">
+                          {isGroupStageRound
+                            ? Number(groupAdvance.ageGroupBreakdown) === 1
+                              ? `Általános: ${groupAdvance.psGroupAdvance}, középiskolás: ${groupAdvance.hsGroupAdvance}`
+                              : `Továbbjutók: ${groupAdvance.allGroupAdvance}`
+                            : `Továbbjutók: ${advancingTeams.length} csapat (korosztályonként felezve)`}
+                        </div>
+                        <div className="small text-muted">
+                          {isGroupStageRound ? 'A versenybeállításokban megadott létszám.' : 'Mindkét korcsoportból azonos arányban jutnak tovább.'}
+                        </div>
+                      </div>
                       <button type="button" className="btn btn-outline-primary" onClick={() => createNextRound(round)} disabled={!roundComplete}>
                         Következő kör létrehozása
                       </button>

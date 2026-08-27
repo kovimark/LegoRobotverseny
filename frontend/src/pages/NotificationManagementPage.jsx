@@ -1,39 +1,115 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
 import FloatingFeedback from '../components/FloatingFeedback'
-import { getNotificationTeams, sendNotificationToTeam, sendNotificationToEmail } from '../services/notificationApi'
+import { getNotificationTeams, getNotificationPrivileges, getAllNotifications, sendNotificationToTeam, sendNotificationToEmail } from '../services/notificationApi'
+import { getPrivilegeLabel } from '../config/privilegeConfig'
 import AgeGroupBadge from '../components/AgeGroupBadge'
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const contactKey = (contact) => `${String(contact.email || '').trim().toLowerCase()}|${String(contact.teamName || '').trim().toLowerCase()}`
+const contactKey = (contact) => String(contact.email || '').trim().toLowerCase()
 
-const contactsFromTeams = (teams) => {
-  const contacts = []
+const contactsFromTeamsAndPrivileges = (teams = [], privileges = []) => {
+  const contacts = new Map()
+  const teamById = new Map(teams.map((team) => [team.id, team]))
+
+  // 1. Process teams and their members
   teams.forEach((team) => {
     const teamName = team.teamName || `Csapat #${team.id}`
+
+    if (Array.isArray(team.members)) {
+      let contestantIndex = 1
+      team.members.forEach((member) => {
+        const email = String(member.email || '').trim().toLowerCase()
+        if (emailPattern.test(email)) {
+          const isCoach = Number(member.isCoach) === 1
+          const role = isCoach ? 'Felkészítő' : `${contestantIndex++}. versenyző`
+          contacts.set(email, {
+            email,
+            teamName,
+            teamId: team.id,
+            privilegeId: member.id || member.privilegeId || null,
+            name: member.name || '',
+            role,
+            category: team.category
+          })
+        }
+      })
+    }
+
     ;[
       [team.teamMember1Email, team.teamMember1Name, '1. versenyző'],
       [team.teamMember2Email, team.teamMember2Name, '2. versenyző'],
-      [team.teamCoach1Email, team.teamCoach1, 'Felkészítő']
+      [team.teamCoach1Email, team.teamCoach1 || team.teamCoach1Name, 'Felkészítő'],
+      [team.coachEmail, team.coachName, 'Felkészítő']
     ].forEach(([email, name, role]) => {
       if (emailPattern.test(String(email || '').trim())) {
-        contacts.push({
-          email: String(email).trim().toLowerCase(),
-          teamName,
-          teamId: team.id,
-          name: name || '',
-          role,
-          category: team.category
-        })
+        const cleanEmail = String(email).trim().toLowerCase()
+        if (!contacts.has(cleanEmail)) {
+          contacts.set(cleanEmail, {
+            email: cleanEmail,
+            teamName,
+            teamId: team.id,
+            privilegeId: null,
+            name: name || '',
+            role,
+            category: team.category
+          })
+        }
       }
     })
   })
-  return Array.from(new Map(contacts.map((contact) => [contactKey(contact), contact])).values())
+
+  // 2. Process all registered users from Privilege table
+  privileges.forEach((item) => {
+    const email = String(item.emailAddress || item.email || '').trim().toLowerCase()
+    if (!email || !emailPattern.test(email)) return
+
+    const team = item.teamId ? teamById.get(item.teamId) : null
+    const teamName = team?.teamName || (item.teamId ? `Csapat #${item.teamId}` : '')
+    const teamId = item.teamId || team?.id || null
+    const category = team ? team.category : null
+
+    let role = 'Regisztrált felhasználó'
+    const priv = Number(item.privilege1)
+    if (priv === 1) {
+      role = 'Adminisztrátor'
+    } else if (priv >= 2) {
+      role = getPrivilegeLabel(priv)
+    } else if (Number(item.isCoach) === 1) {
+      role = 'Felkészítő'
+    } else if (teamId) {
+      role = 'Versenyző'
+    }
+
+    if (contacts.has(email)) {
+      const existing = contacts.get(email)
+      existing.privilegeId = item.id
+      if (priv >= 1) {
+        existing.role = `${existing.role} (${role})`
+      }
+      if (!existing.name && item.name) {
+        existing.name = item.name
+      }
+    } else {
+      contacts.set(email, {
+        email,
+        teamName,
+        teamId,
+        privilegeId: item.id,
+        name: item.name || '',
+        role,
+        category
+      })
+    }
+  })
+
+  return Array.from(contacts.values()).sort((a, b) => a.email.localeCompare(b.email, 'hu'))
 }
 
 export default function NotificationManagementPage() {
   const [recipientMode, setRecipientMode] = useState('teams') // 'teams' | 'emails'
   const [teams, setTeams] = useState([])
+  const [, setPrivileges] = useState([])
   const [contacts, setContacts] = useState([])
   const [selectedTeamIds, setSelectedTeamIds] = useState([])
   const [selectedContactKeys, setSelectedContactKeys] = useState([])
@@ -48,14 +124,37 @@ export default function NotificationManagementPage() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [feedback, setFeedback] = useState(null)
 
+  // Sent notifications state
+  const [sentNotifications, setSentNotifications] = useState([])
+  const [loadingSent, setLoadingSent] = useState(false)
+  const [sentSearch, setSentSearch] = useState('')
+
+  const refreshSentNotifications = async () => {
+    try {
+      setLoadingSent(true)
+      const data = await getAllNotifications()
+      setSentNotifications(Array.isArray(data) ? data : [])
+    } catch (err) {
+      console.warn('Nem sikerült betölteni az elküldött értesítéseket:', err)
+    } finally {
+      setLoadingSent(false)
+    }
+  }
+
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true)
-        const loadedTeams = await getNotificationTeams()
+        const [loadedTeams, loadedPrivileges, loadedSent] = await Promise.all([
+          getNotificationTeams(),
+          getNotificationPrivileges(),
+          getAllNotifications()
+        ])
         const validTeams = loadedTeams.filter((team) => team && typeof team === 'object' && team.id !== null && team.id !== undefined)
         setTeams(validTeams)
-        setContacts(contactsFromTeams(validTeams))
+        setPrivileges(Array.isArray(loadedPrivileges) ? loadedPrivileges : [])
+        setContacts(contactsFromTeamsAndPrivileges(validTeams, loadedPrivileges))
+        setSentNotifications(Array.isArray(loadedSent) ? loadedSent : [])
       } catch (error) {
         setFeedback({ type: 'danger', text: error.message })
       } finally {
@@ -69,9 +168,19 @@ export default function NotificationManagementPage() {
   const filteredTeams = useMemo(() => {
     const term = search.trim().toLocaleLowerCase('hu-HU')
     if (!term) return teams
-    return teams.filter((team) =>
-      [team.teamName, team.schoolName, team.teamMember1Email, team.teamMember2Email, team.teamCoach1Email]
-        .some((value) => String(value || '').toLocaleLowerCase('hu-HU').includes(term)))
+    return teams.filter((team) => {
+      const memberValues = Array.isArray(team.members)
+        ? team.members.flatMap((m) => [m.name, m.email])
+        : []
+      return [
+        team.teamName,
+        team.schoolName,
+        team.teamMember1Email,
+        team.teamMember2Email,
+        team.teamCoach1Email,
+        ...memberValues
+      ].some((value) => String(value || '').toLocaleLowerCase('hu-HU').includes(term))
+    })
   }, [search, teams])
 
   const filteredContacts = useMemo(() => {
@@ -81,6 +190,27 @@ export default function NotificationManagementPage() {
       [contact.email, contact.teamName, contact.name, contact.role]
         .some((value) => String(value || '').toLocaleLowerCase('hu-HU').includes(term)))
   }, [contacts, search])
+
+  const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams])
+
+  const filteredSentNotifications = useMemo(() => {
+    const term = sentSearch.trim().toLocaleLowerCase('hu-HU')
+    if (!term) return sentNotifications
+    return sentNotifications.filter((n) => {
+      const p = n.privilege || {}
+      const teamName = p.teamId ? (teamById.get(p.teamId)?.teamName || `Csapat #${p.teamId}`) : 'Egyéni címzett'
+      const roleName = getPrivilegeLabel(p.privilege1)
+      return [
+        n.title,
+        n.text,
+        n.message,
+        p.name,
+        p.emailAddress,
+        teamName,
+        roleName
+      ].some((val) => String(val || '').toLocaleLowerCase('hu-HU').includes(term))
+    })
+  }, [sentNotifications, sentSearch, teamById])
 
   // Team mode selections
   const selectedTeams = useMemo(() => teams.filter((team) => selectedTeamIds.includes(team.id)), [teams, selectedTeamIds])
@@ -206,13 +336,14 @@ export default function NotificationManagementPage() {
             text: `${allEmailTargets.length - failures.length} értesítés elküldve, ${failures.length} sikertelen. ${failures.join(' | ')}`
           })
         } else {
-          setFeedback({ type: 'success', text: `Az értesítés ${allEmailTargets.length} e-mail-címre sikeresen elküldve.` })
+          setFeedback({ type: 'success', text: `Az értesítés ${allEmailTargets.length} címzettnek sikeresen elküldve.` })
           setTitle('')
           setMessage('')
           setSelectedContactKeys([])
           setManualTargets([])
         }
       }
+      await refreshSentNotifications()
     } finally {
       setSending(false)
     }
@@ -403,11 +534,17 @@ export default function NotificationManagementPage() {
                     <input type="checkbox" checked={isSelected} onChange={() => toggleContact(contact)} />
                     <span>
                       <strong>
-                        <AgeGroupBadge category={contact.category} className="me-2" />
+                        {contact.category !== null && contact.category !== undefined && (
+                          <AgeGroupBadge category={contact.category} className="me-2" />
+                        )}
                         {contact.name || contact.email}
                       </strong>
                       <small>
-                        <span className="text-primary fw-semibold">{contact.email}</span> · {contact.teamName} · {contact.role}
+                        <span className="text-primary fw-semibold">{contact.email}</span>
+                        {' · '}
+                        {contact.teamName ? contact.teamName : <span className="text-muted">Egyéni (nincs csapatban)</span>}
+                        {' · '}
+                        <span className="badge text-bg-light border text-dark ms-1">{contact.role}</span>
                       </small>
                     </span>
                   </label>
@@ -423,6 +560,91 @@ export default function NotificationManagementPage() {
               Értesítés küldése
             </button>
           </div>
+        </div>
+      </section>
+
+      {/* Elküldött értesítések listája */}
+      <section className="card shadow-sm team-card no-hover-card mt-4">
+        <div className="card-body p-4">
+          <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3 pb-3 border-bottom">
+            <div>
+              <h2 className="h5 mb-1 d-flex align-items-center gap-2">
+                <i className="bi bi-clock-history text-primary" />
+                <span>Elküldött értesítések előzményei</span>
+                <span className="badge text-bg-secondary">{sentNotifications.length}</span>
+              </h2>
+              <p className="text-muted small mb-0">Az eddig kiküldött összes értesítés és a hozzájuk tartozó címzettek listája.</p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-outline-secondary btn-sm"
+              disabled={loadingSent}
+              onClick={refreshSentNotifications}
+            >
+              <i className={`bi bi-arrow-clockwise me-1 ${loadingSent ? 'spin-animation' : ''}`} />
+              Frissítés
+            </button>
+          </div>
+
+          <div className="mb-3">
+            <input
+              type="search"
+              className="form-control"
+              placeholder="Keresés az elküldött értesítésekben (cím, tartalom, címzett, csapat, szerepkör)…"
+              value={sentSearch}
+              onChange={(e) => setSentSearch(e.target.value)}
+            />
+          </div>
+
+          {loadingSent ? (
+            <div className="alert alert-info mb-0">Értesítések betöltése…</div>
+          ) : filteredSentNotifications.length > 0 ? (
+            <div className="table-responsive">
+              <table className="table table-hover align-middle mb-0">
+                <thead className="table-light">
+                  <tr>
+                    <th style={{ width: '4rem' }}>#</th>
+                    <th>Értesítés címe és tartalma</th>
+                    <th>Címzett</th>
+                    <th>Csapat / Szerepkör</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredSentNotifications.map((item, idx) => {
+                    const priv = item.privilege || {}
+                    const teamName = priv.teamId ? (teamById.get(priv.teamId)?.teamName || `Csapat #${priv.teamId}`) : 'Egyéni címzett'
+                    const roleName = getPrivilegeLabel(priv.privilege1)
+
+                    return (
+                      <tr key={item.id || idx}>
+                        <td>
+                          <span className="text-muted fw-bold">#{item.id || idx + 1}</span>
+                        </td>
+                        <td>
+                          <strong className="d-block text-primary">{item.title || 'Nincs cím'}</strong>
+                          <span className="text-muted small" style={{ whiteSpace: 'pre-wrap' }}>
+                            {item.text || item.message}
+                          </span>
+                        </td>
+                        <td>
+                          <strong className="d-block">{priv.name || priv.emailAddress || 'Ismeretlen'}</strong>
+                          <span className="small text-muted">{priv.emailAddress}</span>
+                        </td>
+                        <td>
+                          <span className="badge text-bg-light border text-dark me-1">{teamName}</span>
+                          <span className="badge text-bg-secondary">{roleName}</span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="alert alert-secondary mb-0">
+              {sentSearch ? 'Nincs a keresésnek megfelelő elküldött értesítés.' : 'Még nem lett értesítés elküldve.'}
+            </div>
+          )}
         </div>
       </section>
 

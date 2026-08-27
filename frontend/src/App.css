@@ -2216,34 +2216,14 @@ form {
   background-clip: padding-box;
 }
 
-.basket-throw-standings-scroll {
-  overflow-x: scroll !important;
-  overflow-y: hidden !important;
-  overscroll-behavior-x: contain;
-  touch-action: pan-x pan-y;
-  scrollbar-gutter: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.basket-throw-standings-scroll::-webkit-scrollbar {
-  display: none;
-}
-
-.basket-throw-standings-scroll .scoring-results-table {
-  width: max-content !important;
-  min-width: 100% !important;
-  max-width: none !important;
-}
-
-.basket-throw-standings-scroll .scoring-results-table th,
-.basket-throw-standings-scroll .scoring-results-table td {
-  white-space: nowrap;
-}
-
 .scoring-results-table {
   width: 100%;
   margin-bottom: 0;
+}
+
+.scoring-results-table th,
+.scoring-results-table td {
+  white-space: nowrap;
 }
 
 .scoring-table-hint {
@@ -2617,7 +2597,9 @@ form {
   z-index: 1100;
   width: min(390px, 92vw);
   height: 100vh;
-  padding: 1.25rem;
+  height: 100dvh;
+  max-height: 100dvh;
+  padding: 1.25rem 1.25rem calc(3.5rem + env(safe-area-inset-bottom, 0px)) 1.25rem;
   border-left: 2px solid var(--black);
   background:
     linear-gradient(145deg, rgba(253, 231, 76, 0.34), rgba(91, 192, 235, 0.2)),
@@ -2627,6 +2609,13 @@ form {
   transition: transform 0.25s ease;
   text-align: left;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.profile-signout-button {
+  margin-top: 1rem;
+  margin-bottom: 2.5rem !important;
 }
 
 .profile-notification-status {
@@ -3571,8 +3560,10 @@ form {
   font-size: 0.9em;
 }
 
-/* Vetítésen jól látható, élénk, kontrasztos W, L, D körök (hover effekt nélkül) */
-.show-match-grid .sumo-history-chip {
+/* Vetítésen jól látható, extra élénk, kontrasztos W, L, D körök (hover és animáció nélkül) */
+.show-match-grid .sumo-history-chip,
+.show-grand-final-arena .sumo-history-chip,
+.sumo-history-chip {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -3587,39 +3578,54 @@ form {
   cursor: default !important;
   pointer-events: none !important;
   user-select: none !important;
+  transition: none !important;
+  animation: none !important;
 }
 
+.sumo-history-chip:hover,
+.sumo-history-chip:focus,
+.sumo-history-chip:active,
 .show-match-grid .sumo-history-chip:hover,
 .show-match-grid .sumo-history-chip:focus,
 .show-match-grid .sumo-history-chip:active {
   transform: none !important;
 }
 
+.sumo-history-chip--win,
+.sumo-history-chip--win:hover,
+.sumo-history-chip--win:focus,
 .show-match-grid .sumo-history-chip--win,
 .show-match-grid .sumo-history-chip--win:hover,
 .show-match-grid .sumo-history-chip--win:focus {
-  background: #15803d !important;
-  border: 2px solid #4ade80 !important;
+  background: #16a34a !important;
+  border: 2px solid #86efac !important;
   color: #ffffff !important;
-  box-shadow: 0 0 10px rgba(74, 222, 128, 0.65) !important;
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.85) !important;
 }
 
+.sumo-history-chip--loss,
+.sumo-history-chip--loss:hover,
+.sumo-history-chip--loss:focus,
 .show-match-grid .sumo-history-chip--loss,
 .show-match-grid .sumo-history-chip--loss:hover,
 .show-match-grid .sumo-history-chip--loss:focus {
-  background: #b91c1c !important;
-  border: 2px solid #f87171 !important;
+  background: #dc2626 !important;
+  border: 2px solid #fca5a5 !important;
   color: #ffffff !important;
-  box-shadow: 0 0 10px rgba(248, 113, 113, 0.65) !important;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.85) !important;
 }
 
+.sumo-history-chip--draw,
+.sumo-history-chip--draw:hover,
+.sumo-history-chip--draw:focus,
 .show-match-grid .sumo-history-chip--draw,
 .show-match-grid .sumo-history-chip--draw:hover,
 .show-match-grid .sumo-history-chip--draw:focus {
-  background: #ca8a04 !important;
-  border: 2px solid #fde047 !important;
+  background: #eab308 !important;
+  border: 2px solid #fef08a !important;
   color: #000000 !important;
-  box-shadow: 0 0 10px rgba(253, 224, 71, 0.65) !important;
+  font-weight: 900 !important;
+  box-shadow: 0 0 14px rgba(234, 179, 8, 0.9) !important;
 }
 
 .show-empty {
@@ -4065,4 +4071,397 @@ form {
   .show-live-status {
     display: none;
   }
+}
+
+/* ==========================================================================
+   Szumó Abszolút Döntő - Természetes, letisztult Eredményjelző Tábla
+   ========================================================================== */
+
+.show-scoreboard-board {
+  display: flex;
+  flex-direction: column;
+  max-width: 76rem;
+  margin: auto auto;
+  width: 100%;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 1.25rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.show-scoreboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.75rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: clamp(0.85rem, 1.1vw, 1.1rem);
+  font-weight: 700;
+}
+
+.show-scoreboard-tag {
+  display: inline-flex;
+  align-items: center;
+  color: #f8fafc;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.show-scoreboard-table {
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.show-scoreboard-status {
+  padding: 0.25rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.show-scoreboard-status.status-live {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.show-scoreboard-status.status-finished {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.show-scoreboard-status.status-upcoming {
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.show-scoreboard-body {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: clamp(1rem, 2.5vw, 3rem);
+  padding: clamp(1.5rem, 3vh, 2.5rem) clamp(1.5rem, 2.5vw, 3rem);
+}
+
+.show-scoreboard-team {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.show-scoreboard-team--left {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.show-scoreboard-team--right {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.show-scoreboard-category {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #cbd5e1;
+  font-size: clamp(0.8rem, 1vw, 1rem);
+  font-weight: 700;
+}
+
+.show-scoreboard-team-name {
+  color: #ffffff;
+  font-size: clamp(1.6rem, 2.8vw, 3.4rem);
+  font-weight: 900;
+  line-height: 1.15;
+  word-break: break-word;
+}
+
+.show-scoreboard-winner-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.65rem;
+  border-radius: 6px;
+  background: rgba(253, 231, 76, 0.16);
+  border: 1px solid rgba(253, 231, 76, 0.45);
+  color: #fde74c;
+  font-size: clamp(0.75rem, 0.95vw, 0.9rem);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.show-scoreboard-score-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.75rem 1.5rem;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+}
+
+.show-scoreboard-digits {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-family: monospace, system-ui, -apple-system, sans-serif;
+  font-size: clamp(2.8rem, 5vw, 5.5rem);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.score-digit {
+  color: #f8fafc;
+  min-width: 1.2ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-colon {
+  color: #64748b;
+  font-weight: 400;
+}
+
+.show-scoreboard-vs-label {
+  color: #e55934;
+  font-size: 1rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+/* ==========================================================================
+   Sima korosztályos döntők: egymás alatt, tiszta struktúrával
+   ========================================================================== */
+
+.show-match-grid.finals-stacked-layout {
+  display: grid;
+  grid-template-columns: 1fr !important;
+  gap: clamp(0.75rem, 1.4vh, 1.25rem) !important;
+  max-width: 74rem;
+  margin: auto auto;
+  width: 100%;
+  padding: 0.25rem 0.5rem !important;
+  overflow: hidden !important;
+}
+
+.show-match-grid.finals-stacked-layout article {
+  padding: clamp(0.85rem, 1.6vh, 1.35rem) clamp(1.25rem, 2vw, 2.25rem) !important;
+  border-radius: 1rem !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  background: #0f172a !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+}
+
+.show-match-grid.finals-stacked-layout .show-match-card-header {
+  margin-bottom: 0.5rem !important;
+  padding-bottom: 0.4rem !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.show-match-grid.finals-stacked-layout .show-match-stage-tag {
+  font-size: clamp(0.85rem, 1.1vw, 1.05rem) !important;
+  padding: 0.25rem 0.75rem !important;
+  border-radius: 6px !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: #e2e8f0 !important;
+}
+
+.show-match-grid.finals-stacked-layout .show-match-card-body {
+  display: grid !important;
+  grid-template-columns: 1fr auto 1fr !important;
+  align-items: center !important;
+  gap: clamp(0.8rem, 2vw, 2.5rem) !important;
+}
+
+.show-match-grid.finals-stacked-layout .show-match-side b {
+  font-size: clamp(1.35rem, 2.1vw, 2.3rem) !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+}
+
+.show-match-grid.finals-stacked-layout .show-match-vs {
+  font-size: clamp(1.1rem, 1.6vw, 1.8rem) !important;
+  font-weight: 900 !important;
+  padding: 0 0.6rem !important;
+  color: #e55934 !important;
+}
+
+.show-match-grid.finals-stacked-layout .sumo-history-chip {
+  width: 2.2rem !important;
+  height: 2.2rem !important;
+  min-width: 2.2rem !important;
+  font-size: 1.05rem !important;
+}
+
+/* ==========================================================================
+   Vonalkövetés Kétoszlopos Korosztályos Táblázat (ShowPage)
+   ========================================================================== */
+
+.show-stage-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(91, 192, 235, 0.16);
+  border: 1px solid rgba(91, 192, 235, 0.4);
+  color: #7dd3fc;
+  font-size: clamp(0.75rem, 0.95vw, 0.9rem);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
+.show-line-dual-slide {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.show-line-dual-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(0.75rem, 1.5vw, 1.5rem);
+  flex: 1;
+  min-height: 0;
+  margin-top: 0.5rem;
+}
+
+.show-line-category-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 1rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.show-line-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.show-line-header--primary {
+  background: linear-gradient(90deg, rgba(34, 197, 94, 0.15), rgba(255, 255, 255, 0.03));
+}
+
+.show-line-header--secondary {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.15), rgba(255, 255, 255, 0.03));
+}
+
+.show-line-category-header h3 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: clamp(1rem, 1.3vw, 1.3rem);
+  font-weight: 800;
+}
+
+.show-line-table-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.show-line-table-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.show-line-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.show-line-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 0.6rem 1rem;
+  background: #111c2e;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.12);
+  color: #94a3b8;
+  font-size: clamp(0.75rem, 0.95vw, 0.9rem);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.show-line-table td {
+  padding: clamp(0.5rem, 0.9vh, 0.75rem) 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  color: #cbd5e1;
+  font-size: clamp(0.9rem, 1.2vw, 1.15rem);
+  vertical-align: middle;
+}
+
+.show-line-table tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.show-line-table tr.has-score td {
+  color: #ffffff;
+}
+
+.show-line-table tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.show-line-team-name {
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.show-line-time-badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 4px;
+  background: rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(34, 197, 94, 0.45);
+  color: #86efac;
+  font-family: monospace, system-ui;
+  font-size: 0.9em;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.show-line-waiting-badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #94a3b8;
+  font-size: 0.8em;
+  font-weight: 600;
+}
+
+.show-empty-inline {
+  padding: 2.5rem 1rem !important;
+}
+
+.show-overall-total-badge {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 4px;
+  background: rgba(234, 179, 8, 0.2);
+  border: 1px solid rgba(234, 179, 8, 0.55);
+  color: #fde047;
+  font-family: monospace, system-ui;
+  font-size: 0.95em;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }

@@ -11,7 +11,8 @@ const SLIDE_OPTIONS = [
   { id: 'hill', label: 'Hegymászás külön dia', icon: 'bi-graph-up-arrow' },
   { id: 'basketball', label: 'Kosárra dobás külön dia', icon: 'bi-bullseye' },
   { id: 'sumo', label: 'Szumó tabella külön dia', icon: 'bi-record-circle' },
-  { id: 'matches', label: 'Szumómérkőzések', icon: 'bi-diagram-3-fill' }
+  { id: 'matches', label: 'Szumómérkőzések', icon: 'bi-diagram-3-fill' },
+  { id: 'grand_final', label: 'Szumó abszolút döntő (Kiemelt dia)', icon: 'bi-trophy-fill' }
 ]
 const defaultSlideOrder = SLIDE_OPTIONS.map((option) => option.id)
 const DETAIL_OPTIONS = {
@@ -22,7 +23,8 @@ const DETAIL_OPTIONS = {
   hill: [{ id: 'category', label: 'Korosztály' }, { id: 'level', label: 'Teljesített szint' }, { id: 'time', label: 'Felhasznált idő' }],
   basketball: [{ id: 'category', label: 'Korosztály' }, { id: 'points', label: 'Pontszám' }, { id: 'time', label: 'Felhasznált idő' }],
   sumo: [{ id: 'category', label: 'Korosztály' }, { id: 'points', label: 'Pontszám' }, { id: 'wins', label: 'Győzelmek' }],
-  matches: [{ id: 'table', label: 'Mérkőzés sorszáma' }, { id: 'status', label: 'Állapot' }, { id: 'results', label: 'Meneteredmények' }]
+  matches: [{ id: 'table', label: 'Mérkőzés sorszáma' }, { id: 'status', label: 'Állapot' }, { id: 'results', label: 'Meneteredmények' }],
+  grand_final: [{ id: 'table', label: 'Mérkőzés sorszáma' }, { id: 'status', label: 'Állapot' }, { id: 'results', label: 'Meneteredmények' }, { id: 'category', label: 'Korosztályjelölés' }]
 }
 const defaultDetails = Object.fromEntries(Object.entries(DETAIL_OPTIONS).map(([id, options]) => [id, options.map((option) => option.id)]))
 const storedDetails = () => {
@@ -84,6 +86,13 @@ function ProjectionTable({ rows, columns, empty = 'Még nincs megjeleníthető e
 
 const CombinedStandingsNotice = () => <div className="show-combined-notice"><i className="bi bi-info-circle-fill" /><span>A megjelenített sorrend a korosztályok <strong>összevont állása</strong>, nem korosztályonként bontott rangsor.</span></div>
 
+const LINE_FOLLOWING_STAGE_LABELS = {
+  1: 'Csoportkör',
+  2: 'Legjobb 16',
+  3: 'Negyeddöntő',
+  4: 'Legjobb 4 (Döntő)'
+}
+
 const SUMO_STAGE_LABELS = {
   1: 'Alapszakasz',
   2: 'Legjobb 16',
@@ -100,6 +109,31 @@ const SUMO_STAGE_LABELS = {
 }
 
 const getMatchStageName = (stage) => SUMO_STAGE_LABELS[stage] || SUMO_STAGE_LABELS[String(stage).toUpperCase()] || 'Alapszakasz'
+
+const getMatchDetailedStageName = (match, withCategory) => {
+  const stageOrder = getStageOrder(match.stage)
+  const cat1 = withCategory(match.team1)
+  const cat2 = withCategory(match.team2)
+  const isCross = cat1 !== cat2
+
+  if (stageOrder === 6) {
+    if (isCross) return 'Abszolút döntő'
+    if (cat1 === 0) return 'Általános iskolás döntő'
+    if (cat1 === 1) return 'Középiskolás döntő'
+    return 'Döntő'
+  }
+  if (stageOrder === 4) {
+    if (cat1 === 0 && cat2 === 0) return 'Általános elődöntő'
+    if (cat1 === 1 && cat2 === 1) return 'Középiskolás elődöntő'
+    return 'Elődöntő'
+  }
+  if (stageOrder === 3) {
+    if (cat1 === 0 && cat2 === 0) return 'Általános negyeddöntő'
+    if (cat1 === 1 && cat2 === 1) return 'Középiskolás negyeddöntő'
+    return 'Negyeddöntő'
+  }
+  return getMatchStageName(match.stage)
+}
 
 const getSumoScore = (resultsStr) => {
   if (!resultsStr) return 0
@@ -147,12 +181,16 @@ const getStageOrder = (stage) => {
 function SumoMatchesSlide({
   activeSumoStageName,
   matches,
-  hasDetail
+  hasDetail,
+  withCategory
 }) {
   const gridRef = useRef(null)
   const matchesKey = useMemo(() => {
     return matches.map((m) => `${m.table}-${m.result1}-${m.result2}`).join('|')
   }, [matches])
+
+  const isFinalsRound = matches.length > 0 && matches.every((m) => getStageOrder(m.stage) === 6)
+  const isStackedLayout = isFinalsRound || (matches.length <= 2 && matches.every((m) => getStageOrder(m.stage) >= 4))
 
   useEffect(() => {
     const el = gridRef.current
@@ -174,7 +212,8 @@ function SumoMatchesSlide({
     const tick = (now) => {
       if (!el) return
       const maxScroll = Math.max(0, el.scrollHeight - el.clientHeight)
-      if (maxScroll > 15) {
+      const threshold = isStackedLayout ? 35 : 15
+      if (maxScroll > threshold) {
         const elapsed = (now - startTime) % cycleDuration
 
         if (elapsed < t1) {
@@ -202,15 +241,18 @@ function SumoMatchesSlide({
     return () => {
       if (animationFrameId) cancelAnimationFrame(animationFrameId)
     }
-  }, [matchesKey])
+  }, [matchesKey, isStackedLayout])
+
+  const slideEyebrow = isFinalsRound ? 'Szumó · Korosztályos döntők' : `Szumó · ${activeSumoStageName}`
+  const slideHeading = isFinalsRound ? 'Döntők — Általános és Középiskola' : `Mérkőzések — ${activeSumoStageName}`
 
   return (
     <section className="show-slide" key="matches">
       <div className="show-slide-title">
-        <span>Szumó · {activeSumoStageName}</span>
-        <h2>Mérkőzések — {activeSumoStageName}</h2>
+        <span>{slideEyebrow}</span>
+        <h2>{slideHeading}</h2>
       </div>
-      <div className="show-match-grid" ref={gridRef}>
+      <div className={`show-match-grid ${isStackedLayout ? 'finals-stacked-layout' : ''}`} ref={gridRef}>
         {matches.length ? (
           matches.map((match, index) => {
             const score1 = getSumoScore(match.result1)
@@ -218,7 +260,9 @@ function SumoMatchesSlide({
             const hasPlayed = Boolean(match.result1 || match.result2)
             const isTeam1Winning = hasPlayed && score1 > score2
             const isTeam2Winning = hasPlayed && score2 > score1
-            const stageName = getMatchStageName(match.stage)
+            const stageName = getMatchDetailedStageName(match, withCategory)
+            const cat1 = withCategory(match.team1)
+            const cat2 = withCategory(match.team2)
             const matchGradientClass = isTeam1Winning
               ? 'gradient-team1-win'
               : isTeam2Winning
@@ -237,6 +281,7 @@ function SumoMatchesSlide({
                 <div className="show-match-card-body">
                   <div className="show-match-side show-match-left">
                     <b title={match.team1}>
+                      <em className={`show-age age-${cat1} me-2`}>{categoryLabel(cat1)}</em>
                       {match.team1}
                       {isTeam1Winning && <i className="bi bi-trophy-fill ms-2 show-winner-icon" />}
                     </b>
@@ -247,6 +292,7 @@ function SumoMatchesSlide({
                     <b title={match.team2}>
                       {isTeam2Winning && <i className="bi bi-trophy-fill me-2 show-winner-icon" />}
                       {match.team2}
+                      <em className={`show-age age-${cat2} ms-2`}>{categoryLabel(cat2)}</em>
                     </b>
                     {hasDetail('matches', 'results') && renderResultChips(match.result2, true)}
                   </div>
@@ -260,6 +306,483 @@ function SumoMatchesSlide({
             <span>Még nincs kisorsolt szumómérkőzés.</span>
           </div>
         )}
+      </div>
+    </section>
+  )
+}
+
+function LineFollowingSlide({
+  activeLineStageName,
+  primaryTeams,
+  secondaryTeams,
+  hasDetail
+}) {
+  const leftRef = useRef(null)
+  const rightRef = useRef(null)
+
+  const teamsKey = useMemo(() => {
+    return `${primaryTeams.map((t) => `${t.name}-${t.time}`).join('|')}#${secondaryTeams.map((t) => `${t.name}-${t.time}`).join('|')}`
+  }, [primaryTeams, secondaryTeams])
+
+  useEffect(() => {
+    const leftEl = leftRef.current
+    const rightEl = rightRef.current
+    if (!leftEl && !rightEl) return
+
+    let animationFrameId
+    const startTime = performance.now()
+    const topPause = 3000
+    const scrollDownDuration = 6000
+    const bottomPause = 3000
+    const scrollUpDuration = 6000
+    const cycleDuration = topPause + scrollDownDuration + bottomPause + scrollUpDuration
+
+    const t1 = topPause
+    const t2 = t1 + scrollDownDuration
+    const t3 = t2 + bottomPause
+    const t4 = cycleDuration
+
+    const tick = (now) => {
+      const elapsed = (now - startTime) % cycleDuration
+
+      const syncScroll = (el) => {
+        if (!el) return
+        const maxScroll = Math.max(0, el.scrollHeight - el.clientHeight)
+        if (maxScroll > 15) {
+          if (elapsed < t1) {
+            el.scrollTop = 0
+          } else if (elapsed < t2) {
+            const progress = Math.min(1, Math.max(0, (elapsed - t1) / scrollDownDuration))
+            el.scrollTop = easeInOutQuad(progress) * maxScroll
+          } else if (elapsed < t3) {
+            el.scrollTop = maxScroll
+          } else if (elapsed < t4) {
+            const progress = Math.min(1, Math.max(0, (elapsed - t3) / scrollUpDuration))
+            el.scrollTop = (1 - easeInOutQuad(progress)) * maxScroll
+          } else {
+            el.scrollTop = 0
+          }
+        } else {
+          el.scrollTop = 0
+        }
+      }
+
+      syncScroll(leftEl)
+      syncScroll(rightEl)
+
+      animationFrameId = requestAnimationFrame(tick)
+    }
+
+    animationFrameId = requestAnimationFrame(tick)
+
+    return () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId)
+    }
+  }, [teamsKey])
+
+  return (
+    <section className="show-slide show-line-dual-slide" key="line">
+      <div className="show-slide-title">
+        <div className="d-flex align-items-center gap-2 flex-wrap mb-1">
+          <span>Versenyszám</span>
+          <span className="show-stage-pill">
+            <i className="bi bi-diagram-3-fill me-1" />
+            {activeLineStageName}
+          </span>
+        </div>
+        <h2>Vonalkövetés — {activeLineStageName}</h2>
+      </div>
+
+      <div className="show-line-dual-grid">
+        {/* Általános Iskolások */}
+        <div className="show-line-category-card">
+          <div className="show-line-category-header show-line-header--primary">
+            <div className="d-flex align-items-center gap-2">
+              <em className="show-age age-0">Á</em>
+              <h3>Általános iskolás korosztály</h3>
+            </div>
+            <span className="badge text-bg-light">{primaryTeams.length} csapat</span>
+          </div>
+
+          <div className="show-line-table-scroll" ref={leftRef}>
+            {primaryTeams.length > 0 ? (
+              <table className="show-line-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '3.5rem' }}>#</th>
+                    <th>Csapat</th>
+                    <th className="text-end" style={{ width: '8.5rem' }}>Idő</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {primaryTeams.map((team) => (
+                    <tr key={team.name} className={team.time !== null ? 'has-score' : ''}>
+                      <td>
+                        <strong>{team.rank !== '-' ? `${team.rank}.` : '–'}</strong>
+                      </td>
+                      <td>
+                        <span className="show-line-team-name">{team.name}</span>
+                      </td>
+                      <td className="text-end">
+                        {team.time !== null ? (
+                          <span className="show-line-time-badge">{team.time.toFixed(3)} s</span>
+                        ) : (
+                          <span className="show-line-waiting-badge">Várakozik</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="show-empty show-empty-inline">
+                <i className="bi bi-hourglass-split" />
+                <span>Nincs csapat ebben a korosztályban.</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Középiskolások */}
+        <div className="show-line-category-card">
+          <div className="show-line-category-header show-line-header--secondary">
+            <div className="d-flex align-items-center gap-2">
+              <em className="show-age age-1">K</em>
+              <h3>Középiskolás korosztály</h3>
+            </div>
+            <span className="badge text-bg-light">{secondaryTeams.length} csapat</span>
+          </div>
+
+          <div className="show-line-table-scroll" ref={rightRef}>
+            {secondaryTeams.length > 0 ? (
+              <table className="show-line-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '3.5rem' }}>#</th>
+                    <th>Csapat</th>
+                    <th className="text-end" style={{ width: '8.5rem' }}>Idő</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {secondaryTeams.map((team) => (
+                    <tr key={team.name} className={team.time !== null ? 'has-score' : ''}>
+                      <td>
+                        <strong>{team.rank !== '-' ? `${team.rank}.` : '–'}</strong>
+                      </td>
+                      <td>
+                        <span className="show-line-team-name">{team.name}</span>
+                      </td>
+                      <td className="text-end">
+                        {team.time !== null ? (
+                          <span className="show-line-time-badge">{team.time.toFixed(3)} s</span>
+                        ) : (
+                          <span className="show-line-waiting-badge">Várakozik</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="show-empty show-empty-inline">
+                <i className="bi bi-hourglass-split" />
+                <span>Nincs csapat ebben a korosztályban.</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function OverallStandingsSlide({
+  primaryTeams,
+  secondaryTeams,
+  hasDetail
+}) {
+  const leftRef = useRef(null)
+  const rightRef = useRef(null)
+
+  const teamsKey = useMemo(() => {
+    return `${primaryTeams.map((t) => `${t.name}-${t.total}`).join('|')}#${secondaryTeams.map((t) => `${t.name}-${t.total}`).join('|')}`
+  }, [primaryTeams, secondaryTeams])
+
+  useEffect(() => {
+    const leftEl = leftRef.current
+    const rightEl = rightRef.current
+    if (!leftEl && !rightEl) return
+
+    let animationFrameId
+    const startTime = performance.now()
+    const topPause = 3000
+    const scrollDownDuration = 6000
+    const bottomPause = 3000
+    const scrollUpDuration = 6000
+    const cycleDuration = topPause + scrollDownDuration + bottomPause + scrollUpDuration
+
+    const t1 = topPause
+    const t2 = t1 + scrollDownDuration
+    const t3 = t2 + bottomPause
+    const t4 = cycleDuration
+
+    const tick = (now) => {
+      const elapsed = (now - startTime) % cycleDuration
+
+      const syncScroll = (el) => {
+        if (!el) return
+        const maxScroll = Math.max(0, el.scrollHeight - el.clientHeight)
+        if (maxScroll > 15) {
+          if (elapsed < t1) {
+            el.scrollTop = 0
+          } else if (elapsed < t2) {
+            const progress = Math.min(1, Math.max(0, (elapsed - t1) / scrollDownDuration))
+            el.scrollTop = easeInOutQuad(progress) * maxScroll
+          } else if (elapsed < t3) {
+            el.scrollTop = maxScroll
+          } else if (elapsed < t4) {
+            const progress = Math.min(1, Math.max(0, (elapsed - t3) / scrollUpDuration))
+            el.scrollTop = (1 - easeInOutQuad(progress)) * maxScroll
+          } else {
+            el.scrollTop = 0
+          }
+        } else {
+          el.scrollTop = 0
+        }
+      }
+
+      syncScroll(leftEl)
+      syncScroll(rightEl)
+
+      animationFrameId = requestAnimationFrame(tick)
+    }
+
+    animationFrameId = requestAnimationFrame(tick)
+
+    return () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId)
+    }
+  }, [teamsKey])
+
+  const renderTable = (teamsList) => {
+    if (teamsList.length === 0) {
+      return (
+        <div className="show-empty show-empty-inline">
+          <i className="bi bi-hourglass-split" />
+          <span>Nincs csapat ebben a korosztályban.</span>
+        </div>
+      )
+    }
+
+    const showLine = hasDetail('overall', 'line')
+    const showHill = hasDetail('overall', 'hill')
+    const showSumo = hasDetail('overall', 'sumo')
+    const showBasket = hasDetail('overall', 'basketball')
+    const showTotal = hasDetail('overall', 'total') ?? true
+
+    return (
+      <table className="show-line-table show-overall-table">
+        <thead>
+          <tr>
+            <th style={{ width: '3.2rem' }}>#</th>
+            <th>Csapat</th>
+            {showLine && <th className="text-end" style={{ width: '4.8rem' }}>Vonal</th>}
+            {showHill && <th className="text-end" style={{ width: '4.8rem' }}>Hegy</th>}
+            {showSumo && <th className="text-end" style={{ width: '4.8rem' }}>Szumó</th>}
+            {showBasket && <th className="text-end" style={{ width: '4.8rem' }}>Kosár</th>}
+            {showTotal && <th className="text-end" style={{ width: '5.8rem' }}>Össz.</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {teamsList.map((team) => (
+            <tr key={team.name} className={team.total > 0 ? 'has-score' : ''}>
+              <td>
+                <strong>
+                  {team.rank}.
+                </strong>
+              </td>
+              <td>
+                <span className="show-line-team-name">{team.name}</span>
+              </td>
+              {showLine && (
+                <td className="text-end font-monospace">
+                  {number(team.lineFollowPoint)}
+                </td>
+              )}
+              {showHill && (
+                <td className="text-end font-monospace">
+                  {number(team.hillClimbPoint)}
+                </td>
+              )}
+              {showSumo && (
+                <td className="text-end font-monospace">
+                  {number(team.sumoPoint)}
+                </td>
+              )}
+              {showBasket && (
+                <td className="text-end font-monospace">
+                  {number(team.basketballPoint)}
+                </td>
+              )}
+              {showTotal && (
+                <td className="text-end">
+                  <span className="show-overall-total-badge">{team.total}</span>
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+
+  return (
+    <section className="show-slide show-line-dual-slide" key="overall">
+      <div className="show-slide-title">
+        <div className="d-flex align-items-center gap-2 flex-wrap mb-1">
+          <span>Élő eredmények</span>
+          <span className="show-stage-pill">
+            <i className="bi bi-trophy-fill me-1" />
+            Összetett
+          </span>
+        </div>
+        <h2>Összesített állás</h2>
+      </div>
+
+      <div className="show-line-dual-grid">
+        {/* Általános Iskolások */}
+        <div className="show-line-category-card">
+          <div className="show-line-category-header show-line-header--primary">
+            <div className="d-flex align-items-center gap-2">
+              <em className="show-age age-0">Á</em>
+              <h3>Általános iskolás korosztály</h3>
+            </div>
+            <span className="badge text-bg-light">{primaryTeams.length} csapat</span>
+          </div>
+
+          <div className="show-line-table-scroll" ref={leftRef}>
+            {renderTable(primaryTeams)}
+          </div>
+        </div>
+
+        {/* Középiskolások */}
+        <div className="show-line-category-card">
+          <div className="show-line-category-header show-line-header--secondary">
+            <div className="d-flex align-items-center gap-2">
+              <em className="show-age age-1">K</em>
+              <h3>Középiskolás korosztály</h3>
+            </div>
+            <span className="badge text-bg-light">{secondaryTeams.length} csapat</span>
+          </div>
+
+          <div className="show-line-table-scroll" ref={rightRef}>
+            {renderTable(secondaryTeams)}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function SumoGrandFinalSlide({
+  finalMatch,
+  withCategory,
+  hasDetail
+}) {
+  if (!finalMatch) {
+    return (
+      <section className="show-slide" key="grand_final">
+        <div className="show-slide-title">
+          <span>Szumó bajnokság</span>
+          <h2>Abszolút döntő</h2>
+        </div>
+        <div className="show-empty">
+          <i className="bi bi-trophy text-warning" />
+          <span>Az abszolút döntő az általános és a középiskolás korosztályos döntők lezárulta után kezdődik.</span>
+        </div>
+      </section>
+    )
+  }
+
+  const score1 = getSumoScore(finalMatch.result1)
+  const score2 = getSumoScore(finalMatch.result2)
+  const hasPlayed = Boolean(finalMatch.result1 || finalMatch.result2)
+  const isFinished = score1 >= 6 || score2 >= 6 || (hasPlayed && Math.abs(score1 - score2) >= 2 && Math.max(score1, score2) >= 4)
+  const isTeam1Winning = hasPlayed && score1 > score2
+  const isTeam2Winning = hasPlayed && score2 > score1
+  const cat1 = withCategory(finalMatch.team1)
+  const cat2 = withCategory(finalMatch.team2)
+  const cat1Label = cat1 === 0 ? 'Általános iskola bajnoka' : 'Középiskola bajnoka'
+  const cat2Label = cat2 === 0 ? 'Általános iskola bajnoka' : 'Középiskola bajnoka'
+
+  return (
+    <section className="show-slide" key="grand_final">
+      <div className="show-slide-title">
+        <span>Szumó bajnokság</span>
+        <h2>Abszolút döntő — A két korosztály bajnokának összecsapása</h2>
+      </div>
+
+      <div className="show-scoreboard-board">
+        <div className="show-scoreboard-header">
+          <span className="show-scoreboard-tag">
+            Abszolút Bajnoki Döntő
+          </span>
+          {hasDetail('grand_final', 'table') && finalMatch.table ? (
+            <span className="show-scoreboard-table">#{finalMatch.table}. mérkőzés</span>
+          ) : null}
+          {hasDetail('grand_final', 'status') && (
+            <span className={`show-scoreboard-status ${hasPlayed ? (isFinished ? 'status-finished' : 'status-live') : 'status-upcoming'}`}>
+              {hasPlayed ? (isFinished ? 'Befejezve' : 'Élő mérkőzés') : 'Következik'}
+            </span>
+          )}
+        </div>
+
+        <div className="show-scoreboard-body">
+          <div className={`show-scoreboard-team show-scoreboard-team--left ${isTeam1Winning ? 'is-winning' : ''}`}>
+            <div className="d-flex align-items-center gap-2 flex-wrap">
+              <div className="show-scoreboard-category">
+                <em className={`show-age age-${cat1} me-2`}>{categoryLabel(cat1)}</em>
+                {cat1Label}
+              </div>
+              {isTeam1Winning && (
+                <span className="show-scoreboard-winner-badge">
+                  {isFinished ? 'Bajnok' : 'Vezet'}
+                </span>
+              )}
+            </div>
+            <div className="show-scoreboard-team-name" title={finalMatch.team1}>
+              {finalMatch.team1}
+            </div>
+            {hasDetail('grand_final', 'results') && renderResultChips(finalMatch.result1, false)}
+          </div>
+
+          <div className="show-scoreboard-score-panel">
+            <div className="show-scoreboard-digits">
+              <span className={`score-digit ${isTeam1Winning ? 'text-success' : ''}`}>{score1}</span>
+              <span className="score-colon">:</span>
+              <span className={`score-digit ${isTeam2Winning ? 'text-success' : ''}`}>{score2}</span>
+            </div>
+            <span className="show-scoreboard-vs-label">VS</span>
+          </div>
+
+          <div className={`show-scoreboard-team show-scoreboard-team--right ${isTeam2Winning ? 'is-winning' : ''}`}>
+            <div className="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+              {isTeam2Winning && (
+                <span className="show-scoreboard-winner-badge">
+                  {isFinished ? 'Bajnok' : 'Vezet'}
+                </span>
+              )}
+              <div className="show-scoreboard-category">
+                <em className={`show-age age-${cat2} me-2`}>{categoryLabel(cat2)}</em>
+                {cat2Label}
+              </div>
+            </div>
+            <div className="show-scoreboard-team-name" title={finalMatch.team2}>
+              {finalMatch.team2}
+            </div>
+            {hasDetail('grand_final', 'results') && renderResultChips(finalMatch.result2, true)}
+          </div>
+        </div>
       </div>
     </section>
   )
@@ -343,8 +866,105 @@ export default function ShowPage() {
     return { selected, next: index >= 0 ? ordered[index + 1] || null : ordered[0] || null, remaining, progress }
   }, [data.phases, data.settings, now])
 
-  const overall = useMemo(() => [...data.points].map((item) => ({ ...item, name: teamName(item), category: withCategory(teamName(item)), total: number(item.allPoint, item.point, item.points) })).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'hu')).slice(0, 10), [data.points, withCategory])
-  const line = useMemo(() => [...data.line].map((item) => ({ name: teamName(item), category: withCategory(teamName(item)), value: number(item.time), stage: number(item.stage) })).sort((a, b) => a.value - b.value).slice(0, 6), [data.line, withCategory])
+  const overallCategoryData = useMemo(() => {
+    const all = [...data.points].map((item) => ({
+      ...item,
+      name: teamName(item),
+      category: withCategory(teamName(item)),
+      total: number(item.allPoint, item.point, item.points)
+    }))
+
+    const sortTeams = (list) => [...list].sort((a, b) => {
+      if (b.total !== a.total) return b.total - a.total
+      return a.name.localeCompare(b.name, 'hu')
+    }).map((t, idx) => ({ ...t, rank: idx + 1 }))
+
+    return {
+      primary: sortTeams(all.filter((t) => t.category === 0)),
+      secondary: sortTeams(all.filter((t) => t.category === 1))
+    }
+  }, [data.points, withCategory])
+  const activeLineStageOrder = useMemo(() => {
+    if (!data.line || !data.line.length) return 1
+    return Math.max(1, ...data.line.map((item) => Number(item.stage ?? item.tournamentStage ?? item.tournament_stage ?? 1)))
+  }, [data.line])
+
+  const activeLineStageName = useMemo(() => {
+    return LINE_FOLLOWING_STAGE_LABELS[activeLineStageOrder] || `${activeLineStageOrder}. szakasz`
+  }, [activeLineStageOrder])
+
+  const lineCategoryData = useMemo(() => {
+    const stageItems = (data.line || []).filter((item) => Number(item.stage ?? item.tournamentStage ?? item.tournament_stage ?? 1) === activeLineStageOrder)
+    const stageTimeMap = new Map()
+    stageItems.forEach((item) => {
+      const name = teamName(item)
+      const time = number(item.time)
+      const prev = stageTimeMap.get(name)
+      if (prev === undefined || (time > 0 && (prev <= 0 || time < prev))) {
+        stageTimeMap.set(name, time)
+      }
+    })
+
+    let primaryTeams = []
+    let secondaryTeams = []
+
+    if (activeLineStageOrder === 1 && data.teams && data.teams.length > 0) {
+      data.teams.forEach((t) => {
+        const name = teamName(t)
+        const cat = withCategory(name)
+        const time = stageTimeMap.get(name) ?? null
+        const entry = { name, category: cat, time: time && time > 0 ? time : null }
+        if (cat === 0) primaryTeams.push(entry)
+        else secondaryTeams.push(entry)
+      })
+    } else {
+      stageTimeMap.forEach((time, name) => {
+        const cat = withCategory(name)
+        const entry = { name, category: cat, time: time && time > 0 ? time : null }
+        if (cat === 0) primaryTeams.push(entry)
+        else secondaryTeams.push(entry)
+      })
+      if (primaryTeams.length === 0 && secondaryTeams.length === 0 && data.teams && data.teams.length > 0) {
+        data.teams.forEach((t) => {
+          const name = teamName(t)
+          const cat = withCategory(name)
+          const time = stageTimeMap.get(name) ?? null
+          const entry = { name, category: cat, time: time && time > 0 ? time : null }
+          if (cat === 0) primaryTeams.push(entry)
+          else secondaryTeams.push(entry)
+        })
+      }
+    }
+
+    const sortTeams = (list) => [...list].sort((a, b) => {
+      if (a.time !== null && b.time !== null) return a.time - b.time
+      if (a.time !== null) return -1
+      if (b.time !== null) return 1
+      return a.name.localeCompare(b.name, 'hu')
+    }).map((t, idx) => ({ ...t, rank: t.time !== null ? idx + 1 : '-' }))
+
+    return {
+      primary: sortTeams(primaryTeams),
+      secondary: sortTeams(secondaryTeams)
+    }
+  }, [data.line, data.teams, activeLineStageOrder, withCategory])
+
+  const line = useMemo(() => {
+    const allStageTeams = [...lineCategoryData.primary, ...lineCategoryData.secondary].filter((t) => t.time !== null)
+    if (allStageTeams.length > 0) {
+      return allStageTeams.slice(0, 8).map((t) => ({ name: t.name, category: t.category, value: t.time, stage: activeLineStageOrder }))
+    }
+    return [...data.line]
+      .map((item) => ({
+        name: teamName(item),
+        category: withCategory(teamName(item)),
+        value: number(item.time),
+        stage: number(item.stage)
+      }))
+      .filter((item) => item.value > 0)
+      .sort((a, b) => a.value - b.value)
+      .slice(0, 8)
+  }, [lineCategoryData, data.line, activeLineStageOrder, withCategory])
   const hill = useMemo(() => [...data.hill].map((item) => ({ name: teamName(item), category: withCategory(teamName(item)), level: number(item.completed_level, item.completedLevel), time: number(item.time_spent_on_level, item.timeSpentOnLevel, item.time) })).sort((a, b) => b.level - a.level || a.time - b.time).slice(0, 6), [data.hill, withCategory])
   const basketball = useMemo(() => [...data.basketball].map((item) => ({ name: teamName(item), category: withCategory(teamName(item)), points: number(item.points, item.point), time: number(item.time) })).sort((a, b) => b.points - a.points || a.time - b.time).slice(0, 6), [data.basketball, withCategory])
   const sumo = useMemo(() => [...data.sumo].map((item) => ({ name: teamName(item), category: withCategory(teamName(item)), points: number(item.points, item.point, item.team_point, item.teamPoint), wins: number(item.wins, item.win) })).sort((a, b) => b.points - a.points || b.wins - a.wins).slice(0, 8), [data.sumo, withCategory])
@@ -357,6 +977,25 @@ export default function ShowPage() {
     return SUMO_STAGE_LABELS[activeSumoStageOrder] || 'Alapszakasz'
   }, [activeSumoStageOrder])
 
+  const crossCategoryFinalMatch = useMemo(() => {
+    if (!data.matches || !data.matches.length) return null
+    const finals = data.matches
+      .map((item) => ({
+        team1: item.team1_name || item.team1Name,
+        team2: item.team2_name || item.team2Name,
+        table: Number(item.table || 0),
+        result1: item.team1result || item.team1Result || '',
+        result2: item.team2result || item.team2Result || '',
+        stage: item.tournamentStage || item.tournament_stage || item.stage
+      }))
+      .filter((m) => getStageOrder(m.stage) === 6)
+      .sort((a, b) => (Number(a.table) || 0) - (Number(b.table) || 0))
+
+    if (!finals.length) return null
+    const cross = finals.find((m) => withCategory(m.team1) !== withCategory(m.team2))
+    return cross || null
+  }, [data.matches, withCategory])
+
   const matches = useMemo(() => {
     if (!data.matches || !data.matches.length) return []
     const all = [...data.matches].map((item) => ({
@@ -368,6 +1007,17 @@ export default function ShowPage() {
       stage: item.tournamentStage || item.tournament_stage || item.stage
     })).sort((a, b) => (Number(a.table) || 0) - (Number(b.table) || 0))
 
+    if (activeSumoStageOrder === 6) {
+      if (crossCategoryFinalMatch) {
+        return [crossCategoryFinalMatch]
+      }
+      const categoryFinals = all.filter((m) => getStageOrder(m.stage) === 6 && withCategory(m.team1) === withCategory(m.team2))
+      if (categoryFinals.length > 0) {
+        return categoryFinals
+      }
+      return all.filter((m) => getStageOrder(m.stage) === 6)
+    }
+
     if (activeSumoStageOrder > 1) {
       return all.filter((m) => getStageOrder(m.stage) === activeSumoStageOrder)
     }
@@ -375,7 +1025,7 @@ export default function ShowPage() {
     const teamCount = data.teams.length || 16
     const halfCount = Math.max(1, Math.ceil(teamCount / 2))
     return all.filter((m) => getStageOrder(m.stage) === 1).slice(-halfCount)
-  }, [data.matches, data.teams.length, activeSumoStageOrder])
+  }, [data.matches, data.teams.length, activeSumoStageOrder, withCategory, crossCategoryFinalMatch])
   const activeName = phaseName(schedule.selected) || 'Nincs aktív szakasz'
   const hasDetail = (slideId, detailId) => selectedDetails[slideId]?.includes(detailId)
   const ageBadge = (row, slideId) => hasDetail(slideId, 'category') ? <b className={`show-age age-${row.category}`}>{categoryLabel(row.category)}</b> : null
@@ -388,17 +1038,48 @@ export default function ShowPage() {
 
   const slideMap = {
     overview: <section className="show-slide show-overview" key="overview"><div className="show-eyebrow">Verseny állapota</div><h1>{activeName}</h1><div className="show-countdown"><span>{schedule.remaining > 0 ? 'Hátralévő idő' : 'Aktuális idő'}</span><strong>{schedule.remaining > 0 ? countdown(schedule.remaining) : now.toLocaleTimeString('hu-HU')}</strong></div><div className="show-progress"><span style={{ width: `${schedule.progress}%` }} /></div><div className="show-overview-grid">{hasDetail('overview', 'time') && <div><span>Időpont</span><strong>{schedule.selected ? `${timeLabel(phaseStart(schedule.selected))}–${timeLabel(phaseEnd(schedule.selected))}` : '–'}</strong></div>}{hasDetail('overview', 'next') && <div><span>Következő</span><strong>{schedule.next ? `${phaseName(schedule.next)} · ${timeLabel(phaseStart(schedule.next))}` : 'Nincs további szakasz'}</strong></div>}{hasDetail('overview', 'age') && <div><span>Korosztálybontás</span><strong>{Number(data.settings?.ageGroupBreakdown) === 1 ? 'Bekapcsolva' : 'Kikapcsolva'}</strong></div>}{hasDetail('overview', 'teams') && <div><span>Nevezett csapatok</span><strong>{data.teams.length}</strong></div>}</div></section>,
-    overall: <section className="show-slide" key="overall"><div className="show-slide-title"><span>Élő eredmények</span><h2>Összesített állás</h2></div><CombinedStandingsNotice /><ProjectionTable rows={overall} columns={[{ key: 'rank', label: 'Hely', render: (_, index) => <strong>{index + 1}.</strong> }, teamColumn('overall'), hasDetail('overall', 'line') && { key: 'line', label: 'Vonal', render: (row) => number(row.lineFollowPoint) }, hasDetail('overall', 'hill') && { key: 'hill', label: 'Hegy', render: (row) => number(row.hillClimbPoint) }, hasDetail('overall', 'sumo') && { key: 'sumo', label: 'Szumó', render: (row) => number(row.sumoPoint) }, hasDetail('overall', 'basketball') && { key: 'basket', label: 'Kosár', render: (row) => number(row.basketballPoint) }, hasDetail('overall', 'total') && { key: 'total', label: 'Összesen', render: (row) => <strong>{row.total}</strong> }].filter(Boolean)} /></section>,
+    overall: (
+      <OverallStandingsSlide
+        key="overall"
+        primaryTeams={overallCategoryData.primary}
+        secondaryTeams={overallCategoryData.secondary}
+        hasDetail={hasDetail}
+      />
+    ),
     sports: <section className="show-slide" key="sports"><div className="show-slide-title"><span>Versenyszámok</span><h2>Aktuális élmezőny</h2></div><CombinedStandingsNotice /><div className="show-leaderboards">{leaderboardPanel('line', 'Vonalkövetés', 'bi-sign-turn-right', line, (row) => `${row.value.toFixed(3)} s`)}{leaderboardPanel('hill', 'Hegymászás', 'bi-graph-up-arrow', hill, (row) => `${row.level}. szint`)}{leaderboardPanel('basketball', 'Kosárra dobás', 'bi-bullseye', basketball, (row) => `${row.points} pont`)}{leaderboardPanel('sumo', 'Szumó', 'bi-record-circle', sumo, (row) => `${row.points} pont`)}</div></section>,
-    line: resultSlide('line', 'Versenyszám', 'Vonalkövetés', line, [hasDetail('line', 'time') && { key: 'time', label: 'Idő', render: (row) => `${row.value.toFixed(3)} s` }, hasDetail('line', 'stage') && { key: 'stage', label: 'Szakasz', render: (row) => row.stage }]),
+    line: (
+      <LineFollowingSlide
+        key="line"
+        activeLineStageName={activeLineStageName}
+        primaryTeams={lineCategoryData.primary}
+        secondaryTeams={lineCategoryData.secondary}
+        hasDetail={hasDetail}
+      />
+    ),
     hill: resultSlide('hill', 'Versenyszám', 'Hegymászás', hill, [hasDetail('hill', 'level') && { key: 'level', label: 'Szint', render: (row) => row.level }, hasDetail('hill', 'time') && { key: 'time', label: 'Idő', render: (row) => `${row.time.toFixed(3)} s` }]),
     basketball: resultSlide('basketball', 'Versenyszám', 'Kosárra dobás', basketball, [hasDetail('basketball', 'points') && { key: 'points', label: 'Pont', render: (row) => row.points }, hasDetail('basketball', 'time') && { key: 'time', label: 'Idő', render: (row) => `${row.time.toFixed(3)} s` }]),
     sumo: resultSlide('sumo', 'Versenyszám', 'Szumó tabella', sumo, [hasDetail('sumo', 'points') && { key: 'points', label: 'Pont', render: (row) => row.points }, hasDetail('sumo', 'wins') && { key: 'wins', label: 'Győzelem', render: (row) => row.wins }]),
-    matches: (
+    matches: crossCategoryFinalMatch ? (
+      <SumoGrandFinalSlide
+        key="matches_grand_final"
+        finalMatch={crossCategoryFinalMatch}
+        withCategory={withCategory}
+        hasDetail={hasDetail}
+      />
+    ) : (
       <SumoMatchesSlide
         key="matches"
         activeSumoStageName={activeSumoStageName}
         matches={matches}
+        hasDetail={hasDetail}
+        withCategory={withCategory}
+      />
+    ),
+    grand_final: (
+      <SumoGrandFinalSlide
+        key="grand_final"
+        finalMatch={crossCategoryFinalMatch}
+        withCategory={withCategory}
         hasDetail={hasDetail}
       />
     )

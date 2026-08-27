@@ -24,6 +24,8 @@ import NewsDetailsPage from './pages/NewsDetailsPage';
 import NotificationManagementPage from './pages/NotificationManagementPage';
 import EmailManagementPage from './pages/EmailManagementPage';
 import JudgeApplicationsPage from './pages/JudgeApplicationsPage';
+import UserMessagesPage from './pages/UserMessagesPage';
+import NotificationPromptBanner from './components/NotificationPromptBanner';
 import { auth, authPersistenceReady, googleProvider } from './firebase';
 import { isJudgePrivilege } from './config/privilegeConfig';
 import { subscribeTeamsToPush } from './services/notificationApi';
@@ -39,7 +41,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [userPrivilege, setUserPrivilege] = useState(null);
-  const [, setUserTeamId] = useState(null);
+  const [userTeamId, setUserTeamId] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState('');
 
@@ -189,15 +191,21 @@ function App() {
   return (
     <div className="App">
       <AutomaticPhaseAdvancer enabled={userRole === 'admin'} />
-      {!isFocusPage && <Navbar
-        user={user}
-        userRole={userRole}
-        userPrivilege={userPrivilege}
-        authLoading={authLoading}
-        authError={authError}
-        onGoogleSignIn={handleGoogleSignIn}
-        onSignOut={handleSignOut}
-      />}
+      {!isFocusPage && (
+        <>
+          <Navbar
+            user={user}
+            userRole={userRole}
+            userPrivilege={userPrivilege}
+            userTeamId={userTeamId}
+            authLoading={authLoading}
+            authError={authError}
+            onGoogleSignIn={handleGoogleSignIn}
+            onSignOut={handleSignOut}
+          />
+          <NotificationPromptBanner user={user} />
+        </>
+      )}
       <Routes>
         <Route path="*" element={<HomePage />} />
         <Route path="/" element={<HomePage />} />
@@ -210,6 +218,8 @@ function App() {
         <Route path="/hirek" element={<NewsPage />} />
         <Route path="/hirek/:messageId" element={<NewsDetailsPage />} />
         <Route path="/hirek/cim/:messageTitle" element={<NewsDetailsPage />} />
+        <Route path="/uzenetek" element={<UserMessagesPage user={user} userTeamId={userTeamId} />} />
+        <Route path="/ertesiteseim" element={<UserMessagesPage user={user} userTeamId={userTeamId} />} />
         <Route path="/allasok" element={<StandingsPage />} />
         <Route path="/csapat/:teamName" element={<TeamDetailsPage userRole={userRole} userPrivilege={userPrivilege} />} />
         <Route path="/sajat-csapataim" element={user ? <MyTeamsPage user={user} /> : <LoginPage user={user} authLoading={authLoading} authError={authError} onGoogleSignIn={handleGoogleSignIn} onSignOut={handleSignOut} />} />

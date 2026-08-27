@@ -118,6 +118,9 @@ export default function PrivilegeManagementPage() {
       })
       if (!response.ok) {
         const errorText = await response.text()
+        if (response.status === 400 && privilege.teamId) {
+          throw new Error(`A(z) ${privilege.emailAddress} felhasználó a(z) „${getTeamName(privilege.teamId)}” csapat tagja, ezért a rendszer nem engedi törölni. A jogosultság megvonásához állítsd a szerepkört „Versenyző”-re, majd kattints a Mentés gombra.`)
+        }
         throw new Error(errorText || 'A jogosultság törlése nem sikerült.')
       }
       setPrivileges((current) => current.filter((item) => item.id !== privilege.id))
@@ -247,7 +250,15 @@ export default function PrivilegeManagementPage() {
         onConfirm={() => deletePrivilege(deleteTarget)}
       >
         <p className="mb-2">Biztosan törlöd ezt az e-mail-címet és a hozzá tartozó jogosultságot?</p>
-        <strong>{deleteTarget?.emailAddress}</strong>
+        <div className="border rounded p-3 bg-light">
+          <strong>{deleteTarget?.emailAddress}</strong>
+          {deleteTarget?.teamId && (
+            <div className="text-warning-emphasis small mt-2">
+              <i className="bi bi-exclamation-triangle-fill me-1" />
+              Ez a felhasználó a(z) <strong>{getTeamName(deleteTarget.teamId)}</strong> csapat regisztrált tagja. Ha csak a bírói/adminisztrátori jogát szeretnéd elvenni, állítsd a szerepkört „Versenyző”-re, és kattints a Mentés gombra.
+            </div>
+          )}
+        </div>
       </ConfirmModal>
     </div>
   )

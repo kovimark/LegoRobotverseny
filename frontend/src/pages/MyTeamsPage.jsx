@@ -129,8 +129,8 @@ export default function MyTeamsPage({ user }) {
   return (
     <div className="container py-4">
       <div className="mb-4">
-        <h2 className="mb-1">Saját csapatom</h2>
-        <p className="text-muted mb-0">A(z) {user?.email} e-mail-címhez tartozó csapatadatok és eredmények.</p>
+        <h2 className="mb-1"><i className="bi bi-people-fill me-2" aria-hidden="true" />Saját csapatom</h2>
+        <p className="text-muted mb-0"><i className="bi bi-envelope-fill me-1" aria-hidden="true" /> A(z) {user?.email} e-mail-címhez tartozó csapatadatok és eredmények.</p>
       </div>
       <FloatingFeedback message={pushFeedback} onClose={() => setPushFeedback(null)} />
 
@@ -140,22 +140,23 @@ export default function MyTeamsPage({ user }) {
         <section className="card shadow-sm team-card no-hover-card mb-4">
           <div className="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
             <div>
-              <h3 className="h5 mb-1">Csapatértesítések</h3>
+              <h3 className="h5 mb-1"><i className="bi bi-bell-fill me-2" aria-hidden="true" />Csapatértesítések</h3>
               <p className="text-muted mb-0">
                 {pushEnabled ? 'Az értesítések engedélyezve vannak ezen az eszközön.' : 'Kapj értesítést a csapatodnak küldött fontos információkról.'}
               </p>
             </div>
             <button type="button" className={`btn ${pushEnabled ? 'btn-success' : 'btn-primary'}`} disabled={pushLoading || pushEnabled} onClick={enableNotifications}>
+              <i className={`bi ${pushEnabled ? 'bi-check-circle-fill' : 'bi-bell-fill'} me-2`} aria-hidden="true" />
               {pushLoading ? 'Bekapcsolás…' : pushEnabled ? 'Értesítések bekapcsolva' : 'Értesítések bekapcsolása'}
             </button>
           </div>
         </section>
       )}
 
-      {loading && <div className="alert alert-info">Csapatok betöltése...</div>}
-      {error && <div className="alert alert-danger">{error}</div>}
+      {loading && <div className="alert alert-info"><i className="bi bi-arrow-repeat me-2" />Csapatok betöltése...</div>}
+      {error && <div className="alert alert-danger"><i className="bi bi-exclamation-triangle-fill me-2" />{error}</div>}
       {!loading && !error && teams.length === 0 && (
-        <div className="alert alert-secondary">Ehhez az e-mail-címhez még nem tartozik csapat.</div>
+        <div className="alert alert-secondary"><i className="bi bi-info-circle me-2" />Ehhez az e-mail-címhez még nem tartozik csapat.</div>
       )}
 
       <div className="d-flex flex-column gap-4">
@@ -169,7 +170,7 @@ export default function MyTeamsPage({ user }) {
               <header className="team-card-header p-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
                 <div>
                   <h3 className="h4 mb-1"><AgeGroupBadge category={team.category} className="me-2" />{team.teamName || `Csapat #${team.id}`}</h3>
-                  <div className="text-muted">{team.schoolName || 'Nincs megadott iskola'}</div>
+                  <div className="text-muted"><i className="bi bi-building me-1" aria-hidden="true" />{team.schoolName || 'Nincs megadott iskola'}</div>
                 </div>
                 <div className="d-flex flex-wrap align-items-center gap-2">
                   <span className={`badge fs-6 ${team.group || team.details?.team?.group ? 'text-bg-primary' : 'text-bg-secondary'}`}>
@@ -186,20 +187,20 @@ export default function MyTeamsPage({ user }) {
                 <section className="team-info-box team-info-category mb-3">
                   <div className="row g-3 align-items-center">
                     <div className="col-md-4">
-                      <h4 className="team-info-title mb-1">Összes pont</h4>
+                      <h4 className="team-info-title mb-1"><i className="bi bi-trophy-fill me-1" aria-hidden="true" /> Összes pont</h4>
                       <div className="display-6 fw-bold">{team.details?.allPoint ?? team.point?.allPoint ?? 0}</div>
                     </div>
                     <div className="col-md-8">
                       <div className="row g-2">
                         {[
-                          ['Vonalkövetés', team.details?.lineFollowPoint, team.details?.lineFollowPosition],
-                          ['Hegymászás', team.details?.hillClimbPoint, team.details?.hillClimbPosition],
-                          ['Szumó', team.details?.sumoPoint, team.details?.sumoPosition],
-                          ['Kosárra dobás', team.details?.basketballPoint, team.details?.basketballPosition]
-                        ].map(([label, point, position]) => (
+                          ['Vonalkövetés', team.details?.lineFollowPoint, team.details?.lineFollowPosition, 'bi-bezier2'],
+                          ['Hegymászás', team.details?.hillClimbPoint, team.details?.hillClimbPosition, 'bi-triangle-half'],
+                          ['Szumó', team.details?.sumoPoint, team.details?.sumoPosition, 'bi-shield-shaded'],
+                          ['Kosárra dobás', team.details?.basketballPoint, team.details?.basketballPosition, 'bi-dribbble']
+                        ].map(([label, point, position, icon]) => (
                           <div className="col-sm-6 col-xl-3" key={label}>
                             <div className="bg-white border rounded p-2 h-100">
-                              <div className="small text-muted">{label}</div>
+                              <div className="small text-muted"><i className={`bi ${icon} me-1`} aria-hidden="true" />{label}</div>
                               <div className="fw-bold">{point ?? 0} pont</div>
                               <div className="small">{position ? `${position}. hely` : 'Nincs helyezés'}</div>
                             </div>
@@ -214,14 +215,14 @@ export default function MyTeamsPage({ user }) {
                   {competitors.length > 0 && (
                     <>
                       <div className="col-12">
-                        <h4 className="team-info-title mb-3">Versenyzők</h4>
+                        <h4 className="team-info-title mb-3"><i className="bi bi-person-fill me-1" aria-hidden="true" /> Versenyzők</h4>
                       </div>
                       {competitors.map((competitor, index) => (
                         <div className="col-md-6 col-xl-3" key={competitor.id}>
                           <section className="team-info-box h-100">
-                            <h5 className="team-info-title">{index + 1}. versenyző</h5>
+                            <h5 className="team-info-title"><i className="bi bi-person me-1" aria-hidden="true" />{index + 1}. versenyző</h5>
                             <div className="team-info-value">{competitor.name}</div>
-                            <div className="team-info-meta">{competitor.email}</div>
+                            <div className="team-info-meta"><i className="bi bi-envelope me-1" aria-hidden="true" />{competitor.email}</div>
                             <span className="badge text-bg-light mt-2">
                               {competitor.class !== '–' ? `${competitor.class}. osztály` : '–'}
                             </span>
@@ -234,13 +235,13 @@ export default function MyTeamsPage({ user }) {
                   {coach && (
                     <>
                       <div className="col-12 mt-2">
-                        <h4 className="team-info-title mb-3">Felkészítő tanárok</h4>
+                        <h4 className="team-info-title mb-3"><i className="bi bi-mortarboard-fill me-1" aria-hidden="true" /> Felkészítő tanárok</h4>
                       </div>
                       <div className="col-md-6 col-xl-3">
                         <section className="team-info-box h-100">
-                          <h5 className="team-info-title">Felkészítő tanár</h5>
+                          <h5 className="team-info-title"><i className="bi bi-mortarboard me-1" aria-hidden="true" />Felkészítő tanár</h5>
                           <div className="team-info-value">{coach.name}</div>
-                          <div className="team-info-meta">{coach.email}</div>
+                          <div className="team-info-meta"><i className="bi bi-envelope me-1" aria-hidden="true" />{coach.email}</div>
                         </section>
                       </div>
                     </>

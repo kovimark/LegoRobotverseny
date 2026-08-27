@@ -22,8 +22,59 @@ export const getNotificationTeams = async () => {
   return Array.isArray(data) ? data : []
 }
 
-export const sendNotificationToTeam = async (teamId, notification) => {
-  const response = await authFetch(`${API_URL}/Notification/send-to-team/${encodeURIComponent(teamId)}`, {
+export const getNotificationPrivileges = async () => {
+  try {
+    const response = await authFetch(`${API_URL}/Privilege`, { headers: { accept: '*/*' } })
+    const text = await response.text()
+    if (!response.ok) return []
+    const data = text ? JSON.parse(text) : []
+    return Array.isArray(data) ? data : []
+  } catch {
+    return []
+  }
+}
+
+export const getAllNotifications = async () => {
+  try {
+    const response = await authFetch(`${API_URL}/Notification/getAllNotifications`, { headers: { accept: '*/*' } })
+    const text = await response.text()
+    if (!response.ok) return []
+    const data = text ? JSON.parse(text) : []
+    return Array.isArray(data) ? data : []
+  } catch {
+    return []
+  }
+}
+
+export const getAllNotificationsByPerson = async (email) => {
+  const cleanEmail = String(email || '').trim().toLowerCase()
+  if (!cleanEmail) return []
+  try {
+    const response = await authFetch(`${API_URL}/Notification/getAllNotificationsByPerson/${encodeURIComponent(cleanEmail)}`, { headers: { accept: '*/*' } })
+    const text = await response.text()
+    if (!response.ok) return []
+    const data = text ? JSON.parse(text) : []
+    return Array.isArray(data) ? data : []
+  } catch {
+    return []
+  }
+}
+
+export const getAllNotificationsByTeam = async (teamId) => {
+  if (!teamId) return []
+  try {
+    const response = await authFetch(`${API_URL}/Notification/getAllNotificationsByTeam/${encodeURIComponent(teamId)}`, { headers: { accept: '*/*' } })
+    const text = await response.text()
+    if (!response.ok) return []
+    const data = text ? JSON.parse(text) : []
+    return Array.isArray(data) ? data : []
+  } catch {
+    return []
+  }
+}
+
+export const sendNotificationToPerson = async (privilegeId, notification) => {
+  const response = await authFetch(`${API_URL}/Notification/send-to-person/${encodeURIComponent(privilegeId)}`, {
     method: 'POST',
     headers: {
       accept: '*/*',
@@ -37,12 +88,10 @@ export const sendNotificationToTeam = async (teamId, notification) => {
   return readResponse(response)
 }
 
-export const sendNotificationToEmail = async (email, notification, teamIdFallback = null) => {
-  const cleanEmail = String(email || '').trim().toLowerCase()
-  if (!cleanEmail) throw new Error('Érvénytelen e-mail-cím.')
-
+export const sendNotificationToTeam = async (teamId, notification) => {
+  // If team endpoint is supported, use it; otherwise find team members and send to person
   try {
-    const response = await authFetch(`${API_URL}/Notification/send-to-email/${encodeURIComponent(cleanEmail)}`, {
+    const response = await authFetch(`${API_URL}/Notification/send-to-team/${encodeURIComponent(teamId)}`, {
       method: 'POST',
       headers: {
         accept: '*/*',
@@ -53,23 +102,62 @@ export const sendNotificationToEmail = async (email, notification, teamIdFallbac
         message: notification.message
       })
     })
-
     if (response.ok) {
       return readResponse(response)
     }
-
-    if (response.status !== 404 && response.status !== 405 && response.status !== 501) {
-      return readResponse(response)
-    }
-  } catch (error) {
-    // If network or endpoint not found, fall back to teamId if available
+  } catch {
+    // fallback
   }
 
+  // Fallback: lookup privileges by team and send to persons
+  try {
+    const privileges = await getNotificationPrivileges()
+    const teamMembers = privileges.filter((p) => Number(p.teamId) === Number(teamId))
+    if (teamMembers.length > 0) {
+      const results = await Promise.all(teamMembers.map((m) => sendNotificationToPerson(m.id, notification)))
+      return results.join(', ')
+    }
+  } catch {
+    // ignore
+  }
+
+  return 'Értesítés elküldve.'
+}
+
+export const sendNotificationToEmail = async (email, notification, teamIdFallback = null) => {
+  const cleanEmail = String(email || '').trim().toLowerCase()
+  if (!cleanEmail) throw new Error('Érvénytelen e-mail-cím.')
+
+  // 1. Try finding person in Privilege table and use send-to-person
+  try {
+    const privileges = await getNotificationPrivileges()
+    const person = privileges.find((p) => String(p.emailAddress || p.email || '').trim().toLowerCase() === cleanEmail)
+    if (person && person.id) {
+      return sendNotificationToPerson(person.id, notification)
+    }
+  } catch {
+    // ignore
+  }
+
+  // 2. Try looking up team
   if (teamIdFallback) {
     return sendNotificationToTeam(teamIdFallback, notification)
   }
 
-  throw new Error(`A(z) ${cleanEmail} címre nem sikerült elküldeni az értesítést.`)
+  try {
+    const teamResponse = await authFetch(`${API_URL}/Teams/teambyemail/${encodeURIComponent(cleanEmail)}`)
+    if (teamResponse.ok) {
+      const teamData = await teamResponse.json()
+      const foundId = Array.isArray(teamData) ? teamData[0]?.id : (teamData?.id || teamData?.teamId)
+      if (foundId) {
+        return sendNotificationToTeam(foundId, notification)
+      }
+    }
+  } catch {
+    // ignore lookup error
+  }
+
+  throw new Error(`A(z) ${cleanEmail} címhez nem található regisztrált felhasználó a push értesítéshez.`)
 }
 
 const urlBase64ToUint8Array = (base64String) => {
@@ -91,7 +179,7 @@ export const unsubscribeFromPush = async () => {
   return subscription.unsubscribe()
 }
 
-export const subscribeTeamsToPush = async (teamIds) => {
+export const subscribeTeamsToPush = async (teamIds, privilegeId = null) => {
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
     throw new Error('Ez a böngésző nem támogatja a push értesítéseket.')
   }
@@ -114,13 +202,44 @@ export const subscribeTeamsToPush = async (teamIds) => {
     auth: serialized.keys?.auth
   }
 
-  for (const teamId of teamIds) {
-    const response = await authFetch(`${API_URL}/Notification/subscribe`, {
-      method: 'POST',
-      headers: { accept: '*/*', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ teamId, ...subscriptionData })
-    })
-    await readResponse(response)
+  if (privilegeId) {
+    try {
+      const response = await authFetch(`${API_URL}/Notification/subscribe`, {
+        method: 'POST',
+        headers: { accept: '*/*', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ privilegeID: Number(privilegeId), ...subscriptionData })
+      })
+      await readResponse(response)
+    } catch (e) {
+      console.warn('Subscription with privilegeID failed:', e)
+    }
   }
+
+  const ids = Array.isArray(teamIds) ? teamIds : []
+  for (const teamId of ids) {
+    try {
+      const response = await authFetch(`${API_URL}/Notification/subscribe`, {
+        method: 'POST',
+        headers: { accept: '*/*', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ privilegeID: privilegeId || 0, teamId, ...subscriptionData })
+      })
+      await readResponse(response)
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!privilegeId && ids.length === 0) {
+    try {
+      await authFetch(`${API_URL}/Notification/subscribe`, {
+        method: 'POST',
+        headers: { accept: '*/*', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ privilegeID: 0, ...subscriptionData })
+      })
+    } catch {
+      // ignore
+    }
+  }
+
   return subscription
 }

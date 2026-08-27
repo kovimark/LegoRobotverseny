@@ -540,7 +540,6 @@ export default function BasketThrowScoring() {
 
           <CategorizedResultsStandings
             title="Kosárra dobás eredménytáblája"
-            tableWrapperClassName="basket-throw-standings-scroll"
             rows={standingsResults.map((result) => ({
               ...result,
               category: Number(allTeams.find((team) => (team.teamName || team.team_name) === result.team_name)?.category) === 1 ? 1 : 0

@@ -10,7 +10,7 @@ const competitionConfig = getCompetitionConfig('szumo')
 const GROUP_STAGE = 'GS'
 const GROUP_MATCH_RESULT_LIMIT = 3
 const KNOCKOUT_WIN_POINTS = 6
-const KNOCKOUT_STAGES = ['RO16', 'QF', 'SF', 'BM', 'F']
+const KNOCKOUT_STAGES = ['RO16', 'QF', 'SF', 'F']
 const KNOCKOUT_STAGE_PRIORITY = [
   { minTeams: 16, stage: 'RO16' },
   { minTeams: 8, stage: 'QF' },
@@ -20,7 +20,7 @@ const KNOCKOUT_STAGE_PRIORITY = [
 
 const STAGE_GROUPS = [
   { id: 'group', label: 'Alapszakasz', stages: ['GS'] },
-  { id: 'knockout', label: 'Kieséses szakasz', stages: ['RO16', 'QF', 'SF', 'BM', 'F'] }
+  { id: 'knockout', label: 'Kieséses szakasz', stages: ['RO16', 'QF', 'SF', 'F'] }
 ]
 
 const ALL_STAGE_VALUE = 'ALL'
@@ -374,18 +374,18 @@ const SumoBracket = ({ matches, teams, ageGroupBreakdown }) => {
                 .filter((match) => getMatchStage(match) === stage)
                 .sort((left, right) => left.table - right.table || left.team1Name.localeCompare(right.team1Name, 'hu'))
               if (stageItems.length === 0) return null
-              return <div className="sumo-bracket-round" key={stage}><h6>{stage === 'F' && ageGroupBreakdown ? 'Elődöntő' : getStageLabel(stage)}</h6>{stageItems.map(renderMatch)}</div>
+              return <div className="sumo-bracket-round" key={stage}><h6>{getStageLabel(stage)}</h6>{stageItems.map(renderMatch)}</div>
             })}
           </div>
         </section>
       ))}
       {ageGroupBreakdown && (
         <section className="sumo-bracket-section sumo-grand-final">
-          <h5><i className="bi bi-trophy-fill me-2" />Döntő – az elődöntők két győztese</h5>
+          <h5>Abszolút döntő – a két korosztály bajnoka</h5>
           <div className="p-3 p-md-4">
             {crossCategoryMatches.length > 0
               ? <div className="sumo-grand-final-match">{crossCategoryMatches.map(renderMatch)}</div>
-              : <div className="alert alert-info mb-0">A döntő akkor hozható létre, amikor az általános és a középiskolás elődöntőnek is megvan a győztese.</div>}
+              : <div className="alert alert-info mb-0">Az abszolút döntő akkor hozható létre, amikor az általános és a középiskolás korosztályos döntőnek is megvan a győztese.</div>}
           </div>
         </section>
       )}
@@ -762,8 +762,9 @@ export default function SumoScoring({ userPrivilege }) {
       if (currentStage === 'BM') continue
 
       if (currentStage === 'SF') {
-        if (!poolMatches.some((match) => getMatchStage(match) === 'F') && winners.length >= 2) generatedPairings.push({ team1: winners[0], team2: winners[1], table: nextMatchNumber++, stage: 'F' })
-        if (!poolMatches.some((match) => getMatchStage(match) === 'BM') && losers.length >= 2) generatedPairings.push({ team1: losers[0], team2: losers[1], table: nextMatchNumber++, stage: 'BM' })
+        if (!poolMatches.some((match) => getMatchStage(match) === 'F') && winners.length >= 2) {
+          generatedPairings.push({ team1: winners[0], team2: winners[1], table: nextMatchNumber++, stage: 'F' })
+        }
         continue
       }
 
@@ -1254,7 +1255,7 @@ export default function SumoScoring({ userPrivilege }) {
                   <div className="home-kicker">Szumó {getStageLabel(selectedStage)}</div>
                   <h3 className="mb-2">Meccsek, fordulók és eredmények</h3>
                   <p className="text-muted mb-0">
-                    A generálás a jelenlegi állás alapján történik, visszavágó nélkül. {ageGroupBreakdown ? 'A két korosztály külön ágon játszik. Az általános és a középiskolás ág utolsó meccse adja a két elődöntőt, ezek győztesei játszanak az egyetlen döntőben.' : 'A két korosztály közös mezőnyben szerepel.'}
+                    A generálás a jelenlegi állás alapján történik, visszavágó nélkül. {ageGroupBreakdown ? 'A két korosztály külön ágon játszik. Az általános és a középiskolás ág döntőinek győztesei mérkőznek meg az abszolút döntőben.' : 'A két korosztály közös mezőnyben szerepel.'}
                   </p>
                 </div>
                 {isAdmin && (
@@ -1448,11 +1449,33 @@ export default function SumoScoring({ userPrivilege }) {
                     const team2Draws = team2History.filter((result) => result === 'D').length
                     const team2Losses = team2History.filter((result) => result === 'L').length
 
+                    const cat1 = teams.find((team) => team.name === match.team1Name)?.category
+                    const cat2 = teams.find((team) => team.name === match.team2Name)?.category
+                    const stage = getMatchStage(match)
+                    let matchStageBadgeText = getStageLabel(stage)
+                    if (ageGroupBreakdown) {
+                      if (stage === 'F') {
+                        if (cat1 !== undefined && cat2 !== undefined && cat1 !== cat2) {
+                          matchStageBadgeText = 'Abszolút döntő'
+                        } else if (cat1 === 0) {
+                          matchStageBadgeText = 'Általános iskolás döntő'
+                        } else if (cat1 === 1) {
+                          matchStageBadgeText = 'Középiskolás döntő'
+                        }
+                      } else if (stage === 'SF') {
+                        if (cat1 === 0 && cat2 === 0) matchStageBadgeText = 'Általános iskolás elődöntő'
+                        else if (cat1 === 1 && cat2 === 1) matchStageBadgeText = 'Középiskolás elődöntő'
+                      } else if (stage === 'QF') {
+                        if (cat1 === 0 && cat2 === 0) matchStageBadgeText = 'Általános iskolás negyeddöntő'
+                        else if (cat1 === 1 && cat2 === 1) matchStageBadgeText = 'Középiskolás negyeddöntő'
+                      }
+                    }
+
                     return (
                       <div key={match.id} className="card shadow-sm team-card no-hover-card">
                         <div className="px-3 py-2 bg-light border-bottom d-flex flex-wrap justify-content-between gap-2 small">
                           <span>{match.table}. mérkőzés</span>
-                          <span>{getStageLabel(getMatchStage(match))}</span>
+                          <span className="fw-semibold text-primary">{matchStageBadgeText}</span>
                           {getMatchStage(match) === GROUP_STAGE && <span>{match.team1Results.length}/{GROUP_MATCH_RESULT_LIMIT} menet rögzítve</span>}
                         </div>
                         <button

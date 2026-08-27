@@ -2,10 +2,12 @@ import { Link } from 'react-router-dom'
 import './Navbar.css'
 import React, { useState } from 'react'
 import ProfileNotificationStatus from './ProfileNotificationStatus'
+import UserMessagesModal from './UserMessagesModal'
 
-export default function Navbar({ user, userRole, userPrivilege, authLoading, authError, onGoogleSignIn, onSignOut }) {
+export default function Navbar({ user, userRole, userPrivilege, userTeamId, authLoading, authError, onGoogleSignIn, onSignOut }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [isProfileOpen, setIsProfileOpen] = useState(false)
+    const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false)
     const isAdmin = userRole === 'admin' || Number(userPrivilege) === 1
 
     const closeMenu = () => {
@@ -98,12 +100,32 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                             <img className="profile-drawer-avatar" src={user.photoURL || user.picture || user.avatarUrl} alt={user.displayName || 'Google profil'} />
                             <div>
                                 <h2>{user.displayName || 'Bejelentkezett felhasználó'}</h2>
-                                <p>{user.email}</p>
+                                <p className="mb-1"><i className="bi bi-envelope-fill me-2" aria-hidden="true" />{user.email}</p>
+                                {isAdmin ? (
+                                    <span className="badge text-bg-danger"><i className="bi bi-shield-lock-fill me-1" aria-hidden="true" />Adminisztrátor</span>
+                                ) : userRole === 'judge' ? (
+                                    <span className="badge text-bg-warning text-dark"><i className="bi bi-person-badge-fill me-1" aria-hidden="true" />Bíró</span>
+                                ) : (
+                                    <span className="badge text-bg-primary"><i className="bi bi-person-fill me-1" aria-hidden="true" />Versenyző</span>
+                                )}
                             </div>
                         </div>
                         <div className="profile-drawer-content">
                             <p><i className="bi bi-google me-2" aria-hidden="true" />Google fiókkal bejelentkezve.</p>
                             <ProfileNotificationStatus user={user} />
+
+                            <button
+                                type="button"
+                                className="btn btn-outline-primary w-100 profile-menu-link text-start"
+                                onClick={() => {
+                                    setIsMessagesModalOpen(true)
+                                    setIsProfileOpen(false)
+                                }}
+                            >
+                                <i className="bi bi-bell-fill text-primary" aria-hidden="true" />
+                                <span>Értesítések és üzenetek</span>
+                            </button>
+
                             {isAdmin ? (
                                 <div className="d-grid gap-2">
                                     <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin" onClick={() => setIsProfileOpen(false)}>
@@ -122,7 +144,7 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                                         <i className="bi bi-person-lock" aria-hidden="true" /><span>E-mailek és jogosultságok kezelése</span>
                                     </Link>
                                     <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/uzenetek" onClick={() => setIsProfileOpen(false)}>
-                                        <i className="bi bi-newspaper" aria-hidden="true" /><span>Üzenetek kezelése</span>
+                                        <i className="bi bi-newspaper" aria-hidden="true" /><span>Hírek kezelése</span>
                                     </Link>
                                     <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/ertesitesek" onClick={() => setIsProfileOpen(false)}>
                                         <i className="bi bi-send-fill" aria-hidden="true" /><span>Értesítések küldése</span>
@@ -133,21 +155,25 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                                     <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/beallitasok" onClick={() => setIsProfileOpen(false)}>
                                         <i className="bi bi-gear-fill" aria-hidden="true" /><span>Versenybeállítások</span>
                                     </Link>
-                                    {isAdmin && (
-                                        <div className="navbar-nav">
-                                            <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/show" onClick={closeMenu}>
-                                                <i className="bi bi-gear-fill" aria-hidden="true" /><span>Kivetítő</span>
-                                            </Link>
-                                        </div>
-                                    )}
-                                    {isAdmin && (
-                                        <div className="navbar-nav">
-                                            <Link to="/admin/eredmenyhirdetes" className="btn btn-outline-primary w-100 profile-menu-link"><i className="bi bi-gear-fill" aria-hidden="true" /><span>Eredményhirdetés</span></Link>
-                                        </div>
-                                    )}
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/show" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-display" aria-hidden="true" /><span>Kivetítő</span>
+                                    </Link>
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/eredmenyhirdetes" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-award-fill" aria-hidden="true" /><span>Eredményhirdetés</span>
+                                    </Link>
                                 </div>
                             ) : userRole === 'judge' ? (
-                                <div className="d-grid gap-2"><Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/pontozas" onClick={() => setIsProfileOpen(false)}><i className="bi bi-trophy-fill" aria-hidden="true" /><span>Saját versenyszám pontozása</span></Link><Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/pontozas-jatek" onClick={() => setIsProfileOpen(false)}><i className="bi bi-controller" aria-hidden="true" /><span>Játékos pontozás</span></Link><Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/beallitasok" onClick={() => setIsProfileOpen(false)}><i className="bi bi-diagram-3-fill" aria-hidden="true" /><span>Csapatcsoportok</span></Link></div>
+                                <div className="d-grid gap-2">
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/pontozas" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-trophy-fill" aria-hidden="true" /><span>Saját versenyszám pontozása</span>
+                                    </Link>
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/pontozas-jatek" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-controller" aria-hidden="true" /><span>Játékos pontozás</span>
+                                    </Link>
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/beallitasok" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-diagram-3-fill" aria-hidden="true" /><span>Csapatcsoportok</span>
+                                    </Link>
+                                </div>
                             ) : (
                                 <div className="d-grid gap-2">
                                     <Link className="btn btn-primary w-100 profile-menu-link" to="/sajat-csapataim" onClick={() => setIsProfileOpen(false)}>
@@ -161,12 +187,19 @@ export default function Navbar({ user, userRole, userPrivilege, authLoading, aut
                             <hr />
                         </div>
                         {authError && <div className="alert alert-danger mt-3">{authError}</div>}
-                        <button className="btn btn-primary w-100 mt-3 profile-menu-link" type="button" onClick={handleSignOut}>
+                        <button className="btn btn-primary w-100 profile-menu-link profile-signout-button" type="button" onClick={handleSignOut}>
                             <i className="bi bi-box-arrow-right" aria-hidden="true" /><span>Kijelentkezés</span>
                         </button>
                     </>
                 )}
             </aside>
+
+            <UserMessagesModal
+                open={isMessagesModalOpen}
+                onClose={() => setIsMessagesModalOpen(false)}
+                user={user}
+                userTeamId={userTeamId}
+            />
         </>
     )
 }

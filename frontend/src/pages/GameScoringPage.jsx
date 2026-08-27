@@ -719,6 +719,7 @@ function GameBasketScoring() {
 function GameLineFollowingScoring() {
   const [teamNames, setTeamNames] = useState([])
   const [allTeams, setAllTeams] = useState([])
+  const [lineResults, setLineResults] = useState([])
   const [selectedTeamName, setSelectedTeamName] = useState('')
   const [selectedTeamCategory, setSelectedTeamCategory] = useState(null)
   const [time, setTime] = useState('')
@@ -727,56 +728,61 @@ function GameLineFollowingScoring() {
   const [saving, setSaving] = useState(false)
   const [actionMessage, setActionMessage] = useState(null)
   const [teamSearch, setTeamSearch] = useState('')
+  const [sortField, setSortField] = useState('name')
+  const [sortDirection, setSortDirection] = useState('asc')
+  const [resultsSearch, setResultsSearch] = useState('')
+  const [resultToDelete, setResultToDelete] = useState(null)
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [lineResultsResponse, lineTeamNamesResponse, teamNamesResponse, allTeamsResponse] = await Promise.all([
+        fetch(`${API_BASE}/LineFollowing`),
+        fetch(`${API_BASE}/LineFollowing/teamnames`),
+        fetch(`${API_BASE}/Teams/teamnames`),
+        fetch(`${API_BASE}/Teams`)
+      ])
+
+      const lineResultsData = lineResultsResponse.ok ? await lineResultsResponse.json() : []
+      const lineTeamNamesData = lineTeamNamesResponse.ok ? await lineTeamNamesResponse.json() : []
+      const teamNamesData = teamNamesResponse.ok ? await teamNamesResponse.json() : []
+      const allTeamsData = allTeamsResponse.ok ? await allTeamsResponse.json() : []
+
+      const namesFromResults = Array.isArray(lineResultsData)
+        ? Array.from(new Set(lineResultsData
+          .map((item) => item?.team_name || item?.teamName || '')
+          .filter(Boolean)))
+        : []
+
+      const activeLineFollowingTeamNames = Array.isArray(lineTeamNamesData)
+        ? lineTeamNamesData.map((item) => (typeof item === 'string' ? item : item?.teamName || item?.team_name || '')).filter(Boolean)
+        : []
+
+      const fallbackTeamNames = Array.isArray(teamNamesData)
+        ? teamNamesData.map((item) => (typeof item === 'string' ? item : item?.teamName || item?.team_name || '')).filter(Boolean)
+        : []
+
+      const finalTeamNames = activeLineFollowingTeamNames.length > 0
+        ? activeLineFollowingTeamNames
+        : fallbackTeamNames.length > 0
+          ? fallbackTeamNames
+          : namesFromResults
+
+      setTeamNames(Array.from(new Set(finalTeamNames)))
+      setAllTeams(Array.isArray(allTeamsData) ? allTeamsData : [])
+      setLineResults(Array.isArray(lineResultsData) ? lineResultsData : [])
+    } catch (error) {
+      setActionMessage({ type: 'danger', text: error.message })
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true)
-      try {
-        const [lineResultsResponse, lineTeamNamesResponse, teamNamesResponse, allTeamsResponse] = await Promise.all([
-          fetch(`${API_BASE}/LineFollowing`),
-          fetch(`${API_BASE}/LineFollowing/teamnames`),
-          fetch(`${API_BASE}/Teams/teamnames`),
-          fetch(`${API_BASE}/Teams`)
-        ])
-
-        const lineResultsData = lineResultsResponse.ok ? await lineResultsResponse.json() : []
-        const lineTeamNamesData = lineTeamNamesResponse.ok ? await lineTeamNamesResponse.json() : []
-        const teamNamesData = teamNamesResponse.ok ? await teamNamesResponse.json() : []
-        const allTeamsData = allTeamsResponse.ok ? await allTeamsResponse.json() : []
-
-        const namesFromResults = Array.isArray(lineResultsData)
-          ? Array.from(new Set(lineResultsData
-            .map((item) => item?.team_name || item?.teamName || '')
-            .filter(Boolean)))
-          : []
-
-        const activeLineFollowingTeamNames = Array.isArray(lineTeamNamesData)
-          ? lineTeamNamesData.map((item) => (typeof item === 'string' ? item : item?.teamName || item?.team_name || '')).filter(Boolean)
-          : []
-
-        const fallbackTeamNames = Array.isArray(teamNamesData)
-          ? teamNamesData.map((item) => (typeof item === 'string' ? item : item?.teamName || item?.team_name || '')).filter(Boolean)
-          : []
-
-        const finalTeamNames = activeLineFollowingTeamNames.length > 0
-          ? activeLineFollowingTeamNames
-          : fallbackTeamNames.length > 0
-            ? fallbackTeamNames
-            : namesFromResults
-
-        setTeamNames(Array.from(new Set(finalTeamNames)))
-        setAllTeams(Array.isArray(allTeamsData) ? allTeamsData : [])
-      } catch (error) {
-        setActionMessage({ type: 'danger', text: error.message })
-      } finally {
-        setLoading(false)
-      }
-    }
-
     loadData()
     window.addEventListener(DATA_REFRESH_EVENT, loadData)
     return () => window.removeEventListener(DATA_REFRESH_EVENT, loadData)
-  }, [])
+  }, [loadData])
 
   useEffect(() => {
     if (!selectedTeamName) {
@@ -830,12 +836,84 @@ function GameLineFollowingScoring() {
       setSelectedTeamName('')
       setTeamSearch('')
       setActionMessage({ type: 'success', text: 'Vonalkövetés eredmény rögzítve.' })
+
+      // Reload results
+      const res = await fetch(`${API_BASE}/LineFollowing`)
+      if (res.ok) {
+        const data = await res.json()
+        setLineResults(Array.isArray(data) ? data : [])
+      }
     } catch (error) {
       setActionMessage({ type: 'danger', text: error.message })
     } finally {
       setSaving(false)
     }
   }
+
+  const handleDeleteResult = async () => {
+    if (!resultToDelete) return
+    const teamName = resultToDelete.team_name || resultToDelete.teamName
+    const rTime = Number(resultToDelete.time)
+    const rStage = Number(resultToDelete.tournamentStage || resultToDelete.tournament_stage || resultToDelete.stage || 1)
+
+    setSaving(true)
+    try {
+      const response = await authFetch(`${API_BASE}/LineFollowing/${encodeURIComponent(teamName)}/${rTime}/${rStage}`, {
+        method: 'DELETE',
+        headers: { accept: '*/*' }
+      })
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || 'Az eredmény törlése sikertelen volt.')
+      }
+      setLineResults((prev) => prev.filter((item) => item !== resultToDelete))
+      setActionMessage({ type: 'success', text: 'Az eredmény sikeresen törölve.' })
+      setResultToDelete(null)
+    } catch (error) {
+      setActionMessage({ type: 'danger', text: error.message })
+      setResultToDelete(null)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const stageFilteredResults = useMemo(() => {
+    return lineResults.filter((item) => {
+      const itemStage = Number(item.tournamentStage || item.tournament_stage || item.stage || 1)
+      return itemStage === stage
+    })
+  }, [lineResults, stage])
+
+  const displayResults = useMemo(() => {
+    const query = resultsSearch.trim().toLowerCase()
+    let filtered = stageFilteredResults
+    if (query) {
+      filtered = filtered.filter((item) => {
+        const name = (item.team_name || item.teamName || '').toLowerCase()
+        const timeStr = `${item.time} s`
+        return name.includes(query) || timeStr.includes(query)
+      })
+    }
+
+    return [...filtered].sort((a, b) => {
+      const aName = a.team_name || a.teamName || ''
+      const bName = b.team_name || b.teamName || ''
+
+      if (sortField === 'name') {
+        return sortDirection === 'desc'
+          ? bName.localeCompare(aName, 'hu')
+          : aName.localeCompare(bName, 'hu')
+      }
+
+      const aTime = Number(a.time) || 0
+      const bTime = Number(b.time) || 0
+
+      if (sortDirection === 'desc') {
+        return (bTime - aTime) || bName.localeCompare(aName, 'hu')
+      }
+      return (aTime - bTime) || aName.localeCompare(bName, 'hu')
+    })
+  }, [stageFilteredResults, resultsSearch, sortField, sortDirection])
 
   return (
     <section className="game-scoring-panel">
@@ -903,7 +981,140 @@ function GameLineFollowingScoring() {
               {saving ? 'Mentés...' : 'Eredmény rögzítése'}
             </button>
           </div>
+
+          <div className="card shadow-sm border mt-4 p-3 bg-light">
+            <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+              <div>
+                <h4 className="h5 mb-0">Rögzített próbálkozások ({LINE_STAGES.find((s) => s.value === stage)?.label || `${stage}. szakasz`})</h4>
+                <span className="text-muted small">{displayResults.length} eredmény találva</span>
+              </div>
+              <div className="btn-group" role="group" aria-label="Rendezés">
+                <button
+                  type="button"
+                  className={`btn btn-sm ${sortField === 'name' ? 'btn-primary' : 'btn-outline-primary'}`}
+                  onClick={() => {
+                    if (sortField === 'name') {
+                      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+                    } else {
+                      setSortField('name')
+                      setSortDirection('asc')
+                    }
+                  }}
+                >
+                  <i className={`bi ${sortField === 'name' ? (sortDirection === 'asc' ? 'bi-sort-alpha-down' : 'bi-sort-alpha-up-alt') : 'bi-sort-alpha-down'} me-1`} />
+                  Név szerint {sortField === 'name' ? (sortDirection === 'asc' ? '(A → Z ↑)' : '(Z → A ↓)') : ''}
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${sortField === 'time' ? 'btn-primary' : 'btn-outline-primary'}`}
+                  onClick={() => {
+                    if (sortField === 'time') {
+                      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+                    } else {
+                      setSortField('time')
+                      setSortDirection('asc')
+                    }
+                  }}
+                >
+                  <i className={`bi ${sortField === 'time' ? (sortDirection === 'asc' ? 'bi-sort-numeric-down' : 'bi-sort-numeric-up-alt') : 'bi-sort-numeric-down'} me-1`} />
+                  Idő szerint {sortField === 'time' ? (sortDirection === 'asc' ? '(gyorsabb elöl ↑)' : '(lassabb elöl ↓)') : ''}
+                </button>
+              </div>
+            </div>
+
+            <div className="mb-3">
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                placeholder="Keresés csapatnév vagy idő alapján..."
+                value={resultsSearch}
+                onChange={(e) => setResultsSearch(e.target.value)}
+              />
+            </div>
+
+            {displayResults.length === 0 ? (
+              <div className="alert alert-secondary mb-0">Ebben a szakaszban még nincs rögzített próbálkozás.</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-sm table-hover align-middle mb-0 bg-white rounded shadow-sm">
+                  <thead className="table-light">
+                    <tr>
+                      <th>Csapat</th>
+                      <th>Korosztály</th>
+                      <th>Szakasz</th>
+                      <th className="text-end">Idő</th>
+                      <th className="text-end" style={{ width: '80px' }}>Művelet</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayResults.map((item, idx) => {
+                      const teamName = item.team_name || item.teamName
+                      const teamObj = allTeams.find((t) => (t.teamName || t.team_name) === teamName)
+                      const category = teamObj ? (Number(teamObj.category) === 1 ? 1 : 0) : null
+                      const itemStage = Number(item.tournamentStage || item.tournament_stage || item.stage || 1)
+                      const stageLabel = LINE_STAGES.find((s) => s.value === itemStage)?.label || `${itemStage}. szakasz`
+
+                      return (
+                        <tr key={`${teamName}-${item.time}-${itemStage}-${idx}`}>
+                          <td className="fw-semibold">
+                            <AgeGroupBadge category={category} className="me-2" />
+                            {teamName}
+                          </td>
+                          <td>
+                            <span className="small text-muted">{category === 1 ? 'Középiskola' : 'Általános iskola'}</span>
+                          </td>
+                          <td>
+                            <span className="badge text-bg-light border">{stageLabel}</span>
+                          </td>
+                          <td className="text-end font-monospace fw-bold">
+                            {item.time} s
+                          </td>
+                          <td className="text-end">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-danger"
+                              onClick={() => setResultToDelete(item)}
+                              title="Eredmény törlése"
+                            >
+                              <i className="bi bi-trash" />
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </>
+      )}
+
+      {resultToDelete && (
+        <div className="modal d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered" role="document">
+            <div className="modal-content border-0 shadow-lg">
+              <div className="modal-header">
+                <h5 className="modal-title fw-bold text-dark">Vonalkövetés eredményének törlése</h5>
+                <button type="button" className="btn-close" aria-label="Close" onClick={() => setResultToDelete(null)} />
+              </div>
+              <div className="modal-body">
+                <p className="mb-2 text-dark">Biztosan törlöd ezt az eredményt?</p>
+                <p className="fw-semibold mb-1 text-dark">{resultToDelete.team_name || resultToDelete.teamName}</p>
+                <p className="small mb-0 text-dark">Idő: {resultToDelete.time} s</p>
+                <p className="small mb-0 text-dark">Szakasz: {LINE_STAGES.find((s) => s.value === Number(resultToDelete.tournamentStage || resultToDelete.tournament_stage || resultToDelete.stage || 1))?.label || `${resultToDelete.tournamentStage || 1}. szakasz`}</p>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-outline-secondary" onClick={() => setResultToDelete(null)} disabled={saving}>
+                  Mégse
+                </button>
+                <button type="button" className="btn btn-danger" onClick={handleDeleteResult} disabled={saving}>
+                  {saving ? 'Törlés...' : 'Törlés megerősítése'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 <br /><br />
       <JudgeScenarioHelper competitionId="line" />
