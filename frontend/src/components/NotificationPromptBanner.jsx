@@ -2,14 +2,18 @@ import React, { useEffect, useState } from 'react'
 import { subscribeTeamsToPush } from '../services/notificationApi'
 import './NotificationPromptBanner.css'
 
-const DISMISSED_KEY = 'robotverseny_prompt_dismissed'
-
 export default function NotificationPromptBanner({ user }) {
   const [visible, setVisible] = useState(false)
   const [busy, setBusy] = useState(false)
   const [step, setStep] = useState('ask') // 'ask' | 'info' | 'success'
 
   useEffect(() => {
+    // Only show if the user is logged in
+    if (!user?.email) {
+      setVisible(false)
+      return
+    }
+
     // Check if notifications are supported and in default state
     if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
       return
@@ -19,22 +23,18 @@ export default function NotificationPromptBanner({ user }) {
       return
     }
 
-    if (sessionStorage.getItem(DISMISSED_KEY) === 'true') {
-      return
-    }
-
-    // Delay so it doesn't jarringly appear on initial page mount
+    // Delay slightly so it doesn't jarringly appear on initial page mount
     const timer = setTimeout(() => {
+      setStep('ask')
       setVisible(true)
-    }, 1200)
+    }, 800)
 
     return () => clearTimeout(timer)
-  }, [])
+  }, [user?.email])
 
-  const loadTeamIdsAndPrivilege = async () => {
-    if (!user?.email) return { teamIds: [], privilegeId: null }
+  const loadTeamIds = async () => {
+    if (!user?.email) return []
     let teamIds = []
-    let privilegeId = null
     try {
       const response = await fetch(`https://legocompetition.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`, {
         headers: { accept: '*/*' }
@@ -48,25 +48,14 @@ export default function NotificationPromptBanner({ user }) {
     } catch {
       // ignore
     }
-
-    try {
-      const privRes = await fetch(`https://legocompetition.runasp.net/api/Privilege/${encodeURIComponent(user.email)}`)
-      if (privRes.ok) {
-        const priv = await privRes.json()
-        if (priv && priv.id) privilegeId = priv.id
-      }
-    } catch {
-      // ignore
-    }
-
-    return { teamIds, privilegeId }
+    return teamIds
   }
 
   const handleAllow = async () => {
     try {
       setBusy(true)
-      const { teamIds, privilegeId } = await loadTeamIdsAndPrivilege()
-      await subscribeTeamsToPush(teamIds, privilegeId)
+      const teamIds = await loadTeamIds()
+      await subscribeTeamsToPush(teamIds, user?.email)
       window.localStorage.removeItem('robotverseny_push_disabled')
       setStep('success')
       setTimeout(() => {
@@ -84,7 +73,6 @@ export default function NotificationPromptBanner({ user }) {
   }
 
   const handleDeny = () => {
-    sessionStorage.setItem(DISMISSED_KEY, 'true')
     setStep('info')
   }
 
@@ -92,7 +80,7 @@ export default function NotificationPromptBanner({ user }) {
     setVisible(false)
   }
 
-  if (!visible) return null
+  if (!visible || !user?.email) return null
 
   return (
     <aside className="notification-prompt-banner shadow-lg animate-slide-up" aria-label="Értesítések engedélyezése">

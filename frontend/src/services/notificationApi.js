@@ -165,7 +165,7 @@ export const unsubscribeFromPush = async () => {
   return subscription.unsubscribe()
 }
 
-export const subscribeToPush = async (userEmailOrPrivilegeId = null, teamIds = []) => {
+export const subscribeToPush = async (userEmailOrPrivilegeId = null) => {
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
     throw new Error('Ez a böngésző nem támogatja a push értesítéseket.')
   }
@@ -188,81 +188,36 @@ export const subscribeToPush = async (userEmailOrPrivilegeId = null, teamIds = [
     auth: serialized.keys?.auth
   }
 
-  const privilegeIds = new Set()
-  let cleanEmail = null
+  let targetPrivilegeId = null
 
   if (typeof userEmailOrPrivilegeId === 'number' && userEmailOrPrivilegeId > 0) {
-    privilegeIds.add(userEmailOrPrivilegeId)
+    targetPrivilegeId = userEmailOrPrivilegeId
   } else if (typeof userEmailOrPrivilegeId === 'string' && userEmailOrPrivilegeId.includes('@')) {
-    cleanEmail = userEmailOrPrivilegeId.trim().toLowerCase()
-  }
-
-  // Resolve privilege IDs from email
-  if (cleanEmail) {
+    const cleanEmail = userEmailOrPrivilegeId.trim().toLowerCase()
     try {
       const allPrivs = await getNotificationPrivileges()
-      const matched = allPrivs.filter((p) => String(p.emailAddress || p.email || '').trim().toLowerCase() === cleanEmail)
-      matched.forEach((p) => { if (p.id) privilegeIds.add(p.id) })
-
-      // If user is in a team, also add all team privileges if teamIds were provided
-      if (Array.isArray(teamIds) && teamIds.length > 0) {
-        teamIds.forEach((tId) => {
-          allPrivs.filter((p) => Number(p.teamId) === Number(tId)).forEach((p) => {
-            if (p.id) privilegeIds.add(p.id)
-          })
-        })
+      const matched = allPrivs.find((p) => String(p.emailAddress || p.email || '').trim().toLowerCase() === cleanEmail)
+      if (matched?.id) {
+        targetPrivilegeId = matched.id
       }
-    } catch (e) {
-      console.warn('Privilege feloldási hiba:', e)
-    }
-  }
-
-  // If team IDs passed without email
-  if (privilegeIds.size === 0 && Array.isArray(teamIds) && teamIds.length > 0) {
-    try {
-      const allPrivs = await getNotificationPrivileges()
-      teamIds.forEach((tId) => {
-        allPrivs.filter((p) => Number(p.teamId) === Number(tId)).forEach((p) => {
-          if (p.id) privilegeIds.add(p.id)
-        })
-      })
     } catch {
       // ignore
     }
   }
 
-  // Send subscription for every resolved privilegeID
-  let subscribedAny = false
-  for (const pId of privilegeIds) {
-    try {
-      const response = await authFetch(`${API_URL}/Notification/subscribe`, {
-        method: 'POST',
-        headers: { accept: '*/*', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ privilegeID: Number(pId), ...subscriptionData })
-      })
-      await readResponse(response)
-      subscribedAny = true
-    } catch (e) {
-      console.warn(`Feliratkozás a ${pId} privilegeID-re:`, e)
-    }
-  }
+  const response = await authFetch(`${API_URL}/Notification/subscribe`, {
+    method: 'POST',
+    headers: { accept: '*/*', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      privilegeID: targetPrivilegeId ? Number(targetPrivilegeId) : 0,
+      ...subscriptionData
+    })
+  })
 
-  if (!subscribedAny && privilegeIds.size === 0) {
-    try {
-      const response = await authFetch(`${API_URL}/Notification/subscribe`, {
-        method: 'POST',
-        headers: { accept: '*/*', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ privilegeID: 0, ...subscriptionData })
-      })
-      await readResponse(response)
-    } catch {
-      // ignore
-    }
-  }
-
+  await readResponse(response)
   return subscription
 }
 
-export const subscribeTeamsToPush = async (teamIds, privilegeIdOrEmail = null) => {
-  return subscribeToPush(privilegeIdOrEmail, teamIds)
+export const subscribeTeamsToPush = async (teamIds = [], privilegeIdOrEmail = null) => {
+  return subscribeToPush(privilegeIdOrEmail)
 }

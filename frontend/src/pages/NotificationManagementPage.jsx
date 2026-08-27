@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
 import FloatingFeedback from '../components/FloatingFeedback'
 import { getNotificationTeams, getNotificationPrivileges, getAllNotifications, sendNotificationToEmail, sendNotificationToPerson } from '../services/notificationApi'
+import { attachTimestampToMessage, parseMessageTimestamp } from '../utils/notificationFormat'
 import { getPrivilegeLabel } from '../config/privilegeConfig'
 import AgeGroupBadge from '../components/AgeGroupBadge'
 
@@ -295,7 +296,8 @@ export default function NotificationManagementPage() {
   const send = async () => {
     try {
       setSending(true)
-      const notificationPayload = { title: title.trim(), message: message.trim() }
+      const formattedMessage = attachTimestampToMessage(message.trim())
+      const notificationPayload = { title: title.trim(), message: formattedMessage }
       const successfulRecipients = []
       const failedRecipients = []
 
@@ -319,46 +321,28 @@ export default function NotificationManagementPage() {
         }
       })
 
-      // Send to each person individually
-      for (const target of uniqueTargets) {
-        let sent = false
+      // Send to each person individually (strictly once per recipient)
+      const sentPrivilegeIds = new Set()
 
-        // 1. Try sending to target's own privilegeId
-        if (target.privilegeId) {
-          try {
-            await sendNotificationToPerson(target.privilegeId, notificationPayload)
-            successfulRecipients.push(target.name || target.email)
-            sent = true
-          } catch (e) {
-            // If failed with 400 (no device) and person belongs to a team, try team fallback
-            if (target.teamId) {
-              const teamPrivs = privileges.filter((p) => Number(p.teamId) === Number(target.teamId) && p.id !== target.privilegeId)
-              for (const altPriv of teamPrivs) {
-                try {
-                  await sendNotificationToPerson(altPriv.id, notificationPayload)
-                  successfulRecipients.push(`${target.name || target.email} (csapat eszközön)`)
-                  sent = true
-                  break
-                } catch {
-                  // ignore
-                }
-              }
-            }
-          }
+      for (const target of uniqueTargets) {
+        if (target.privilegeId && sentPrivilegeIds.has(target.privilegeId)) {
+          continue
         }
 
-        // 2. If not sent yet, try sendNotificationToEmail
-        if (!sent) {
-          try {
+        try {
+          if (target.privilegeId) {
+            await sendNotificationToPerson(target.privilegeId, notificationPayload)
+            sentPrivilegeIds.add(target.privilegeId)
+            successfulRecipients.push(target.name || target.email)
+          } else {
             await sendNotificationToEmail(target.email, notificationPayload)
             successfulRecipients.push(target.name || target.email)
-            sent = true
-          } catch (error) {
-            const errMsg = error.message.includes('Nincs feliratkozott eszköz')
-              ? 'Nincs feliratkozott eszköz (még nem kapcsolta be az értesítéseket a profiljában)'
-              : error.message
-            failedRecipients.push(`${target.name || target.email} (${target.teamName}): ${errMsg}`)
           }
+        } catch (error) {
+          const errMsg = error.message.includes('Nincs feliratkozott eszköz')
+            ? 'Nincs feliratkozott eszköz (még nem kapcsolta be az értesítéseket a profiljában)'
+            : error.message
+          failedRecipients.push(`${target.name || target.email} (${target.teamName}): ${errMsg}`)
         }
       }
 
@@ -745,6 +729,7 @@ export default function NotificationManagementPage() {
                     const priv = item.privilege || privilegeById.get(item.privilegeId) || {}
                     const teamName = priv.teamId ? (teamById.get(priv.teamId)?.teamName || `Csapat #${priv.teamId}`) : 'Egyéni címzett'
                     const roleName = getPrivilegeLabel(priv.privilege1) || (priv.isCoach ? 'Felkészítő' : 'Versenyző')
+                    const parsed = parseMessageTimestamp(item.text || item.message)
 
                     return (
                       <tr key={item.id || idx}>
@@ -753,9 +738,15 @@ export default function NotificationManagementPage() {
                         </td>
                         <td>
                           <strong className="d-block text-primary">{item.title || 'Nincs cím'}</strong>
-                          <span className="text-muted small" style={{ whiteSpace: 'pre-wrap' }}>
-                            {item.text || item.message}
+                          <span className="text-muted small d-block" style={{ whiteSpace: 'pre-wrap' }}>
+                            {parsed.text}
                           </span>
+                          {parsed.timestamp && (
+                            <div className="small text-muted mt-1">
+                              <i className="bi bi-clock me-1" />
+                              {parsed.timestamp}
+                            </div>
+                          )}
                         </td>
                         <td>
                           <strong className="d-block">{priv.name || priv.emailAddress || (item.privilegeId ? `Felhasználó #${item.privilegeId}` : 'Mindenki')}</strong>

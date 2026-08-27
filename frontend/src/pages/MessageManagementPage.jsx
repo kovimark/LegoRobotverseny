@@ -58,10 +58,24 @@ export default function MessageManagementPage() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [messageData, typeData, teamData] = await Promise.all([getMessages(), getMessageTypes(), getNotificationTeams()])
-      setMessages(messageData)
+      const [typeData, teamData] = await Promise.all([
+        getMessageTypes().catch(() => []),
+        getNotificationTeams().catch(() => [])
+      ])
       setTypes(typeData)
       setNotificationTeams(teamData)
+
+      const typeMap = new Map((typeData || []).map((t) => [t.id, t]))
+      const messageData = await getMessages()
+      const enriched = (messageData || []).map((msg) => {
+        const matched = typeMap.get(msg.typeId)
+        return {
+          ...msg,
+          type: msg.type || matched?.name || '',
+          typeHex: msg.typeHex || matched?.hex || null
+        }
+      })
+      setMessages(enriched)
       setDraft((current) => ({ ...current, type: current.type || typeData[0]?.name || '' }))
     } catch (error) {
       setStatus({ type: 'danger', text: error.message })
@@ -199,8 +213,10 @@ export default function MessageManagementPage() {
   }
 
   const editMessage = (message) => {
+    const matchedType = types.find((t) => t.id === message.typeId || t.name === message.type)
     setDraft({
       ...message,
+      type: message.type || matchedType?.name || types[0]?.name || '',
       start: toLocalDateTimeInput(message.start),
       end: toLocalDateTimeInput(message.end)
     })

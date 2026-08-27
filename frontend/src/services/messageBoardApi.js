@@ -34,12 +34,30 @@ const normalizeMessage = (message, typeDetailsById = {}) => {
   }
 }
 
-export const getMessages = async () => {
-  const [data, typeData] = await Promise.all([request('/getAllMessage'), request('/allType')])
-  const typeDetailsById = (Array.isArray(typeData) ? typeData : []).reduce((result, type) => {
-    result[type.id] = { name: type.name || '', hex: type.hex || null }
-    return result
-  }, {})
+export const getMessages = async (includeTypes = false) => {
+  let typeDetailsById = {}
+  let data = []
+
+  if (includeTypes) {
+    try {
+      const [messagesData, typeData] = await Promise.all([
+        request('/getAllMessage'),
+        request('/allType').catch(() => [])
+      ])
+      data = messagesData
+      typeDetailsById = (Array.isArray(typeData) ? typeData : []).reduce((result, type) => {
+        if (type && typeof type === 'object') {
+          result[type.id] = { name: type.name || '', hex: type.hex || null }
+        }
+        return result
+      }, {})
+    } catch {
+      data = await request('/getAllMessage').catch(() => [])
+    }
+  } else {
+    data = await request('/getAllMessage').catch(() => [])
+  }
+
   return (Array.isArray(data) ? data : []).map((message) => normalizeMessage(message, typeDetailsById))
 }
 
