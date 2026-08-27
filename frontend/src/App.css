@@ -2181,18 +2181,18 @@ form {
   position: relative;
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   overflow-x: auto !important;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
   touch-action: pan-x pan-y;
-  scrollbar-width: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #6c757d #f1f3f5;
   border: 1px solid rgba(0, 0, 0, .12);
   border-radius: .45rem;
 }
 
-/* Minden Bootstrap táblázatburkoló valóban a saját szélességén belül
-   görgessen, ne a teljes oldalt húzza szélesebbre. */
 .table-responsive {
   display: block;
   width: 100%;
@@ -2203,27 +2203,44 @@ form {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
   touch-action: pan-x pan-y;
+  scrollbar-width: thin;
 }
 
-.scoring-table-scroll::-webkit-scrollbar {
-  height: .7rem;
+.scoring-table-scroll::-webkit-scrollbar,
+.table-responsive::-webkit-scrollbar {
+  height: 0.65rem;
 }
 
-.scoring-table-scroll::-webkit-scrollbar-thumb {
+.scoring-table-scroll::-webkit-scrollbar-track,
+.table-responsive::-webkit-scrollbar-track {
+  background: #f1f3f5;
+  border-radius: 999px;
+}
+
+.scoring-table-scroll::-webkit-scrollbar-thumb,
+.table-responsive::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 999px;
   background: #6c757d;
   background-clip: padding-box;
 }
 
+.scoring-table-scroll::-webkit-scrollbar-thumb:hover,
+.table-responsive::-webkit-scrollbar-thumb:hover {
+  background: #495057;
+  background-clip: padding-box;
+}
+
 .scoring-results-table {
   width: 100%;
   margin-bottom: 0;
+  white-space: nowrap;
 }
 
 .scoring-results-table th,
 .scoring-results-table td {
-  white-space: nowrap;
+  white-space: nowrap !important;
+  padding: 0.5rem 0.75rem;
 }
 
 .scoring-table-hint {
@@ -2245,7 +2262,7 @@ form {
   }
 
   .table-responsive {
-    overflow-x: scroll !important;
+    overflow-x: auto !important;
     scrollbar-gutter: stable;
   }
 

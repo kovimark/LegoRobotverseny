@@ -557,20 +557,33 @@ function GameBasketScoring() {
 
     setSaving(true)
     try {
-      const response = await authFetch(`${API_BASE}/Basketball`, {
+      const payload = {
+        teamName: selectedTeamName,
+        hoop1: Number(draft.hoop1 || 0),
+        hoop2: Number(draft.hoop2 || 0),
+        hoop3: Number(draft.hoop3 || 0),
+        hoop4: Number(draft.hoop4 || 0),
+        hoop5: Number(draft.hoop5 || 0),
+        time,
+        throwNumber
+      }
+
+      let response = await authFetch(`${API_BASE}/Basketball`, {
         method: 'PUT',
         headers: { accept: '*/*', 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          teamName: selectedTeamName,
-          hoop1: Number(draft.hoop1 || 0),
-          hoop2: Number(draft.hoop2 || 0),
-          hoop3: Number(draft.hoop3 || 0),
-          hoop4: Number(draft.hoop4 || 0),
-          hoop5: Number(draft.hoop5 || 0),
-          time,
-          throwNumber
-        })
+        body: JSON.stringify(payload)
       })
+
+      if (!response.ok) {
+        const fallbackResponse = await authFetch(`${API_BASE}/Basketball/modifyExistingAttempt`, {
+          method: 'PUT',
+          headers: { accept: '*/*', 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        if (fallbackResponse.ok) {
+          response = fallbackResponse
+        }
+      }
 
       if (!response.ok) {
         const errorText = await response.text()

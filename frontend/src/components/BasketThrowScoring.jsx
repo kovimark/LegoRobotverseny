@@ -45,18 +45,28 @@ const normalizeTimeInput = (value) => {
   return Math.min(MAX_TIME_SECONDS, Math.max(0, number))
 }
 
-const normalizeResult = (result, index) => ({
-  id: result.id ?? `${result.team_name || result.teamName || 'basketball-result'}-${result.throwNumber ?? result.throw_number ?? index}`,
-  team_name: result.team_name || result.teamName || '',
-  hoop1: Number(result.hoop1 ?? 0),
-  hoop2: Number(result.hoop2 ?? 0),
-  hoop3: Number(result.hoop3 ?? 0),
-  hoop4: Number(result.hoop4 ?? 0),
-  hoop5: Number(result.hoop5 ?? 0),
-  points: Number(result.points ?? 0),
-  time: result.time == null ? null : Number(result.time),
-  throwNumber: Number(result.throwNumber ?? result.throw_number ?? 1)
-})
+const normalizeResult = (result, index) => {
+  const h1 = Number(result.hoop1 ?? 0)
+  const h2 = Number(result.hoop2 ?? 0)
+  const h3 = Number(result.hoop3 ?? 0)
+  const h4 = Number(result.hoop4 ?? 0)
+  const h5 = Number(result.hoop5 ?? 0)
+  const calculatedPoints = h1 * 1 + h2 * 2 + h3 * 3 + h4 * 4 + h5 * 5
+  const rawPoints = Number(result.points ?? result.pointsScored ?? 0)
+
+  return {
+    id: result.id ?? `${result.team_name || result.teamName || 'basketball-result'}-${result.throwNumber ?? result.throw_number ?? result.throws ?? index}`,
+    team_name: result.team_name || result.teamName || '',
+    hoop1: h1,
+    hoop2: h2,
+    hoop3: h3,
+    hoop4: h4,
+    hoop5: h5,
+    points: rawPoints > 0 ? rawPoints : calculatedPoints,
+    time: result.time == null ? null : Number(result.time),
+    throwNumber: Number(result.throwNumber ?? result.throw_number ?? result.throws ?? 0)
+  }
+}
 
 export default function BasketThrowScoring() {
   const [teamNames, setTeamNames] = useState([])
@@ -77,7 +87,7 @@ export default function BasketThrowScoring() {
   const [modifying, setModifying] = useState(false)
 
   const refreshResults = async () => {
-    const response = await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`)
+    const response = await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}?_t=${Date.now()}`)
     if (!response.ok) {
       throw new Error('Nem sikerült betölteni a kosárra dobás eredményeit.')
     }
@@ -95,9 +105,9 @@ export default function BasketThrowScoring() {
 
       try {
         const [resultsResponse, teamNamesResponse, allTeamsResponse] = await Promise.all([
-          fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`),
-          fetch('https://legocompetition.runasp.net/api/Teams/teamnames'),
-          fetch('https://legocompetition.runasp.net/api/Teams')
+          fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}?_t=${Date.now()}`),
+          fetch(`https://legocompetition.runasp.net/api/Teams/teamnames?_t=${Date.now()}`),
+          fetch(`https://legocompetition.runasp.net/api/Teams?_t=${Date.now()}`)
         ])
 
         if (!resultsResponse.ok) {
@@ -152,14 +162,15 @@ export default function BasketThrowScoring() {
 
     const existing = results.find((r) => r.team_name === teamName)
     if (existing) {
+      const isDefaultPlaceholder = Number(existing.points || 0) === 0 && Number(existing.time) === 121 && Number(existing.throwNumber || 0) <= 1
       setDraft({
-        hoop1: existing.hoop1,
-        hoop2: existing.hoop2,
-        hoop3: existing.hoop3,
-        hoop4: existing.hoop4,
-        hoop5: existing.hoop5,
-        time: existing.time ?? '',
-        throwNumber: existing.throwNumber || 1
+        hoop1: existing.hoop1 || 0,
+        hoop2: existing.hoop2 || 0,
+        hoop3: existing.hoop3 || 0,
+        hoop4: existing.hoop4 || 0,
+        hoop5: existing.hoop5 || 0,
+        time: isDefaultPlaceholder ? '' : (existing.time ?? ''),
+        throwNumber: isDefaultPlaceholder ? 1 : (existing.throwNumber || 1)
       })
     } else {
       setDraft(createEmptyDraft())
@@ -261,21 +272,32 @@ export default function BasketThrowScoring() {
       return
     }
 
+    const hoop1 = Number(draft.hoop1 || 0)
+    const hoop2 = Number(draft.hoop2 || 0)
+    const hoop3 = Number(draft.hoop3 || 0)
+    const hoop4 = Number(draft.hoop4 || 0)
+    const hoop5 = Number(draft.hoop5 || 0)
+    const calculatedPoints = hoop1 * 1 + hoop2 * 2 + hoop3 * 3 + hoop4 * 4 + hoop5 * 5
+
     const payload = {
       teamName: selectedTeamName,
-      hoop1: Number(draft.hoop1 || 0),
-      hoop2: Number(draft.hoop2 || 0),
-      hoop3: Number(draft.hoop3 || 0),
-      hoop4: Number(draft.hoop4 || 0),
-      hoop5: Number(draft.hoop5 || 0),
-      time,
-      throwNumber
+      hoop1,
+      hoop2,
+      hoop3,
+      hoop4,
+      hoop5,
+      time: Number(time),
+      throwNumber: Number(throwNumber),
+      throws: Number(throwNumber),
+      points: calculatedPoints,
+      pointsScored: calculatedPoints
     }
 
     setSaving(true)
 
     try {
-      const response = await authFetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`, {
+      // 1. Try modifyExistingAttempt first (since teams already exist in DB)
+      let response = await authFetch(`https://legocompetition.runasp.net/api/Basketball/modifyExistingAttempt`, {
         method: 'PUT',
         headers: {
           accept: '*/*',
@@ -283,6 +305,21 @@ export default function BasketThrowScoring() {
         },
         body: JSON.stringify(payload)
       })
+
+      // 2. Fallback to /Basketball if modifyExistingAttempt fails
+      if (!response.ok) {
+        const altResponse = await authFetch(`https://legocompetition.runasp.net/api/Basketball`, {
+          method: 'PUT',
+          headers: {
+            accept: '*/*',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        })
+        if (altResponse.ok) {
+          response = altResponse
+        }
+      }
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -293,7 +330,7 @@ export default function BasketThrowScoring() {
       setSearchTerm('')
       setSelectedTeamName('')
       setDraft(createEmptyDraft())
-      setActionMessage({ type: 'success', text: 'Az eredmény mentése sikeres volt.' })
+      setActionMessage({ type: 'success', text: `"${selectedTeamName}" kosárra dobás eredménye (${calculatedPoints} pont) sikeresen rögzítve!` })
     } catch (err) {
       setActionMessage({ type: 'danger', text: err.message })
     } finally {
@@ -373,23 +410,40 @@ export default function BasketThrowScoring() {
 
     setModifying(true)
     try {
-      const response = await authFetch(
-        `https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/modifyExistingAttempt`,
+      const payload = {
+        teamName: result.team_name,
+        hoop1: Number(editDraft.hoop1 || 0),
+        hoop2: Number(editDraft.hoop2 || 0),
+        hoop3: Number(editDraft.hoop3 || 0),
+        hoop4: Number(editDraft.hoop4 || 0),
+        hoop5: Number(editDraft.hoop5 || 0),
+        time,
+        throwNumber
+      }
+
+      let response = await authFetch(
+        `https://legocompetition.runasp.net/api/Basketball/modifyExistingAttempt`,
         {
           method: 'PUT',
           headers: { accept: '*/*', 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            teamName: result.team_name,
-            hoop1: Number(editDraft.hoop1 || 0),
-            hoop2: Number(editDraft.hoop2 || 0),
-            hoop3: Number(editDraft.hoop3 || 0),
-            hoop4: Number(editDraft.hoop4 || 0),
-            hoop5: Number(editDraft.hoop5 || 0),
-            time,
-            throwNumber
-          })
+          body: JSON.stringify(payload)
         }
       )
+
+      if (!response.ok) {
+        const fallbackResponse = await authFetch(
+          `https://legocompetition.runasp.net/api/Basketball`,
+          {
+            method: 'PUT',
+            headers: { accept: '*/*', 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          }
+        )
+        if (fallbackResponse.ok) {
+          response = fallbackResponse
+        }
+      }
+
       if (!response.ok) {
         const errorText = await response.text()
         throw new Error(errorText || 'A próbálkozás módosítása sikertelen volt.')

@@ -373,17 +373,54 @@ export default function MessageManagementPage() {
       {loading ? <div className="alert alert-info">Betöltés...</div> : messages.length === 0 ? <div className="alert alert-secondary">Nincs üzenet.</div> : (
         filteredMessages.length > 0 ? <div className="d-flex flex-column gap-3">{filteredMessages.map((message) => (
           <details className="message-admin-dropdown" key={message.id}>
-            <summary>
-              <span className="badge" style={getCategoryBadgeStyle(message.typeHex)}>{message.type || 'Nincs típus'}</span>
-              <span className="message-admin-dropdown-title">{message.title}</span>
-              <span className="message-admin-dropdown-date">{message.start ? new Date(message.start).toLocaleString('hu-HU') : 'Most'}</span>
-              <i className="bi bi-chevron-down message-admin-dropdown-icon" aria-hidden="true" />
+            <summary className="d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <div className="d-flex align-items-center gap-2 flex-grow-1" style={{ minWidth: 0 }}>
+                <span className="badge" style={getCategoryBadgeStyle(message.typeHex)}>{message.type || 'Nincs típus'}</span>
+                <span className="message-admin-dropdown-title text-truncate">{message.title}</span>
+              </div>
+              <div className="d-flex align-items-center gap-2">
+                <span className="message-admin-dropdown-date text-muted small">{message.start ? new Date(message.start).toLocaleString('hu-HU') : 'Most'}</span>
+                <button
+                  type="button"
+                  className="btn btn-outline-primary btn-sm py-0 px-2"
+                  title="Szerkesztés"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setConfirmAction({ kind: 'edit-message', message })
+                  }}
+                >
+                  <i className="bi bi-pencil-square me-1" />
+                  Szerkesztés
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline-danger btn-sm py-0 px-2"
+                  title="Törlés"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setDeleteRequest({ kind: 'message', item: message })
+                  }}
+                >
+                  <i className="bi bi-trash3 me-1" />
+                  Törlés
+                </button>
+                <i className="bi bi-chevron-down message-admin-dropdown-icon" aria-hidden="true" />
+              </div>
             </summary>
             <div className="message-admin-dropdown-content">
               <MessageText text={message.text} links={message.links} />
               <MessageLinks links={message.links} compact />
               <div className="small text-muted mb-3"><strong>Megjelenés:</strong> {message.start ? new Date(message.start).toLocaleString('hu-HU') : 'Azonnal'}<br /><strong>Lejárat:</strong> {message.end ? new Date(message.end).toLocaleString('hu-HU') : 'Nincs lejárat'}</div>
-              <div className="d-flex flex-wrap gap-2"><button type="button" className="btn btn-outline-primary btn-sm" onClick={() => setConfirmAction({ kind: 'edit-message', message })}>Szerkesztés</button><button type="button" className="btn btn-outline-danger btn-sm" onClick={() => setDeleteRequest({ kind: 'message', item: message })}>Törlés</button></div>
+              <div className="d-flex flex-wrap gap-2">
+                <button type="button" className="btn btn-outline-primary btn-sm" onClick={() => setConfirmAction({ kind: 'edit-message', message })}>
+                  <i className="bi bi-pencil-square me-1" /> Szerkesztés
+                </button>
+                <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => setDeleteRequest({ kind: 'message', item: message })}>
+                  <i className="bi bi-trash3 me-1" /> Törlés
+                </button>
+              </div>
             </div>
           </details>
         ))}</div> : <div className="alert alert-secondary">Nincs a keresésnek megfelelő üzenet.</div>

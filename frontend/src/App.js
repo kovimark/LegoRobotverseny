@@ -26,6 +26,7 @@ import EmailManagementPage from './pages/EmailManagementPage';
 import JudgeApplicationsPage from './pages/JudgeApplicationsPage';
 import UserMessagesPage from './pages/UserMessagesPage';
 import NotificationPromptBanner from './components/NotificationPromptBanner';
+import AutoBackupRunner from './components/AutoBackupRunner';
 import { auth, authPersistenceReady, googleProvider } from './firebase';
 import { isJudgePrivilege } from './config/privilegeConfig';
 import { subscribeTeamsToPush } from './services/notificationApi';
@@ -199,6 +200,7 @@ function App() {
   return (
     <div className="App">
       <AutomaticPhaseAdvancer enabled={userRole === 'admin'} />
+      <AutoBackupRunner enabled={userRole === 'admin'} />
       {!isFocusPage && (
         <>
           <Navbar
@@ -224,8 +226,8 @@ function App() {
         <Route path="/biro-jelentkezes" element={<JudgeRegistration />} />
         <Route path="/szabalyzat" element={<RulesPage />} />
         <Route path="/hirek" element={<NewsPage />} />
-        <Route path="/hirek/:messageId" element={<NewsDetailsPage />} />
-        <Route path="/hirek/cim/:messageTitle" element={<NewsDetailsPage />} />
+        <Route path="/hirek/:messageId" element={<NewsDetailsPage userRole={userRole} />} />
+        <Route path="/hirek/cim/:messageTitle" element={<NewsDetailsPage userRole={userRole} />} />
         <Route path="/uzenetek" element={<UserMessagesPage user={user} userTeamId={userTeamId} />} />
         <Route path="/ertesiteseim" element={<UserMessagesPage user={user} userTeamId={userTeamId} />} />
         <Route path="/allasok" element={<StandingsPage />} />

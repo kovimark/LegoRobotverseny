@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
 import FloatingFeedback from '../components/FloatingFeedback'
-import { getNotificationTeams, getNotificationPrivileges, getAllNotifications, sendNotificationToEmail, sendNotificationToPerson } from '../services/notificationApi'
+import { getNotificationTeams, getNotificationPrivileges, getAllNotifications, deleteNotification, sendNotificationToEmail, sendNotificationToPerson } from '../services/notificationApi'
 import { attachTimestampToMessage, parseMessageTimestamp } from '../utils/notificationFormat'
 import { getPrivilegeLabel } from '../config/privilegeConfig'
 import AgeGroupBadge from '../components/AgeGroupBadge'
@@ -123,6 +123,8 @@ export default function NotificationManagementPage() {
   const [sending, setSending] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [feedback, setFeedback] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   // Sent notifications state
   const [sentNotifications, setSentNotifications] = useState([])
@@ -138,6 +140,30 @@ export default function NotificationManagementPage() {
       console.warn('Nem sikerült betölteni az elküldött értesítéseket:', err)
     } finally {
       setLoadingSent(false)
+    }
+  }
+
+  const handleDeleteNotification = async () => {
+    if (!deleteTarget?.id) return
+    try {
+      setDeleting(true)
+      await deleteNotification(deleteTarget.id)
+      setFeedback({ type: 'success', text: `A(z) #${deleteTarget.id} számú értesítés törölve lett.` })
+      setDeleteTarget(null)
+      await refreshSentNotifications()
+    } catch (err) {
+      const is404 = err.message?.includes('404') || err.message?.includes('Szerverhiba (404)')
+      if (is404) {
+        setFeedback({
+          type: 'warning',
+          text: 'A backend szerveren még nincs beállítva az értesítések törlésének végpontja (DELETE /api/Notification/deleteNotification/{id}).'
+        })
+      } else {
+        setFeedback({ type: 'danger', text: err.message || 'Hiba történt az értesítés törlésekor.' })
+      }
+      setDeleteTarget(null)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -722,6 +748,7 @@ export default function NotificationManagementPage() {
                     <th>Értesítés címe és tartalma</th>
                     <th>Címzett</th>
                     <th>Csapat / Szerepkör</th>
+                    <th style={{ width: '6rem' }} className="text-end">Művelet</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -756,6 +783,17 @@ export default function NotificationManagementPage() {
                           <span className="badge text-bg-light border text-dark me-1">{teamName}</span>
                           <span className="badge text-bg-secondary">{roleName}</span>
                         </td>
+                        <td className="text-end">
+                          <button
+                            type="button"
+                            className="btn btn-outline-danger btn-sm"
+                            title="Értesítés törlése"
+                            onClick={() => setDeleteTarget(item)}
+                          >
+                            <i className="bi bi-trash3 me-1" />
+                            Törlés
+                          </button>
+                        </td>
                       </tr>
                     )
                   })}
@@ -769,6 +807,22 @@ export default function NotificationManagementPage() {
           )}
         </div>
       </section>
+
+      {/* Törlés megerősítő ablak */}
+      <ConfirmModal
+        open={Boolean(deleteTarget)}
+        title="Értesítés törlése"
+        confirmLabel="Törlés"
+        busy={deleting}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteNotification}
+      >
+        <p className="mb-2">Biztosan törölni szeretnéd ezt az elküldött értesítést?</p>
+        <div className="border rounded p-3 bg-light">
+          <strong className="d-block mb-1 text-primary">{deleteTarget?.title}</strong>
+          <span className="small text-muted">{deleteTarget?.text}</span>
+        </div>
+      </ConfirmModal>
 
       {/* Megerősítő ablak */}
       <ConfirmModal

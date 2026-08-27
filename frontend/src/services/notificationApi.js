@@ -46,6 +46,14 @@ export const getAllNotifications = async () => {
   }
 }
 
+export const deleteNotification = async (notificationId) => {
+  const response = await authFetch(`${API_URL}/Notification/deleteNotification/${notificationId}`, {
+    method: 'DELETE',
+    headers: { accept: '*/*' }
+  })
+  return readResponse(response)
+}
+
 export const getAllNotificationsByPerson = async (email) => {
   const cleanEmail = String(email || '').trim().toLowerCase()
   if (!cleanEmail) return []

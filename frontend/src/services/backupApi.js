@@ -9,6 +9,51 @@ import { authFetch } from './apiClient'
 
 const API_URL = 'https://legocompetition.runasp.net/api'
 
+export const AUTO_BACKUP_CONFIG_CHANGED_EVENT = 'robotverseny_auto_backup_changed'
+export const AUTO_BACKUP_TRIGGERED_EVENT = 'robotverseny_auto_backup_triggered'
+
+const SCORES_CONFIG_KEY = 'robotverseny_auto_backup_scores_config'
+const SETTINGS_CONFIG_KEY = 'robotverseny_auto_backup_settings_config'
+
+export const getAutoBackupConfig = (kind = 'scores') => {
+  const key = kind === 'settings' ? SETTINGS_CONFIG_KEY : SCORES_CONFIG_KEY
+  const defaultInterval = kind === 'settings' ? 30 : 10
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) return { enabled: false, intervalMinutes: defaultInterval, lastRun: null }
+    const parsed = JSON.parse(raw)
+    return {
+      enabled: Boolean(parsed.enabled),
+      intervalMinutes: Math.max(1, Number(parsed.intervalMinutes) || defaultInterval),
+      lastRun: parsed.lastRun || null
+    }
+  } catch {
+    return { enabled: false, intervalMinutes: defaultInterval, lastRun: null }
+  }
+}
+
+export const saveAutoBackupConfig = (kind, config) => {
+  const key = kind === 'settings' ? SETTINGS_CONFIG_KEY : SCORES_CONFIG_KEY
+  const current = getAutoBackupConfig(kind)
+  const updated = {
+    ...current,
+    ...config,
+    intervalMinutes: Math.max(1, Number(config.intervalMinutes ?? current.intervalMinutes) || 10)
+  }
+  window.localStorage.setItem(key, JSON.stringify(updated))
+  window.dispatchEvent(new CustomEvent(AUTO_BACKUP_CONFIG_CHANGED_EVENT, { detail: { kind, config: updated } }))
+  return updated
+}
+
+export const recordBackupRun = (kind) => {
+  const key = kind === 'settings' ? SETTINGS_CONFIG_KEY : SCORES_CONFIG_KEY
+  const current = getAutoBackupConfig(kind)
+  const updated = { ...current, lastRun: new Date().toISOString() }
+  window.localStorage.setItem(key, JSON.stringify(updated))
+  window.dispatchEvent(new CustomEvent(AUTO_BACKUP_CONFIG_CHANGED_EVENT, { detail: { kind, config: updated } }))
+  window.dispatchEvent(new CustomEvent(AUTO_BACKUP_TRIGGERED_EVENT, { detail: { kind, timestamp: updated.lastRun } }))
+}
+
 const fetchJson = async (path) => {
   const response = await authFetch(`${API_URL}${path}`, { headers: { accept: '*/*' } })
   if (!response.ok) throw new Error((await response.text()) || `A mentéshez szükséges adat nem tölthető le: ${path}`)
@@ -19,7 +64,7 @@ const postJson = async (path, body, method = 'POST') => {
   const response = await authFetch(`${API_URL}${path}`, {
     method,
     headers: { accept: '*/*', 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+    body: body ? JSON.stringify(body) : undefined
   })
   if (!response.ok) throw new Error((await response.text()) || `A visszaállítás sikertelen: ${path}`)
 }
@@ -38,11 +83,14 @@ export const downloadBackupFile = (data, fileName) => {
 
 const timestamp = () => new Date().toISOString().replace(/[:.]/g, '-')
 
-export const exportSettingsBackup = async () => {
-  const [settings, phases, teams] = await Promise.all([
-    getAllSettings(),
-    getAllCompetitionPhases(),
-    fetchJson('/Teams')
+export const exportSettingsBackup = async (options = {}) => {
+  const isAuto = Boolean(options.isAuto)
+  const [settings, phases, teams, messageTypes, messages] = await Promise.all([
+    getAllSettings().catch(() => ({})),
+    getAllCompetitionPhases().catch(() => []),
+    fetchJson('/Teams').catch(() => []),
+    fetchJson('/Message/allType').catch(() => []),
+    fetchJson('/Message/getAllMessage').catch(() => [])
   ])
   const selectedPhase = typeof settings?.competitionPhase === 'string'
     ? settings.competitionPhase
@@ -54,36 +102,51 @@ export const exportSettingsBackup = async () => {
   }))
   const backup = {
     format: 'robotverseny-settings-backup',
-    version: 2,
+    version: 3,
     createdAt: new Date().toISOString(),
+    isAuto,
     settings: { ...settings, competitionPhase: selectedPhase },
     phases,
-    teamGroups
+    teamGroups,
+    messageTypes: Array.isArray(messageTypes) ? messageTypes : [],
+    messages: Array.isArray(messages) ? messages : []
   }
-  downloadBackupFile(backup, `robotverseny-beallitasok-${timestamp()}.json`)
+  const prefix = isAuto ? 'robotverseny-beallitasok-auto' : 'robotverseny-beallitasok'
+  downloadBackupFile(backup, `${prefix}-${timestamp()}.json`)
+  recordBackupRun('settings')
+  return backup
 }
 
-export const exportScoresBackup = async () => {
-  const [points, lineFollowing, hillClimbing, basketball, sumoMatches, tieBreakers] = await Promise.all([
-    fetchJson('/Points'),
-    fetchJson('/LineFollowing'),
-    fetchJson('/HillClimbing'),
-    fetchJson('/Basketball'),
-    fetchJson('/Sumo/matches'),
-    fetchJson('/TieBreaker')
+export const exportScoresBackup = async (options = {}) => {
+  const isAuto = Boolean(options.isAuto)
+  const [points, lineFollowing, hillClimbing, basketball, sumoMatches, tieBreakers, teams, statistics] = await Promise.all([
+    fetchJson('/Points').catch(() => []),
+    fetchJson('/LineFollowing').catch(() => []),
+    fetchJson('/HillClimbing').catch(() => []),
+    fetchJson('/Basketball').catch(() => []),
+    fetchJson('/Sumo/matches').catch(() => []),
+    fetchJson('/TieBreaker').catch(() => []),
+    fetchJson('/Teams').catch(() => []),
+    fetchJson('/Statistics/getAllStats').catch(() => ({}))
   ])
   const backup = {
     format: 'robotverseny-scores-backup',
-    version: 1,
+    version: 2,
     createdAt: new Date().toISOString(),
-    points,
-    lineFollowing,
-    hillClimbing,
-    basketball,
-    sumoMatches,
-    tieBreakers
+    isAuto,
+    points: Array.isArray(points) ? points : [],
+    lineFollowing: Array.isArray(lineFollowing) ? lineFollowing : [],
+    hillClimbing: Array.isArray(hillClimbing) ? hillClimbing : [],
+    basketball: Array.isArray(basketball) ? basketball : [],
+    sumoMatches: Array.isArray(sumoMatches) ? sumoMatches : [],
+    tieBreakers: Array.isArray(tieBreakers) ? tieBreakers : [],
+    teams: Array.isArray(teams) ? teams : [],
+    statistics: statistics || {}
   }
-  downloadBackupFile(backup, `robotverseny-pontok-${timestamp()}.json`)
+  const prefix = isAuto ? 'robotverseny-pontok-auto' : 'robotverseny-pontok'
+  downloadBackupFile(backup, `${prefix}-${timestamp()}.json`)
+  recordBackupRun('scores')
+  return backup
 }
 
 export const readBackupFile = async (file) => {
@@ -98,9 +161,6 @@ export const restoreSettingsBackup = async (backup) => {
     throw new Error('Ez nem beállításmentési fájl.')
   }
 
-  // Az aktív versenyszakaszt csak azután szabad beállítani, hogy maga a
-  // szakasz már létezik a backendben. Ellenkező esetben a modifySettings
-  // "A verseny szakasz nem található" hibával elutasítja a visszaállítást.
   const existing = await getAllCompetitionPhases()
   const existingByName = new Map(existing.map((phase) => [String(phase.phaseName || phase.name || '').toLocaleLowerCase('hu-HU'), phase]))
   for (const phase of backup.phases) {
@@ -123,8 +183,6 @@ export const restoreSettingsBackup = async (backup) => {
     ? backup.settings.competitionPhase.trim()
     : String(backup.settings.competitionPhase?.phaseName || '').trim()
 
-  // Régebbi mentésben előfordulhat, hogy az aktív szakasz nincs benne a
-  // menetrendi elemek listájában. Ilyenkor létrehozzuk időpont nélkül.
   if (selectedPhase && !existingByName.has(selectedPhase.toLocaleLowerCase('hu-HU'))) {
     await addCompetitionPhase({
       phaseName: selectedPhase,
