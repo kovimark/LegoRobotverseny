@@ -116,26 +116,34 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!user?.email || userRole !== 'competitor') return undefined;
+    if (!user?.email) return undefined;
 
     const controller = new AbortController();
-    const subscribeCurrentCompetitor = async () => {
+    const subscribeCurrentUser = async () => {
       try {
         if (window.localStorage.getItem('robotverseny_push_disabled') === 'true') return;
-        if ('Notification' in window && Notification.permission === 'denied') return;
-        const response = await fetch(
-          `https://legocompetition.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`,
-          { headers: { accept: '*/*' }, signal: controller.signal }
-        );
-        if (!response.ok) return;
-        const teams = await response.json();
-        const teamIds = Array.isArray(teams)
-          ? [...new Set(teams
-            .filter((team) => team && typeof team === 'object')
-            .map((team) => team.id)
-            .filter((id) => id !== null && id !== undefined))]
-          : [];
-        if (!controller.signal.aborted && teamIds.length > 0) await subscribeTeamsToPush(teamIds);
+        if ('Notification' in window && Notification.permission !== 'granted') return;
+        let teamIds = [];
+        try {
+          const response = await fetch(
+            `https://legocompetition.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`,
+            { headers: { accept: '*/*' }, signal: controller.signal }
+          );
+          if (response.ok) {
+            const teams = await response.json();
+            teamIds = Array.isArray(teams)
+              ? [...new Set(teams
+                .filter((team) => team && typeof team === 'object')
+                .map((team) => team.id)
+                .filter((id) => id !== null && id !== undefined))]
+              : [];
+          }
+        } catch {
+          // ignore
+        }
+        if (!controller.signal.aborted) {
+          await subscribeTeamsToPush(teamIds, user.email);
+        }
       } catch (error) {
         if (error.name !== 'AbortError') {
           console.warn('Az automatikus értesítés-feliratkozás nem sikerült:', error.message);
@@ -143,9 +151,9 @@ function App() {
       }
     };
 
-    subscribeCurrentCompetitor();
+    subscribeCurrentUser();
     return () => controller.abort();
-  }, [user?.email, userRole]);
+  }, [user?.email]);
 
   const handleGoogleSignIn = async () => {
     setAuthError('');

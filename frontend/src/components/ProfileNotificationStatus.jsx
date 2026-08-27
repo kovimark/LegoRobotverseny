@@ -47,14 +47,12 @@ export default function ProfileNotificationStatus({ user }) {
     try {
       setBusy(true)
       const teamIds = await loadTeamIds()
-      await subscribeTeamsToPush(teamIds)
+      await subscribeTeamsToPush(teamIds, user?.email)
       window.localStorage.removeItem(DISABLED_KEY)
       setStatus('enabled')
       setFeedback({
         type: 'success',
-        text: teamIds.length > 0
-          ? 'Az értesítések bekapcsolva és a csapataidhoz rendelve.'
-          : 'A böngészős értesítések bekapcsolva.'
+        text: 'Az értesítések sikeresen bekapcsolva ezen az eszközön.'
       })
     } catch (error) {
       await refreshStatus()
