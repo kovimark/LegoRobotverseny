@@ -611,20 +611,24 @@ form {
   align-items: center !important;
   justify-content: center !important;
   text-align: center !important;
-  width: 2.25rem;
-  height: 2.25rem;
-  min-width: 2.25rem;
+  width: 2.25rem !important;
+  height: 2.25rem !important;
+  min-width: 2.25rem !important;
   padding: 0 !important;
-  border: 2px solid rgba(0, 0, 0, 0.18) !important;
+  border: 2px solid rgba(0, 0, 0, 0.22) !important;
   color: var(--black) !important;
-  background: rgba(255, 255, 255, 0.85);
-  border-radius: 999px;
-  font-weight: 800;
-  font-size: 0.95rem;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 999px !important;
+  font-weight: 800 !important;
+  font-size: 0.95rem !important;
   line-height: 1 !important;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  vertical-align: middle;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+  user-select: none !important;
+  position: relative !important;
+  z-index: 15 !important;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, border-color 0.12s ease !important;
 }
 
 .sumo-history-chip--win {
@@ -646,12 +650,13 @@ form {
 }
 
 .sumo-history-chip:hover,
-.sumo-history-chip:focus {
-  border-color: var(--red) !important;
-  color: var(--red) !important;
-  background: rgba(229, 89, 52, 0.15) !important;
-  transform: scale(1.08);
-  box-shadow: 0 0.15rem 0.4rem rgba(0, 0, 0, 0.15);
+.sumo-history-chip:focus,
+.sumo-history-chip:active {
+  border-color: #dc3545 !important;
+  color: #dc3545 !important;
+  background: rgba(220, 53, 69, 0.15) !important;
+  transform: scale(1.15) !important;
+  box-shadow: 0 0.25rem 0.5rem rgba(220, 53, 69, 0.35) !important;
 }
 
 .home-page {
@@ -3580,7 +3585,7 @@ form {
 /* Vetítésen jól látható, extra élénk, kontrasztos W, L, D körök (hover és animáció nélkül) */
 .show-match-grid .sumo-history-chip,
 .show-grand-final-arena .sumo-history-chip,
-.sumo-history-chip {
+.show-standings-grid .sumo-history-chip {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -3599,45 +3604,41 @@ form {
   animation: none !important;
 }
 
-.sumo-history-chip:hover,
-.sumo-history-chip:focus,
-.sumo-history-chip:active,
 .show-match-grid .sumo-history-chip:hover,
 .show-match-grid .sumo-history-chip:focus,
-.show-match-grid .sumo-history-chip:active {
+.show-match-grid .sumo-history-chip:active,
+.show-grand-final-arena .sumo-history-chip:hover,
+.show-standings-grid .sumo-history-chip:hover {
   transform: none !important;
 }
 
-.sumo-history-chip--win,
-.sumo-history-chip--win:hover,
-.sumo-history-chip--win:focus,
 .show-match-grid .sumo-history-chip--win,
 .show-match-grid .sumo-history-chip--win:hover,
-.show-match-grid .sumo-history-chip--win:focus {
+.show-match-grid .sumo-history-chip--win:focus,
+.show-grand-final-arena .sumo-history-chip--win,
+.show-standings-grid .sumo-history-chip--win {
   background: #16a34a !important;
   border: 2px solid #86efac !important;
   color: #ffffff !important;
   box-shadow: 0 0 14px rgba(34, 197, 94, 0.85) !important;
 }
 
-.sumo-history-chip--loss,
-.sumo-history-chip--loss:hover,
-.sumo-history-chip--loss:focus,
 .show-match-grid .sumo-history-chip--loss,
 .show-match-grid .sumo-history-chip--loss:hover,
-.show-match-grid .sumo-history-chip--loss:focus {
+.show-match-grid .sumo-history-chip--loss:focus,
+.show-grand-final-arena .sumo-history-chip--loss,
+.show-standings-grid .sumo-history-chip--loss {
   background: #dc2626 !important;
   border: 2px solid #fca5a5 !important;
   color: #ffffff !important;
   box-shadow: 0 0 14px rgba(239, 68, 68, 0.85) !important;
 }
 
-.sumo-history-chip--draw,
-.sumo-history-chip--draw:hover,
-.sumo-history-chip--draw:focus,
 .show-match-grid .sumo-history-chip--draw,
 .show-match-grid .sumo-history-chip--draw:hover,
-.show-match-grid .sumo-history-chip--draw:focus {
+.show-match-grid .sumo-history-chip--draw:focus,
+.show-grand-final-arena .sumo-history-chip--draw,
+.show-standings-grid .sumo-history-chip--draw {
   background: #eab308 !important;
   border: 2px solid #fef08a !important;
   color: #000000 !important;

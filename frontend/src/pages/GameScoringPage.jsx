@@ -1544,6 +1544,24 @@ function GameSumoScoring() {
       team2result: nextTeam2History.join(',')
     }
 
+    const reversedPayload = {
+      team1Name: selectedMatch.team2Name,
+      team1_name: selectedMatch.team2Name,
+      team2Name: selectedMatch.team1Name,
+      team2_name: selectedMatch.team1Name,
+      team1Point: calculateSumoPoints(nextTeam2History),
+      team1_point: calculateSumoPoints(nextTeam2History),
+      team2Point: calculateSumoPoints(nextTeam1History),
+      team2_point: calculateSumoPoints(nextTeam1History),
+      table: selectedMatch.table,
+      tournamentStage: STAGE_API_VALUES[selectedMatch.stage] || 1,
+      tournament_stage: STAGE_API_VALUES[selectedMatch.stage] || 1,
+      team1Result: nextTeam2History.join(','),
+      team1result: nextTeam2History.join(','),
+      team2Result: nextTeam1History.join(','),
+      team2result: nextTeam1History.join(',')
+    }
+
     setSaving(true)
     try {
       let response = await authFetch(`${API_BASE}/Sumo`, {
@@ -1553,22 +1571,41 @@ function GameSumoScoring() {
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        const shouldFallback = response.status === 400 && /Object reference not set to an instance of an object/i.test(errorText || '')
-        if (!shouldFallback) {
-          throw new Error(errorText || 'A szumó meccs frissítése sikertelen volt.')
-        }
-
-        response = await authFetch(`${API_BASE}/Sumo`, {
+        const postResponse = await authFetch(`${API_BASE}/Sumo`, {
           method: 'POST',
           headers: { accept: '*/*', 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         })
-
-        if (!response.ok) {
-          const fallbackErrorText = await response.text()
-          throw new Error(fallbackErrorText || 'A szumó meccs frissítése sikertelen volt.')
+        if (postResponse.ok) {
+          response = postResponse
         }
+      }
+
+      if (!response.ok) {
+        const revPatchResponse = await authFetch(`${API_BASE}/Sumo`, {
+          method: 'PATCH',
+          headers: { accept: '*/*', 'Content-Type': 'application/json' },
+          body: JSON.stringify(reversedPayload)
+        })
+        if (revPatchResponse.ok) {
+          response = revPatchResponse
+        }
+      }
+
+      if (!response.ok) {
+        const revPostResponse = await authFetch(`${API_BASE}/Sumo`, {
+          method: 'POST',
+          headers: { accept: '*/*', 'Content-Type': 'application/json' },
+          body: JSON.stringify(reversedPayload)
+        })
+        if (revPostResponse.ok) {
+          response = revPostResponse
+        }
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || 'A szumó meccs frissítése sikertelen volt.')
       }
 
       setMatches((prev) => prev.map((match) => (
@@ -1593,10 +1630,30 @@ function GameSumoScoring() {
   const handleDeleteRoundResult = async (resultIndex) => {
     if (!selectedMatch || saving) return
 
-    const nextTeam1History = selectedMatch.team1History.filter((_, index) => index !== resultIndex)
-    const nextTeam2History = selectedMatch.team2History.filter((_, index) => index !== resultIndex)
+    const prevTeam1History = [...(selectedMatch.team1History || [])]
+    const prevTeam2History = [...(selectedMatch.team2History || [])]
+    const prevTeam1Point = selectedMatch.team1Point
+    const prevTeam2Point = selectedMatch.team2Point
+
+    const nextTeam1History = prevTeam1History.filter((_, index) => index !== resultIndex)
+    const nextTeam2History = prevTeam2History.filter((_, index) => index !== resultIndex)
     const nextTeam1Point = calculateSumoPoints(nextTeam1History)
     const nextTeam2Point = calculateSumoPoints(nextTeam2History)
+    const nextTeam1ResultStr = nextTeam1History.join(',')
+    const nextTeam2ResultStr = nextTeam2History.join(',')
+
+    // 1. Azonnali helyi (optimistic) frissítés
+    setMatches((prev) => prev.map((match) => (
+      match.id === selectedMatch.id
+        ? {
+            ...match,
+            team1History: nextTeam1History,
+            team2History: nextTeam2History,
+            team1Point: nextTeam1Point,
+            team2Point: nextTeam2Point
+          }
+        : match
+    )))
 
     const payload = {
       team1Name: selectedMatch.team1Name,
@@ -1610,37 +1667,89 @@ function GameSumoScoring() {
       table: selectedMatch.table,
       tournamentStage: STAGE_API_VALUES[selectedMatch.stage] || 1,
       tournament_stage: STAGE_API_VALUES[selectedMatch.stage] || 1,
-      team1Result: nextTeam1History.join(','),
-      team1result: nextTeam1History.join(','),
-      team2Result: nextTeam2History.join(','),
-      team2result: nextTeam2History.join(',')
+      team1Result: nextTeam1ResultStr,
+      team1result: nextTeam1ResultStr,
+      team2Result: nextTeam2ResultStr,
+      team2result: nextTeam2ResultStr
+    }
+
+    const reversedPayload = {
+      team1Name: selectedMatch.team2Name,
+      team1_name: selectedMatch.team2Name,
+      team2Name: selectedMatch.team1Name,
+      team2_name: selectedMatch.team1Name,
+      team1Point: nextTeam2Point,
+      team1_point: nextTeam2Point,
+      team2Point: nextTeam1Point,
+      team2_point: nextTeam1Point,
+      table: selectedMatch.table,
+      tournamentStage: STAGE_API_VALUES[selectedMatch.stage] || 1,
+      tournament_stage: STAGE_API_VALUES[selectedMatch.stage] || 1,
+      team1Result: nextTeam2ResultStr,
+      team1result: nextTeam2ResultStr,
+      team2Result: nextTeam1ResultStr,
+      team2result: nextTeam1ResultStr
     }
 
     setSaving(true)
     try {
-      const response = await authFetch(`${API_BASE}/Sumo`, {
+      let response = await authFetch(`${API_BASE}/Sumo`, {
         method: 'PATCH',
         headers: { accept: '*/*', 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
 
       if (!response.ok) {
+        const postResponse = await authFetch(`${API_BASE}/Sumo`, {
+          method: 'POST',
+          headers: { accept: '*/*', 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        if (postResponse.ok) {
+          response = postResponse
+        }
+      }
+
+      if (!response.ok) {
+        const revPatchResponse = await authFetch(`${API_BASE}/Sumo`, {
+          method: 'PATCH',
+          headers: { accept: '*/*', 'Content-Type': 'application/json' },
+          body: JSON.stringify(reversedPayload)
+        })
+        if (revPatchResponse.ok) {
+          response = revPatchResponse
+        }
+      }
+
+      if (!response.ok) {
+        const revPostResponse = await authFetch(`${API_BASE}/Sumo`, {
+          method: 'POST',
+          headers: { accept: '*/*', 'Content-Type': 'application/json' },
+          body: JSON.stringify(reversedPayload)
+        })
+        if (revPostResponse.ok) {
+          response = revPostResponse
+        }
+      }
+
+      if (!response.ok) {
+        // Hiba esetén visszaállítás
+        setMatches((prev) => prev.map((match) => (
+          match.id === selectedMatch.id
+            ? {
+                ...match,
+                team1History: prevTeam1History,
+                team2History: prevTeam2History,
+                team1Point: prevTeam1Point,
+                team2Point: prevTeam2Point
+              }
+            : match
+        )))
         const errorText = await response.text()
         throw new Error(errorText || 'A szumó kör törlése sikertelen volt.')
       }
 
-      setMatches((prev) => prev.map((match) => (
-        match.id === selectedMatch.id
-          ? {
-              ...match,
-              team1History: nextTeam1History,
-              team2History: nextTeam2History,
-              team1Point: nextTeam1Point,
-              team2Point: nextTeam2Point
-            }
-          : match
-      )))
-      setActionMessage({ type: 'success', text: 'A kiválasztott kör törölve lett.' })
+      setActionMessage({ type: 'success', text: `A(z) ${resultIndex + 1}. menet sikeresen törölve.` })
     } catch (error) {
       setActionMessage({ type: 'danger', text: error.message })
     } finally {
@@ -1756,7 +1865,11 @@ function GameSumoScoring() {
                           key={`team1-res-${resultIndex}`}
                           type="button"
                           className={`btn btn-sm sumo-history-chip ${result === 'W' ? 'sumo-history-chip--win' : result === 'L' ? 'sumo-history-chip--loss' : 'sumo-history-chip--draw'}`}
-                          onClick={() => handleDeleteRoundResult(resultIndex)}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleDeleteRoundResult(resultIndex)
+                          }}
                           disabled={saving}
                           title={`Kattints a(z) ${resultIndex + 1}. menet (${result}) törléséhez`}
                           aria-label={`Törlés: ${result}`}
@@ -1785,7 +1898,11 @@ function GameSumoScoring() {
                           key={`team2-res-${resultIndex}`}
                           type="button"
                           className={`btn btn-sm sumo-history-chip ${result === 'W' ? 'sumo-history-chip--win' : result === 'L' ? 'sumo-history-chip--loss' : 'sumo-history-chip--draw'}`}
-                          onClick={() => handleDeleteRoundResult(resultIndex)}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleDeleteRoundResult(resultIndex)
+                          }}
                           disabled={saving}
                           title={`Kattints a(z) ${resultIndex + 1}. menet (${result}) törléséhez`}
                           aria-label={`Törlés: ${result}`}

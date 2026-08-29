@@ -707,9 +707,9 @@ export default function SumoScoring({ userPrivilege }) {
         category,
         teams: sortedTeams
           .filter((team) => team.category === category)
-          .slice(0, category === 0 ? groupAdvance.psGroupAdvance : groupAdvance.hsGroupAdvance)
+          .slice(0, category === 0 ? (groupAdvance.psGroupAdvance || 0) : (groupAdvance.hsGroupAdvance || 0))
       }))
-      : [{ category: null, teams: sortedTeams.slice(0, groupAdvance.allGroupAdvance) }]
+      : [{ category: null, teams: sortedTeams.slice(0, groupAdvance.allGroupAdvance || 0) }]
     const generatedPairings = []
     const poolRepresentatives = []
     let unfinishedStage = false
@@ -719,18 +719,27 @@ export default function SumoScoring({ userPrivilege }) {
     let nextMatchNumber = maxMatchNumber + 1
 
     for (const pool of pools) {
-      if (pool.teams.length === 1) {
-        poolRepresentatives.push(pool.teams[0])
-        hasActivePool = true
-        continue
-      }
-      if (pool.teams.length < 2) continue
-      hasActivePool = true
-      const poolTeamNames = new Set(pool.teams.map((team) => team.name))
-      const poolMatches = knockoutMatches.filter((match) => poolTeamNames.has(match.team1Name) && poolTeamNames.has(match.team2Name))
+      // Find existing knockout matches for this pool based on team category
+      const poolMatches = knockoutMatches.filter((match) => {
+        if (pool.category === null) {
+          // If no age breakdown, all matches belong to this single pool
+          return true
+        }
+        const c1 = teamByName.get(match.team1Name)?.category ?? teams.find((t) => t.name === match.team1Name)?.category
+        const c2 = teamByName.get(match.team2Name)?.category ?? teams.find((t) => t.name === match.team2Name)?.category
+        return c1 === pool.category && c2 === pool.category
+      })
+
       const existingStages = KNOCKOUT_STAGES.filter((stage) => poolMatches.some((match) => getMatchStage(match) === stage))
 
       if (existingStages.length === 0) {
+        if (pool.teams.length === 1) {
+          poolRepresentatives.push(pool.teams[0])
+          hasActivePool = true
+          continue
+        }
+        if (pool.teams.length < 2) continue
+        hasActivePool = true
         const stage = getKnockoutStage(pool.teams.length)
         const bracketSize = stage === 'RO16' ? 16 : stage === 'QF' ? 8 : stage === 'SF' ? 4 : 2
         const bracketTeams = pool.teams.slice(0, Math.min(pool.teams.length, bracketSize))
@@ -743,6 +752,7 @@ export default function SumoScoring({ userPrivilege }) {
         continue
       }
 
+      hasActivePool = true
       const currentStage = existingStages[existingStages.length - 1]
       const currentStageMatches = poolMatches.filter((match) => getMatchStage(match) === currentStage)
       const winners = []
@@ -780,13 +790,21 @@ export default function SumoScoring({ userPrivilege }) {
       return []
     }
     if (ageGroupBreakdown && generatedPairings.length === 0) {
-      const activePools = pools.filter((pool) => pool.teams.length > 0)
+      const activePools = pools.filter((pool) => {
+        const hasKnockoutMatches = knockoutMatches.some((match) => {
+          if (pool.category === null) return true
+          const c1 = teamByName.get(match.team1Name)?.category ?? teams.find((t) => t.name === match.team1Name)?.category
+          const c2 = teamByName.get(match.team2Name)?.category ?? teams.find((t) => t.name === match.team2Name)?.category
+          return c1 === pool.category && c2 === pool.category
+        })
+        return pool.teams.length > 0 || hasKnockoutMatches
+      })
       if (activePools.length > 1 && poolRepresentatives.length === activePools.length) {
         const crossCategoryFinal = knockoutMatches.find((match) => {
           if (getMatchStage(match) !== 'F') return false
-          const team1 = teamByName.get(match.team1Name)
-          const team2 = teamByName.get(match.team2Name)
-          return team1 && team2 && team1.category !== team2.category
+          const c1 = teamByName.get(match.team1Name)?.category ?? teams.find((t) => t.name === match.team1Name)?.category
+          const c2 = teamByName.get(match.team2Name)?.category ?? teams.find((t) => t.name === match.team2Name)?.category
+          return c1 !== undefined && c2 !== undefined && c1 !== c2
         })
         if (!crossCategoryFinal) generatedPairings.push({ team1: poolRepresentatives[0], team2: poolRepresentatives[1], table: nextMatchNumber++, stage: 'F' })
         else if (!getKnockoutWinnerName(crossCategoryFinal)) {
@@ -1008,7 +1026,7 @@ export default function SumoScoring({ userPrivilege }) {
     }
 
     try {
-      const response = await authFetch(
+      let response = await authFetch(
         `https://legocompetition.runasp.net/api/Sumo/${encodeURIComponent(match.team1Name)}/${encodeURIComponent(match.team2Name)}/${encodeURIComponent(getApiTournamentStage(match.tournamentStage))}`,
         {
           method: 'DELETE',
@@ -1017,6 +1035,22 @@ export default function SumoScoring({ userPrivilege }) {
           }
         }
       )
+
+      if (!response.ok) {
+        // Fallback: megfordított csapat sorrend próbálása
+        const fallbackResponse = await authFetch(
+          `https://legocompetition.runasp.net/api/Sumo/${encodeURIComponent(match.team2Name)}/${encodeURIComponent(match.team1Name)}/${encodeURIComponent(getApiTournamentStage(match.tournamentStage))}`,
+          {
+            method: 'DELETE',
+            headers: {
+              accept: '*/*'
+            }
+          }
+        )
+        if (fallbackResponse.ok) {
+          response = fallbackResponse
+        }
+      }
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -1071,21 +1105,37 @@ export default function SumoScoring({ userPrivilege }) {
     const nextTeam2Result = selectedValue === 'team1' ? 'L' : selectedValue === 'team2' ? 'W' : 'D'
     const nextTeam1Results = [...match.team1Results, nextTeam1Result]
     const nextTeam2Results = [...match.team2Results, nextTeam2Result]
+    const nextTeam1Point = calculateTotalPoints(nextTeam1Results)
+    const nextTeam2Point = calculateTotalPoints(nextTeam2Results)
+    const nextTeam1ResultStr = nextTeam1Results.join(',')
+    const nextTeam2ResultStr = nextTeam2Results.join(',')
+
     const payload = createSumoPayload({
       team1Name: match.team1Name,
       team2Name: match.team2Name,
-      team1Point: calculateTotalPoints(nextTeam1Results),
-      team2Point: calculateTotalPoints(nextTeam2Results),
+      team1Point: nextTeam1Point,
+      team2Point: nextTeam2Point,
       table: match.table,
       tournamentStage: match.tournamentStage,
-      team1Result: nextTeam1Results.join(','),
-      team2Result: nextTeam2Results.join(',')
+      team1Result: nextTeam1ResultStr,
+      team2Result: nextTeam2ResultStr
+    })
+
+    const reversedPayload = createSumoPayload({
+      team1Name: match.team2Name,
+      team2Name: match.team1Name,
+      team1Point: nextTeam2Point,
+      team2Point: nextTeam1Point,
+      table: match.table,
+      tournamentStage: match.tournamentStage,
+      team1Result: nextTeam2ResultStr,
+      team2Result: nextTeam1ResultStr
     })
 
     logSumoPayload('PATCH payload', payload)
 
     try {
-      const response = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
+      let response = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
         method: 'PATCH',
         headers: {
           accept: '*/*',
@@ -1095,17 +1145,8 @@ export default function SumoScoring({ userPrivilege }) {
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        logSumoPayload('PATCH failed response', { status: response.status, body: errorText, payload })
-        const shouldFallbackToPost = response.status === 400 && /Object reference not set to an instance of an object/i.test(errorText || '')
-
-        if (!shouldFallbackToPost) {
-          throw new Error(errorText || 'A meccs frissítése sikertelen volt.')
-        }
-
-        logSumoPayload('PATCH fallback to POST', payload)
-
-        const fallbackResponse = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
+        logSumoPayload('PATCH failed, trying POST', payload)
+        const postResponse = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
           method: 'POST',
           headers: {
             accept: '*/*',
@@ -1113,30 +1154,53 @@ export default function SumoScoring({ userPrivilege }) {
           },
           body: JSON.stringify(payload)
         })
-
-        if (!fallbackResponse.ok) {
-          const fallbackErrorText = await fallbackResponse.text()
-          logSumoPayload('POST fallback failed response', { status: fallbackResponse.status, body: fallbackErrorText, payload })
-          throw new Error(fallbackErrorText || errorText || 'A meccs frissítése sikertelen volt.')
+        if (postResponse.ok) {
+          response = postResponse
         }
+      }
 
-        await Promise.all([refreshMatches(), refreshGroupStandings()])
-        setMatchDrafts((prev) => {
-          const next = { ...prev }
-          delete next[matchId]
-          return next
+      if (!response.ok) {
+        logSumoPayload('POST failed, trying reversed PATCH', reversedPayload)
+        const revPatchResponse = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
+          method: 'PATCH',
+          headers: {
+            accept: '*/*',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(reversedPayload)
         })
+        if (revPatchResponse.ok) {
+          response = revPatchResponse
+        }
+      }
 
-        setActionMessage({ type: 'success', text: 'A meccs eredménye mentve lett.' })
-        return
+      if (!response.ok) {
+        logSumoPayload('Reversed PATCH failed, trying reversed POST', reversedPayload)
+        const revPostResponse = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
+          method: 'POST',
+          headers: {
+            accept: '*/*',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(reversedPayload)
+        })
+        if (revPostResponse.ok) {
+          response = revPostResponse
+        }
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        logSumoPayload('All match save fallbacks failed', { status: response.status, body: errorText, payload })
+        throw new Error(errorText || 'A meccs frissítése sikertelen volt.')
       }
 
       updateMatchLocally(matchId, () => ({
         ...match,
         team1Results: nextTeam1Results,
         team2Results: nextTeam2Results,
-        team1Point: payload.team1Point,
-        team2Point: payload.team2Point
+        team1Point: nextTeam1Point,
+        team2Point: nextTeam2Point
       }))
       await refreshGroupStandings()
 
@@ -1152,30 +1216,62 @@ export default function SumoScoring({ userPrivilege }) {
     }
   }
 
-  const handleDeleteRoundResult = async (matchId, resultIndex) => {
-    const match = matches.find((item) => item.id === matchId)
+  const handleDeleteRoundResult = async (matchOrId, resultIndex) => {
+    const match = typeof matchOrId === 'object' && matchOrId !== null
+      ? matchOrId
+      : matches.find((item) => item.id === matchOrId)
 
     if (!match) {
       return
     }
 
-    const nextTeam1Results = match.team1Results.filter((_, index) => index !== resultIndex)
-    const nextTeam2Results = match.team2Results.filter((_, index) => index !== resultIndex)
+    const prevTeam1Results = [...(match.team1Results || [])]
+    const prevTeam2Results = [...(match.team2Results || [])]
+    const prevTeam1Point = match.team1Point
+    const prevTeam2Point = match.team2Point
+
+    const nextTeam1Results = prevTeam1Results.filter((_, index) => index !== resultIndex)
+    const nextTeam2Results = prevTeam2Results.filter((_, index) => index !== resultIndex)
+    const nextTeam1Point = calculateTotalPoints(nextTeam1Results)
+    const nextTeam2Point = calculateTotalPoints(nextTeam2Results)
+    const nextTeam1ResultStr = nextTeam1Results.join(',')
+    const nextTeam2ResultStr = nextTeam2Results.join(',')
+
+    // 1. Azonnali felületi (optimistic) frissítés
+    updateMatchLocally(match.id, () => ({
+      ...match,
+      team1Results: nextTeam1Results,
+      team2Results: nextTeam2Results,
+      team1Point: nextTeam1Point,
+      team2Point: nextTeam2Point
+    }))
+
     const payload = createSumoPayload({
       team1Name: match.team1Name,
       team2Name: match.team2Name,
-      team1Point: calculateTotalPoints(nextTeam1Results),
-      team2Point: calculateTotalPoints(nextTeam2Results),
+      team1Point: nextTeam1Point,
+      team2Point: nextTeam2Point,
       table: match.table,
       tournamentStage: match.tournamentStage,
-      team1Result: nextTeam1Results.join(','),
-      team2Result: nextTeam2Results.join(',')
+      team1Result: nextTeam1ResultStr,
+      team2Result: nextTeam2ResultStr
+    })
+
+    const reversedPayload = createSumoPayload({
+      team1Name: match.team2Name,
+      team2Name: match.team1Name,
+      team1Point: nextTeam2Point,
+      team2Point: nextTeam1Point,
+      table: match.table,
+      tournamentStage: match.tournamentStage,
+      team1Result: nextTeam2ResultStr,
+      team2Result: nextTeam1ResultStr
     })
 
     logSumoPayload('PATCH delete payload', payload)
 
     try {
-      const response = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
+      let response = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
         method: 'PATCH',
         headers: {
           accept: '*/*',
@@ -1185,22 +1281,67 @@ export default function SumoScoring({ userPrivilege }) {
       })
 
       if (!response.ok) {
+        logSumoPayload('PATCH delete failed, trying POST', payload)
+        const postResponse = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
+          method: 'POST',
+          headers: {
+            accept: '*/*',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        })
+        if (postResponse.ok) {
+          response = postResponse
+        }
+      }
+
+      if (!response.ok) {
+        logSumoPayload('POST delete failed, trying reversed PATCH', reversedPayload)
+        const revPatchResponse = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
+          method: 'PATCH',
+          headers: {
+            accept: '*/*',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(reversedPayload)
+        })
+        if (revPatchResponse.ok) {
+          response = revPatchResponse
+        }
+      }
+
+      if (!response.ok) {
+        logSumoPayload('Reversed PATCH delete failed, trying reversed POST', reversedPayload)
+        const revPostResponse = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
+          method: 'POST',
+          headers: {
+            accept: '*/*',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(reversedPayload)
+        })
+        if (revPostResponse.ok) {
+          response = revPostResponse
+        }
+      }
+
+      if (!response.ok) {
+        // Visszaállítás hiba esetén
+        updateMatchLocally(match.id, () => ({
+          ...match,
+          team1Results: prevTeam1Results,
+          team2Results: prevTeam2Results,
+          team1Point: prevTeam1Point,
+          team2Point: prevTeam2Point
+        }))
         const errorText = await response.text()
-        logSumoPayload('PATCH delete failed response', { status: response.status, body: errorText, payload })
+        logSumoPayload('All delete fallbacks failed', { status: response.status, body: errorText, payload })
         await refreshMatches()
         throw new Error(errorText || 'A meccs eredményének törlése sikertelen volt.')
       }
 
-      updateMatchLocally(matchId, () => ({
-        ...match,
-        team1Results: nextTeam1Results,
-        team2Results: nextTeam2Results,
-        team1Point: payload.team1Point,
-        team2Point: payload.team2Point
-      }))
       await refreshGroupStandings()
-
-      setActionMessage({ type: 'success', text: 'A kiválasztott kör törölve lett.' })
+      setActionMessage({ type: 'success', text: `A(z) ${resultIndex + 1}. menet sikeresen törölve.` })
     } catch (err) {
       setActionMessage({ type: 'danger', text: err.message })
     }
@@ -1516,8 +1657,13 @@ export default function SumoScoring({ userPrivilege }) {
                                             key={`${match.id}-team1-${resultIndex}`}
                                             type="button"
                                             className={`btn btn-sm sumo-history-chip ${result === 'W' ? 'sumo-history-chip--win' : result === 'L' ? 'sumo-history-chip--loss' : 'sumo-history-chip--draw'}`}
-                                            onClick={() => handleDeleteRoundResult(match.id, resultIndex)}
+                                            onClick={(e) => {
+                                              e.preventDefault()
+                                              e.stopPropagation()
+                                              handleDeleteRoundResult(match, resultIndex)
+                                            }}
                                             aria-label={`Törlés: ${result}`}
+                                            title={`Kattints a(z) ${resultIndex + 1}. menet (${result}) törléséhez`}
                                           >
                                             {result}
                                           </button>
@@ -1542,8 +1688,13 @@ export default function SumoScoring({ userPrivilege }) {
                                             key={`${match.id}-team2-${resultIndex}`}
                                             type="button"
                                             className={`btn btn-sm sumo-history-chip ${result === 'W' ? 'sumo-history-chip--win' : result === 'L' ? 'sumo-history-chip--loss' : 'sumo-history-chip--draw'}`}
-                                            onClick={() => handleDeleteRoundResult(match.id, resultIndex)}
+                                            onClick={(e) => {
+                                              e.preventDefault()
+                                              e.stopPropagation()
+                                              handleDeleteRoundResult(match, resultIndex)
+                                            }}
                                             aria-label={`Törlés: ${result}`}
+                                            title={`Kattints a(z) ${resultIndex + 1}. menet (${result}) törléséhez`}
                                           >
                                             {result}
                                           </button>
