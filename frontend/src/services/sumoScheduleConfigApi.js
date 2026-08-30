@@ -93,9 +93,21 @@ export const modifyCompetitionPhase = async (oldPhaseName, phase) => {
     }
   }
 }
+
 export const deleteCompetitionPhase = async (phaseId) => request(`/deletePhase/${encodeURIComponent(phaseId)}`, { method: 'DELETE' })
 export const resetSettings = async () => request('/resetSettings', { method: 'DELETE' })
 export const resetEveryScore = async () => request('/resetEveryScore', { method: 'DELETE' })
+export const cleanTestData = async () => {
+  const response = await authFetch('https://legocompetition.runasp.net/api/Teams/tesztadattakaritas', {
+    method: 'DELETE',
+    headers: { accept: '*/*' }
+  })
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(errorText || `Szerverhiba (${response.status})`)
+  }
+  return response.status === 204 ? null : response.text()
+}
 
 export const loadSumoScheduleConfig = async () => {
   const settings = await getAllSettings()

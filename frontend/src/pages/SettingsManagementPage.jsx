@@ -7,6 +7,7 @@ import CompetitionStatistics from '../components/CompetitionStatistics'
 import { getNotificationTeams as getTeams } from '../services/notificationApi'
 import {
   addCompetitionPhase,
+  cleanTestData,
   deleteCompetitionPhase,
   getAllCompetitionPhases,
   getAllSettings,
@@ -264,6 +265,20 @@ export default function SettingsManagementPage({ groupOnly = false }) {
     finally { setSaving(false) }
   }
 
+  const handleCleanTestData = async () => {
+    try {
+      setSaving(true)
+      await cleanTestData()
+      setDangerAction(null)
+      setStatus({ type: 'success', text: 'A tesztadatok takarítása sikeresen megtörtént.' })
+      await loadData()
+    } catch (error) {
+      setStatus({ type: 'danger', text: error.message })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (groupOnly) return <div className="container py-4"><h1 className="h2 mb-1">Beállítások</h1><p className="text-muted mb-4">Csapatcsoportok kezelése.</p><TeamGroupManager /></div>
 
   return (
@@ -319,19 +334,22 @@ export default function SettingsManagementPage({ groupOnly = false }) {
         <CompetitionStatistics onStatus={setStatus} />
         <TeamGroupManager />
         <BackupManager onStatus={setStatus} onSettingsRestored={loadData} />
-        <section className="card border-danger mb-4"><div className="card-body"><h3 className="h5 text-danger">Veszélyes műveletek</h3><div className="d-flex flex-wrap gap-2"><button type="button" className="btn btn-outline-danger" onClick={() => setDangerAction('settings')}>Beállítások alaphelyzetbe állítása</button><button type="button" className="btn btn-danger" onClick={() => setDangerAction('scores')}>Minden pont törlése</button></div></div></section>
+        <section className="card border-danger mb-4"><div className="card-body"><h3 className="h5 text-danger">Veszélyes műveletek</h3><div className="d-flex flex-wrap gap-2"><button type="button" className="btn btn-outline-danger" onClick={() => setDangerAction('settings')}>Beállítások alaphelyzetbe állítása</button><button type="button" className="btn btn-danger" onClick={() => setDangerAction('scores')}>Minden pont törlése</button><button type="button" className="btn btn-outline-danger" onClick={() => setDangerAction('testDataClean')}>Tesztadatok takarítása</button></div></div></section>
       </>}
       <ConfirmModal
         open={Boolean(dangerAction)}
-        title={dangerAction === 'scores' ? 'Minden pont törlése' : 'Beállítások alaphelyzetbe állítása'}
-        confirmLabel={dangerAction === 'scores' ? 'Minden pont törlése' : 'Beállítások visszaállítása'}
+        title={dangerAction === 'scores' ? 'Minden pont törlése' : dangerAction === 'testDataClean' ? 'Tesztadatok takarítása' : 'Beállítások alaphelyzetbe állítása'}
+        confirmLabel={dangerAction === 'scores' ? 'Minden pont törlése' : dangerAction === 'testDataClean' ? 'Tesztadatok törlése' : 'Beállítások visszaállítása'}
+        confirmVariant="danger"
         requiredText={dangerAction === 'scores' ? 'MINDEN PONT TÖRLÉSE' : ''}
         busy={saving}
         onClose={() => setDangerAction(null)}
-        onConfirm={dangerAction === 'scores' ? handleResetScores : handleResetSettings}
+        onConfirm={dangerAction === 'scores' ? handleResetScores : dangerAction === 'testDataClean' ? handleCleanTestData : handleResetSettings}
       >
         {dangerAction === 'scores'
           ? <p className="mb-0">Ez minden rögzített pontot és eredményt törölhet, és nem vonható vissza.</p>
+          : dangerAction === 'testDataClean'
+          ? <p className="mb-0">Biztosan törölni szeretnéd az összes tesztadatot? Ez a művelet nem vonható vissza.</p>
           : <p className="mb-0">Biztosan alaphelyzetbe állítod az összes versenybeállítást?</p>}
       </ConfirmModal>
       <ConfirmModal open={confirmScheduleShift} title={shiftDirection === 'advance' ? 'Menetrend siettetése' : 'Menetrend csúsztatása'} confirmLabel={shiftDirection === 'advance' ? 'Időpontok korábbra hozása' : 'Időpontok eltolása'} confirmVariant={shiftDirection === 'advance' ? 'success' : 'warning'} busy={saving} onClose={() => setConfirmScheduleShift(false)} onConfirm={applyScheduleShift}>

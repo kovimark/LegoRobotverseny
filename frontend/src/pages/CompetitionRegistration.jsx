@@ -16,7 +16,9 @@ export default function CompetitionRegistration({ user }) {
     teamCoach1Email: '',
     schoolName: '',
     category: 0,
-    group: '-'
+    group: '-',
+    rulesAccepted: false,
+    privacyAccepted: false
   })
   const [errors, setErrors] = useState({})
   const [submitMessage, setSubmitMessage] = useState(null)
@@ -32,7 +34,9 @@ export default function CompetitionRegistration({ user }) {
     teamMember2Name: 'A 2. Versenyző nevének kitöltése kötelező.',
     teamMember2Class: 'A 2. versenyző osztályának kitöltése kötelező.',
     teamCoach1: 'Az 1. felkészítő tanár nevének kitöltése kötelező.',
-    teamCoach1Email: 'Az 1. felkészítő tanár emailcímének kitöltése kötelező.'
+    teamCoach1Email: 'Az 1. felkészítő tanár emailcímének kitöltése kötelező.',
+    rulesAccepted: 'A versenyszabályzat és a versenyzői kézikönyv elfogadása kötelező.',
+    privacyAccepted: 'Az adatkezelési tájékoztató és a képmás-/videófelvétel-készítéshez való hozzájárulás elfogadása kötelező.'
   }
 
   const getCategory = (member1Class, member2Class) => (
@@ -57,9 +61,10 @@ export default function CompetitionRegistration({ user }) {
   )
 
   const handleChange = (e) => {
-    const { name, value } = e.target
+    const { name, value, type, checked } = e.target
+    const nextValue = type === 'checkbox' ? checked : value
     const isClassField = name === 'teamMember1Class' || name === 'teamMember2Class'
-    const digitsOnly = isClassField ? value.replace(/\D/g, '').slice(0, 2) : value
+    const digitsOnly = isClassField ? String(nextValue).replace(/\D/g, '').slice(0, 2) : nextValue
     const parsedValue = isClassField && digitsOnly !== ''
       ? String(Math.min(13, Number(digitsOnly)))
       : digitsOnly
@@ -76,7 +81,7 @@ export default function CompetitionRegistration({ user }) {
     }))
     setSubmitMessage(null)
 
-    if (value !== '') {
+    if (nextValue !== '' && (type !== 'checkbox' || checked)) {
       setErrors(prev => ({
         ...prev,
         [name]: ''
@@ -196,7 +201,9 @@ export default function CompetitionRegistration({ user }) {
         teamCoach1Email: '',
         schoolName: '',
         category: 0,
-        group: '-'
+        group: '-',
+        rulesAccepted: false,
+        privacyAccepted: false
       })
       setErrors({})
       setSubmitMessage({
@@ -431,6 +438,80 @@ export default function CompetitionRegistration({ user }) {
                   </div>
                   {errors.teamCoach1Email && <div className="text-danger small mt-1">{errors.teamCoach1Email}</div>}
                 </div>
+              </div>
+            </div>
+
+            <div className="card border-0 bg-light p-3 rounded-3 mb-3 shadow-sm">
+              <div className="d-flex align-items-center gap-2 mb-2 text-primary">
+                <i className="bi bi-file-earmark-text-fill fs-5" />
+                <h6 className="mb-0 fw-bold">Dokumentumok és nyilatkozatok</h6>
+              </div>
+              <p className="small text-muted mb-3">
+                Kérjük, a jelentkezés előtt tekintsd át a szabályzatot és a hozzájárulási tájékoztatókat!
+              </p>
+
+              <div className="d-flex flex-column flex-md-row flex-wrap gap-2 mb-3">
+                <a
+                  href="https://drive.google.com/drive/folders/1Lg5k_dhlMSalj5uzqnTpLGu3JpVi_moT"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-outline-primary btn-sm flex-fill d-inline-flex align-items-center justify-content-center"
+                >
+                  <i className="bi bi-box-arrow-up-right me-2" />
+                  Hivatalos szabályzatok (Google Drive)
+                </a>
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary btn-sm flex-fill d-inline-flex align-items-center justify-content-center"
+                  onClick={() => setSubmitMessage({ type: 'info', text: 'Az adatkezelési tájékoztató dokumentuma hamarosan letölthető.' })}
+                >
+                  <i className="bi bi-file-earmark-text me-2" />
+                  Adatkezelési tájékoztató letöltése
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary btn-sm flex-fill d-inline-flex align-items-center justify-content-center"
+                  onClick={() => setSubmitMessage({ type: 'info', text: 'A képmás- és médiatárolási hozzájárulási nyilatkozat hamarosan letölthető.' })}
+                >
+                  <i className="bi bi-camera-video me-2" />
+                  Képmás és médiatárolási nyilatkozat letöltése
+                </button>
+              </div>
+
+              <div className="form-check mb-2">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="rulesAccepted"
+                  name="rulesAccepted"
+                  checked={formData.rulesAccepted}
+                  onChange={handleChange}
+                  disabled={isSubmitting}
+                />
+                <label className="form-check-label small" htmlFor="rulesAccepted">
+                  Elolvastam a versenyszabályzatot és a versenyzői kézikönyvet, és elfogadom az azokban foglaltakat. <span className="text-danger fw-bold">*</span>
+                </label>
+                {errors.rulesAccepted && (
+                  <div className="text-danger small mt-1">{errors.rulesAccepted}</div>
+                )}
+              </div>
+
+              <div className="form-check">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="privacyAccepted"
+                  name="privacyAccepted"
+                  checked={formData.privacyAccepted}
+                  onChange={handleChange}
+                  disabled={isSubmitting}
+                />
+                <label className="form-check-label small" htmlFor="privacyAccepted">
+                  Elfogadom az adatkezelési tájékoztatót, és hozzájárulok ahhoz, hogy a verseny során a csapattagokról és felkészítőkről fényképek és videófelvételek készüljenek, melyeket a szervezők a verseny bemutatására felhasználhatnak. <span className="text-danger fw-bold">*</span>
+                </label>
+                {errors.privacyAccepted && (
+                  <div className="text-danger small mt-1">{errors.privacyAccepted}</div>
+                )}
               </div>
             </div>
 

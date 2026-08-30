@@ -3,6 +3,7 @@ import FloatingFeedback from '../components/FloatingFeedback'
 import AgeGroupBadge from '../components/AgeGroupBadge'
 import ConfirmModal from '../components/ConfirmModal'
 import { authFetch } from '../services/apiClient'
+import { cleanTestData } from '../services/sumoScheduleConfigApi'
 
 const API_BASE_URL = 'https://legocompetition.runasp.net'
 
@@ -117,6 +118,8 @@ export default function AdminPage() {
   const [schoolFilter, setSchoolFilter] = useState('all')
   const [sortBy, setSortBy] = useState('name-asc')
   const [disqualifying, setDisqualifying] = useState(null)
+  const [showCleanTestDataModal, setShowCleanTestDataModal] = useState(false)
+  const [cleaningTestData, setCleaningTestData] = useState(false)
 
   const fetchTeams = async () => {
     try {
@@ -230,6 +233,20 @@ export default function AdminPage() {
     } catch (err) {
       setActionMessage({ type: 'danger', text: err.message })
       setTeamToDelete(null)
+    }
+  }
+
+  const handleCleanTestData = async () => {
+    try {
+      setCleaningTestData(true)
+      await cleanTestData()
+      setShowCleanTestDataModal(false)
+      setActionMessage({ type: 'success', text: 'A tesztadatok takarítása sikeresen megtörtént.' })
+      await fetchTeams()
+    } catch (err) {
+      setActionMessage({ type: 'danger', text: err.message })
+    } finally {
+      setCleaningTestData(false)
     }
   }
 
@@ -362,7 +379,17 @@ export default function AdminPage() {
 
   return (
     <div className="container py-4">
-      <h2 className="mb-4">Csapatok</h2>
+      <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <h2 className="mb-0">Csapatok</h2>
+        <button
+          type="button"
+          className="btn btn-outline-danger"
+          onClick={() => setShowCleanTestDataModal(true)}
+          disabled={loading || saving || cleaningTestData}
+        >
+          <i className="bi bi-trash3 me-2" />Tesztadatok takarítása
+        </button>
+      </div>
 
       {loading && <div className="alert alert-info">Csapatok betöltése...</div>}
       {error && <div className="alert alert-danger">{error}</div>}
@@ -810,6 +837,18 @@ export default function AdminPage() {
         <p className="mb-0 text-muted">
           Csak a szöveg pontos beírása és a jelölőnégyzet kipipálása után lehet folytatni.
         </p>
+      </ConfirmModal>
+
+      <ConfirmModal
+        open={showCleanTestDataModal}
+        title="Tesztadatok takarítása"
+        confirmLabel="Tesztadatok törlése"
+        confirmVariant="danger"
+        busy={cleaningTestData}
+        onClose={() => setShowCleanTestDataModal(false)}
+        onConfirm={handleCleanTestData}
+      >
+        <p className="mb-0">Biztosan törölni szeretnéd az összes tesztadatot? Ez a művelet nem vonható vissza.</p>
       </ConfirmModal>
 
     </div>

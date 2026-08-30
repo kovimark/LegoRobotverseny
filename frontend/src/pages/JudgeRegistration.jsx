@@ -3,8 +3,7 @@ import FloatingFeedback from '../components/FloatingFeedback'
 import PuzzleCaptcha from '../components/PuzzleCaptcha'
 import { submitApplication } from '../services/applicationApi'
 
-const RULEBOOK_URL = `${process.env.PUBLIC_URL}/rulebook/BRICKATHLON_Szabalykonyv.docx`
-const JUDGE_HANDBOOK_URL = `${process.env.PUBLIC_URL}/rulebook/Versenyb%C3%ADr%C3%B3i%20k%C3%A9zik%C3%B6nyv.docx`
+const JUDGE_DOCS_URL = 'https://drive.google.com/drive/folders/1guUTFn7zKm5EDnPqOO1EXa6Sks6YyVR_'
 
 const GRADE_OPTIONS = ['9', '10', '11', '12', '13']
 const CLASS_LETTER_OPTIONS = ['A', 'B', 'C', 'D', 'E', 'K']
@@ -23,7 +22,8 @@ export default function JudgeRegistration() {
     grade: '',
     classLetter: '',
     competitions: [],
-    rulesAccepted: false
+    rulesAccepted: false,
+    privacyAccepted: false
   })
   const [errors, setErrors] = useState({})
   const [submitMessage, setSubmitMessage] = useState(null)
@@ -35,7 +35,8 @@ export default function JudgeRegistration() {
     email: 'Az email cím kitöltése kötelező.',
     grade: 'Az évfolyam kiválasztása kötelező.',
     classLetter: 'A betűjel kiválasztása kötelező.',
-    rulesAccepted: 'A szabályzat és a bírói kivonat elfogadása kötelező.'
+    rulesAccepted: 'A szabályzat és a bírói kivonat elfogadása kötelező.',
+    privacyAccepted: 'Az adatkezelési tájékoztató és a képmás-/videófelvétel-készítéshez való hozzájárulás elfogadása kötelező.'
   }
 
   const selectedClassFormatted = formData.grade && formData.classLetter
@@ -158,7 +159,8 @@ export default function JudgeRegistration() {
         grade: '',
         classLetter: '',
         competitions: [],
-        rulesAccepted: false
+        rulesAccepted: false,
+        privacyAccepted: false
       })
       setErrors({})
       setSubmitMessage({
@@ -329,26 +331,34 @@ export default function JudgeRegistration() {
             <div className="mb-3 p-3 bg-light border rounded">
               <label className="form-label fw-bold mb-2">Bírói dokumentumok és szabályzat</label>
               <p className="text-muted small mb-3">
-                Kérjük, a jelentkezés előtt töltsd le és olvasd el a szabályzatot és a bírói kézikönyvet!
+                Kérjük, a jelentkezés előtt tekintsd át a szabályzatot és az adatkezelési tájékoztatót!
               </p>
-              <div className="d-flex flex-column flex-sm-row gap-2 mb-3">
+              <div className="d-flex flex-column flex-md-row flex-wrap gap-2 mb-3">
                 <a
-                  href={RULEBOOK_URL}
-                  download="BRICKATHLON_Szabalykonyv.docx"
-                  className="btn btn-outline-primary btn-sm flex-fill"
+                  href={JUDGE_DOCS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-outline-primary btn-sm flex-fill d-inline-flex align-items-center justify-content-center"
                 >
-                  <i className="bi bi-download me-1" />
-                  Versenyszabályzat letöltése (.docx)
+                  <i className="bi bi-box-arrow-up-right me-2" />
+                  Bírói dokumentumok (Google Drive)
                 </a>
-
-                <a
-                  href={JUDGE_HANDBOOK_URL}
-                  download="Versenybiroi_kezikonyv.docx"
-                  className="btn btn-outline-primary btn-sm flex-fill"
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary btn-sm flex-fill d-inline-flex align-items-center justify-content-center"
+                  onClick={() => setSubmitMessage({ type: 'info', text: 'Az adatkezelési tájékoztató dokumentuma hamarosan letölthető.' })}
                 >
-                  <i className="bi bi-download me-1" />
-                  Bírói kivonat letöltése (.docx)
-                </a>
+                  <i className="bi bi-file-earmark-text me-2" />
+                  Adatkezelési tájékoztató letöltése
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary btn-sm flex-fill d-inline-flex align-items-center justify-content-center"
+                  onClick={() => setSubmitMessage({ type: 'info', text: 'A képmás- és médiatárolási hozzájárulási nyilatkozat hamarosan letölthető.' })}
+                >
+                  <i className="bi bi-camera-video me-2" />
+                  Képmás és médiatárolási nyilatkozat letöltése
+                </button>
               </div>
 
               {/* Fontos tudnivalók és bírói felelősség a checkbox felett */}
@@ -378,8 +388,8 @@ export default function JudgeRegistration() {
                 </div>
               </div>
 
-              {/* Elfogadó jelölőnégyzet */}
-              <div className="form-check">
+              {/* Elfogadó jelölőnégyzetek */}
+              <div className="form-check mb-2">
                 <input
                   className="form-check-input"
                   type="checkbox"
@@ -394,6 +404,24 @@ export default function JudgeRegistration() {
                 </label>
                 {errors.rulesAccepted && (
                   <div className="text-danger small mt-1">{errors.rulesAccepted}</div>
+                )}
+              </div>
+
+              <div className="form-check">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="privacyAccepted"
+                  name="privacyAccepted"
+                  checked={formData.privacyAccepted}
+                  onChange={handleChange}
+                  disabled={isSubmitting}
+                />
+                <label className="form-check-label small" htmlFor="privacyAccepted">
+                  Elfogadom az adatkezelési tájékoztatót, és hozzájárulok ahhoz, hogy a rendezvényen rólam fényképek és videófelvételek készüljenek, melyeket a szervezők a verseny bemutatására felhasználhatnak. <span className="text-danger fw-bold">*</span>
+                </label>
+                {errors.privacyAccepted && (
+                  <div className="text-danger small mt-1">{errors.privacyAccepted}</div>
                 )}
               </div>
             </div>
