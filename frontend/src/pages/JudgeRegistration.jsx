@@ -281,10 +281,18 @@ export default function JudgeRegistration() {
 
             {/* Versenyszámok kiválasztása (legalább 2) */}
             <div className="mb-3">
-              <label className="form-label d-block">
+              <label className="form-label d-block mb-1">
                 Versenyszámok <span className="text-danger fw-bold">*</span>
                 <span className="text-muted fw-normal ms-2 small">(legalább 2 versenyszámot kötelező választani)</span>
               </label>
+
+              <div className="alert alert-info py-2 px-3 mb-2 d-flex align-items-center gap-2 small">
+                <i className="bi bi-info-circle-fill flex-shrink-0 fs-5 text-primary" />
+                <div>
+                  Kérjük, olyan versenyszámokat válassz, amelyeket <strong>preferálsz</strong>, szívesen bíráskodnál náluk, vagy a leginkább <strong>tetszenek neked</strong>! A végső <strong>bírói beosztásodról és szerepkörödről emailben küldünk értesítést</strong>.
+                </div>
+              </div>
+
               <div className={`p-3 bg-light border rounded ${errors.competitions ? 'border-danger' : ''}`}>
                 <div className="row g-2">
                   {COMPETITION_OPTIONS.map((comp) => {
@@ -361,6 +369,14 @@ export default function JudgeRegistration() {
                 </button>
               </div>
 
+              {/* Kötelező oktatónap és próbaverseny figyelmeztetés */}
+              <div className="alert alert-warning border-warning d-flex align-items-start gap-2 mb-3 p-3">
+                <i className="bi bi-calendar-event-fill flex-shrink-0 fs-5 mt-1 text-warning-emphasis" />
+                <div className="small">
+                  <strong>Fontos információ:</strong> A jelentkezések elbírálása után <strong>emailben értesítünk a pontos bírói beosztásodról és versenyszámodról</strong>. Körülbelül <strong>egy héttel a verseny előtt</strong> egy felkészítő <strong>oktatónapot és próbaversenyt</strong> tartunk, amelyen a <strong>részvétel kötelező</strong> minden jelentkező számára (ennek részleteiről szintén emailt küldünk).
+                </div>
+              </div>
+
               {/* Fontos tudnivalók és bírói felelősség a checkbox felett */}
               <div className="card border-1 border-secondary mb-3 bg-white shadow-sm">
                 <div className="card-body p-3">
@@ -372,6 +388,9 @@ export default function JudgeRegistration() {
                     A Brickathlon versenybírói a verseny tisztaságáért, a szabályzat betartásáért és a hivatalos pontok hiteles rögzítéséért felelnek. Kérjük, csak akkor nyújtsd be a jelentkezést, ha az alábbi feltételeket maradéktalanul vállalod:
                   </p>
                   <ul className="small mb-0 ps-3 d-grid gap-1">
+                    <li>
+                      <strong>Bírói beosztás és kötelező oktatónap:</strong> A jelentkezések feldolgozása után emailben kapod meg, hogy milyen bírói szerepkörbe / melyik versenyszámhoz kerültél beosztásra. A verseny előtt kb. egy héttel tartott oktatónapon és próbaversenyen a részvétel kötelező.
+                    </li>
                     <li>
                       <strong>Kötelező jelenlét és pontosság:</strong> A bírói feladatok ellátása a versenynap teljes időtartama alatt kötelező és felelősségteljes jelenlétet kíván.
                     </li>
