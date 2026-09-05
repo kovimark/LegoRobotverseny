@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import FloatingFeedback from '../components/FloatingFeedback'
+import { authFetch } from '../services/apiClient'
+import { sendWelcomeEmail } from '../services/emailApi'
 
 export default function CompetitionRegistration({ user }) {
   const [formData, setFormData] = useState({
@@ -95,7 +97,11 @@ export default function CompetitionRegistration({ user }) {
 
     const validationErrors = Object.entries(requiredFields).reduce((acc, [fieldName, message]) => {
       const value = formData[fieldName]
-      const isEmpty = typeof value === 'string' ? value.trim() === '' : value === ''
+      const isEmpty = typeof value === 'string'
+        ? value.trim() === ''
+        : typeof value === 'boolean'
+          ? !value
+          : value === ''
 
       if (isEmpty) {
         acc[fieldName] = message
@@ -145,7 +151,7 @@ export default function CompetitionRegistration({ user }) {
     if (Object.keys(validationErrors).length > 0) {
       setSubmitMessage({
         type: 'danger',
-        text: 'A csillaggal megjelölt mezők kitöltése kötelező'
+        text: 'A csillaggal megjelölt mezők kitöltése és a kötelező nyilatkozatok elfogadása szükséges a jelentkezéshez.'
       })
       return
     }
@@ -167,7 +173,7 @@ export default function CompetitionRegistration({ user }) {
         group: formData.group || '-'
       }
 
-      const response = await fetch('https://legocompetition.runasp.net/api/Teams/registerteam', {
+      const response = await authFetch('https://legocompetition.runasp.net/api/Teams/registerteam', {
         method: 'POST',
         headers: {
           accept: '*/*',
@@ -186,6 +192,27 @@ export default function CompetitionRegistration({ user }) {
           // Backend nem JSON hibát küldött
         }
         throw new Error(readableError || 'A jelentkezés mentése nem sikerült.')
+      }
+
+      // Automatikus visszaigazoló email(ek) küldése
+      const emailsToSend = [
+        payload.teamMember1Email,
+        payload.teamMember2Email,
+        payload.teamCoach1Email
+      ].filter((email, index, self) => Boolean(email) && self.indexOf(email) === index)
+
+      let emailSentCount = 0
+      for (const email of emailsToSend) {
+        try {
+          const emailResponse = await sendWelcomeEmail(email, payload.teamName)
+          if (emailResponse.ok) {
+            emailSentCount++
+          } else {
+            console.warn(`Visszaigazoló email küldése sikertelen (${email}):`, await emailResponse.text())
+          }
+        } catch (emailError) {
+          console.warn(`Hiba a visszaigazoló email küldésekor (${email}):`, emailError.message)
+        }
       }
 
       setFormData({
@@ -208,7 +235,9 @@ export default function CompetitionRegistration({ user }) {
       setErrors({})
       setSubmitMessage({
         type: 'success',
-        text: 'Sikeres regisztráció!'
+        text: emailSentCount > 0
+          ? 'Sikeres regisztráció! A visszaigazoló e-mailt elküldtük a megadott címekre.'
+          : 'Sikeres regisztráció!'
       })
     } catch (error) {
       console.error('Hiba:', error)
@@ -480,7 +509,7 @@ export default function CompetitionRegistration({ user }) {
 
               <div className="form-check mb-2">
                 <input
-                  className="form-check-input"
+                  className={`form-check-input ${errors.rulesAccepted ? 'border-danger' : ''}`}
                   type="checkbox"
                   id="rulesAccepted"
                   name="rulesAccepted"
@@ -498,7 +527,7 @@ export default function CompetitionRegistration({ user }) {
 
               <div className="form-check">
                 <input
-                  className="form-check-input"
+                  className={`form-check-input ${errors.privacyAccepted ? 'border-danger' : ''}`}
                   type="checkbox"
                   id="privacyAccepted"
                   name="privacyAccepted"
