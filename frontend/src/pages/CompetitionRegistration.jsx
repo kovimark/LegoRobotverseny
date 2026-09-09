@@ -38,7 +38,7 @@ export default function CompetitionRegistration({ user }) {
     teamCoach1: 'Az 1. felkészítő tanár nevének kitöltése kötelező.',
     teamCoach1Email: 'Az 1. felkészítő tanár emailcímének kitöltése kötelező.',
     rulesAccepted: 'A versenyszabályzat és a versenyzői kézikönyv elfogadása kötelező.',
-    privacyAccepted: 'Az adatkezelési tájékoztató és a képmás-/videófelvétel-készítéshez való hozzájárulás elfogadása kötelező.'
+    privacyAccepted: 'Az adatkezelési tájékoztató, a közvetítési hozzájárulás és az aláírt nyilatkozat leadási kötelezettségének elfogadása kötelező.'
   }
 
   const getCategory = (member1Class, member2Class) => (
@@ -473,38 +473,53 @@ export default function CompetitionRegistration({ user }) {
             <div className="card border-0 bg-light p-3 rounded-3 mb-3 shadow-sm">
               <div className="d-flex align-items-center gap-2 mb-2 text-primary">
                 <i className="bi bi-file-earmark-text-fill fs-5" />
-                <h6 className="mb-0 fw-bold">Dokumentumok és nyilatkozatok</h6>
+                <h6 className="mb-0 fw-bold">Dokumentumok és kötelező nyilatkozatok</h6>
               </div>
               <p className="small text-muted mb-3">
-                Kérjük, a jelentkezés előtt tekintsd át a szabályzatot és a hozzájárulási tájékoztatókat!
+                Kérjük, töltsétek le és olvassátok el a szabályzatokat és a tájékoztatót!
               </p>
 
-              <div className="d-flex flex-column flex-md-row flex-wrap gap-2 mb-3">
+              <div className="mb-2">
                 <a
                   href="https://drive.google.com/drive/folders/1Lg5k_dhlMSalj5uzqnTpLGu3JpVi_moT"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn btn-outline-primary btn-sm flex-fill d-inline-flex align-items-center justify-content-center"
+                  className="btn btn-outline-primary btn-sm w-100 d-inline-flex align-items-center justify-content-center py-2"
                 >
                   <i className="bi bi-box-arrow-up-right me-2" />
                   Hivatalos szabályzatok (Google Drive)
                 </a>
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary btn-sm flex-fill d-inline-flex align-items-center justify-content-center"
-                  onClick={() => setSubmitMessage({ type: 'info', text: 'Az adatkezelési tájékoztató dokumentuma hamarosan letölthető.' })}
+              </div>
+
+              <div className="d-flex flex-column flex-sm-row gap-2 mb-3">
+                <a
+                  href={`${process.env.PUBLIC_URL}/rulebook/ADATKEZELÉSI TÁJÉKOZTATÓ ÉS NYILATKOZAT.pdf`}
+                  download="ADATKEZELÉSI TÁJÉKOZTATÓ ÉS NYILATKOZAT.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-outline-secondary btn-sm flex-fill d-inline-flex align-items-center justify-content-center py-2"
                 >
                   <i className="bi bi-file-earmark-text me-2" />
-                  Adatkezelési tájékoztató letöltése
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary btn-sm flex-fill d-inline-flex align-items-center justify-content-center"
-                  onClick={() => setSubmitMessage({ type: 'info', text: 'A képmás- és médiatárolási hozzájárulási nyilatkozat hamarosan letölthető.' })}
+                  Adatkezelési tájékoztató (PDF)
+                </a>
+                <a
+                  href={`${process.env.PUBLIC_URL}/rulebook/ALÁÍRANDÓ ADATKEZELÉSI TÁJÉKOZTATÓ ÉS NYILATKOZAT.pdf`}
+                  download="ALÁÍRANDÓ ADATKEZELÉSI TÁJÉKOZTATÓ ÉS NYILATKOZAT.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-primary btn-sm flex-fill d-inline-flex align-items-center justify-content-center py-2"
                 >
-                  <i className="bi bi-camera-video me-2" />
-                  Képmás és médiatárolási nyilatkozat letöltése
-                </button>
+                  <i className="bi bi-file-earmark-check-fill me-2" />
+                  Aláírandó nyilatkozat (PDF)
+                </a>
+              </div>
+
+              {/* Figyelmeztetés a közvetítésről és a kötelező nyilatkozat leadásról */}
+              <div className="alert alert-warning border-warning d-flex align-items-start gap-2 mb-3 p-3">
+                <i className="bi bi-broadcast-pin flex-shrink-0 fs-5 mt-1 text-warning-emphasis" />
+                <div className="small">
+                  <strong>Figyelem:</strong> A verseny élőben lesz közvetítve (streamelve) az interneten. A versenyhelyszínre valő belépéshez az <strong>Aláírandó nyilatkozatot</strong> kötelező kinyomtatni, a szülővel/törvényes képviselővel (vagy 18+ versenyző esetén saját kezűleg) aláíratni, és a helyszínen az érkezéskor leadni. Aláírt nyilatkozat hiányában a belépést és a részvételt nem áll módunkban engedélyezni.
+                </div>
               </div>
 
               <div className="form-check mb-2">
@@ -536,7 +551,7 @@ export default function CompetitionRegistration({ user }) {
                   disabled={isSubmitting}
                 />
                 <label className="form-check-label small" htmlFor="privacyAccepted">
-                  Elfogadom az adatkezelési tájékoztatót, és hozzájárulok ahhoz, hogy a verseny során a csapattagokról és felkészítőkről fényképek és videófelvételek készüljenek, melyeket a szervezők a verseny bemutatására felhasználhatnak. <span className="text-danger fw-bold">*</span>
+                  Tudomásul veszem az élő közvetítést (stream), és vállalom, hogy az aláírandó nyilatkozatot kinyomtatva, aláírva leadjuk a helyszínen. <span className="text-danger fw-bold">*</span>
                 </label>
                 {errors.privacyAccepted && (
                   <div className="text-danger small mt-1">{errors.privacyAccepted}</div>

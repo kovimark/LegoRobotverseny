@@ -259,9 +259,16 @@ function App() {
         <Route path="/admin/eredmenyhirdetes" element={protectedAdminPage(userRole === 'admin' ? <TopThrees userPrivilege={userPrivilege} /> : <HomePage />)} />
       </Routes>
       {!isShowPage && <FloatingRefreshButton />}
-      {!isFocusPage && <footer className="container py-4 mt-4 border-top text-center text-muted small">
-        A LEGO® a LEGO Group védjegye. Ez egy független rendezvény és weboldal, amely nem áll kapcsolatban a LEGO Grouppal, és amelyet a LEGO Group nem szponzorál.
-      </footer>}
+      {!isFocusPage && (
+        <footer className="container py-4 mt-4 border-top text-center text-muted small">
+          <p className="mb-1 fst-italic">
+            © 2026 Brickathlon. Minden jog fenntartva.
+          </p>
+          <p className="mb-0 text-secondary" style={{ fontSize: '0.8rem' }}>
+            A LEGO® a LEGO Group védjegye. Ez egy független rendezvény és weboldal, amely nem áll kapcsolatban a LEGO Grouppal, és amelyet a LEGO Group nem szponzorál.
+          </p>
+        </footer>
+      )}
     </div>
   );
 }

@@ -13,7 +13,7 @@ const PUZZLE_THEMES = [
     ]
   },
   {
-    name: 'LEGO Pálya',
+    name: 'Kirakós Azonosítás',
     shapes: [
       { type: 'circle', x: 60, y: 50, r: 35, color: '#e67e22' },
       { type: 'rect', x: 130, y: 25, w: 70, h: 50, color: '#9b59b6' },

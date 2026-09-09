@@ -351,22 +351,16 @@ export default function JudgeRegistration() {
                   <i className="bi bi-box-arrow-up-right me-2" />
                   Bírói dokumentumok (Google Drive)
                 </a>
-                <button
-                  type="button"
+                <a
+                  href={`${process.env.PUBLIC_URL}/rulebook/ADATKEZELÉSI TÁJÉKOZTATÓ ÉS NYILATKOZAT.pdf`}
+                  download="ADATKEZELÉSI TÁJÉKOZTATÓ ÉS NYILATKOZAT.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="btn btn-outline-secondary btn-sm flex-fill d-inline-flex align-items-center justify-content-center"
-                  onClick={() => setSubmitMessage({ type: 'info', text: 'Az adatkezelési tájékoztató dokumentuma hamarosan letölthető.' })}
                 >
-                  <i className="bi bi-file-earmark-text me-2" />
-                  Adatkezelési tájékoztató letöltése
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary btn-sm flex-fill d-inline-flex align-items-center justify-content-center"
-                  onClick={() => setSubmitMessage({ type: 'info', text: 'A képmás- és médiatárolási hozzájárulási nyilatkozat hamarosan letölthető.' })}
-                >
-                  <i className="bi bi-camera-video me-2" />
-                  Képmás és médiatárolási nyilatkozat letöltése
-                </button>
+                  <i className="bi bi-file-earmark-pdf-fill me-2" />
+                  Adatkezelési nyilatkozat letöltése (PDF)
+                </a>
               </div>
 
               {/* Kötelező oktatónap és próbaverseny figyelmeztetés */}
