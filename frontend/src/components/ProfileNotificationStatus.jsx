@@ -30,17 +30,21 @@ export default function ProfileNotificationStatus({ user }) {
 
   const loadTeamIds = async () => {
     if (!user?.email) return []
-    const response = await fetch(`https://legocompetition.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`, {
-      headers: { accept: '*/*' }
-    })
-    if (!response.ok) throw new Error('Nem sikerült betölteni a felhasználó csapatait.')
-    const teams = await response.json()
-    return Array.isArray(teams)
-      ? [...new Set(teams
-        .filter((team) => team && typeof team === 'object')
-        .map((team) => team.id)
-        .filter((id) => id !== null && id !== undefined))]
-      : []
+    try {
+      const response = await fetch(`https://legocompetition.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`, {
+        headers: { accept: '*/*' }
+      })
+      if (!response.ok) return []
+      const teams = await response.json()
+      return Array.isArray(teams)
+        ? [...new Set(teams
+          .filter((team) => team && typeof team === 'object')
+          .map((team) => team.id)
+          .filter((id) => id !== null && id !== undefined))]
+        : []
+    } catch {
+      return []
+    }
   }
 
   const enable = async () => {

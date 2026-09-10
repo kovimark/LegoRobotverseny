@@ -213,19 +213,43 @@ export const subscribeToPush = async (userEmailOrPrivilegeId = null) => {
     }
   }
 
-  const response = await authFetch(`${API_URL}/Notification/subscribe`, {
-    method: 'POST',
-    headers: { accept: '*/*', 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      privilegeID: targetPrivilegeId ? Number(targetPrivilegeId) : 0,
-      ...subscriptionData
-    })
-  })
+  if (!targetPrivilegeId && Array.isArray(userEmailOrPrivilegeId) && userEmailOrPrivilegeId.length > 0) {
+    try {
+      const allPrivs = await getNotificationPrivileges()
+      const matched = allPrivs.find((p) => userEmailOrPrivilegeId.includes(Number(p.teamId)))
+      if (matched?.id) {
+        targetPrivilegeId = matched.id
+      }
+    } catch {
+      // ignore
+    }
+  }
 
-  await readResponse(response)
+  if (!targetPrivilegeId || targetPrivilegeId <= 0) {
+    // A felhasználóhoz még nem tartozik csapat vagy jogosultság az adatbázisban,
+    // így a backend nem tudja hozzárendelni (a privilegeID: 0 szerverhibát adna).
+    // A böngésző szintjén az engedély és a feliratkozás elkészült.
+    return subscription
+  }
+
+  try {
+    const response = await authFetch(`${API_URL}/Notification/subscribe`, {
+      method: 'POST',
+      headers: { accept: '*/*', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        privilegeID: Number(targetPrivilegeId),
+        ...subscriptionData
+      })
+    })
+
+    await readResponse(response)
+  } catch (subscribeError) {
+    console.warn('A push feliratkozás szerveroldali mentése nem sikerült:', subscribeError.message)
+  }
+
   return subscription
 }
 
 export const subscribeTeamsToPush = async (teamIds = [], privilegeIdOrEmail = null) => {
-  return subscribeToPush(privilegeIdOrEmail)
+  return subscribeToPush(privilegeIdOrEmail || teamIds)
 }

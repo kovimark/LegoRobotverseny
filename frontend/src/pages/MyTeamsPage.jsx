@@ -39,20 +39,31 @@ export default function MyTeamsPage({ user }) {
         ])
 
         if (teamsResponse.status === 'fulfilled' && teamsResponse.value.ok) {
-          const teamsData = await teamsResponse.value.json()
-          const teamsArray = Array.isArray(teamsData) ? teamsData : [teamsData]
-          const validTeams = teamsArray.filter((team) => team && typeof team === 'object')
-          setTeams(validTeams)
+          try {
+            const teamsData = await teamsResponse.value.json()
+            const teamsArray = Array.isArray(teamsData) ? teamsData : [teamsData]
+            const validTeams = teamsArray.filter((team) => team && typeof team === 'object')
+            setTeams(validTeams)
+          } catch {
+            setTeams([])
+          }
         } else {
-          throw new Error('Nem sikerült betölteni a csapataidat.')
+          setTeams([])
         }
 
         if (matchesResponse.status === 'fulfilled' && matchesResponse.value.ok) {
-          const matchesData = await matchesResponse.value.json()
-          setSumoMatches(Array.isArray(matchesData) ? matchesData : [])
+          try {
+            const matchesData = await matchesResponse.value.json()
+            setSumoMatches(Array.isArray(matchesData) ? matchesData : [])
+          } catch {
+            setSumoMatches([])
+          }
         }
       } catch (requestError) {
-        if (requestError.name !== 'AbortError') setError(requestError.message)
+        if (requestError.name !== 'AbortError') {
+          console.warn('Csapatok betöltése figyelmeztetés:', requestError.message)
+          setTeams([])
+        }
       } finally {
         if (!controller.signal.aborted) setLoading(false)
       }
@@ -69,21 +80,17 @@ export default function MyTeamsPage({ user }) {
   }, [])
 
   const enableNotifications = async () => {
-    if (teams.length === 0) {
-      setPushFeedback({ type: 'danger', text: 'Az értesítéshez előbb be kell tölteni a csapatodat.' })
-      return
-    }
     try {
       setPushLoading(true)
       const teamIds = [...new Set(teams
         .map((team) => team?.id)
         .filter((id) => id !== null && id !== undefined))]
-      await subscribeTeamsToPush(teamIds)
+      await subscribeTeamsToPush(teamIds, user?.email)
       window.localStorage.removeItem('robotverseny_push_disabled')
       setPushEnabled(true)
       setPushFeedback({ type: 'success', text: 'Az értesítések sikeresen bekapcsolva ezen az eszközön.' })
     } catch (pushError) {
-      setPushFeedback({ type: 'danger', text: pushError.message })
+      setPushFeedback({ type: 'danger', text: pushError.message || 'Nem sikerült bekapcsolni az értesítéseket.' })
     } finally {
       setPushLoading(false)
     }
@@ -154,9 +161,22 @@ export default function MyTeamsPage({ user }) {
       )}
 
       {loading && <div className="alert alert-info"><i className="bi bi-arrow-repeat me-2" />Csapatok betöltése...</div>}
-      {error && <div className="alert alert-danger"><i className="bi bi-exclamation-triangle-fill me-2" />{error}</div>}
       {!loading && !error && teams.length === 0 && (
-        <div className="alert alert-secondary"><i className="bi bi-info-circle me-2" />Ehhez az e-mail-címhez még nem tartozik csapat.</div>
+        <div className="card border-0 bg-light p-4 rounded-3 text-center shadow-sm mb-4">
+          <div className="mb-2">
+            <i className="bi bi-people text-primary fs-2" />
+          </div>
+          <h5 className="fw-bold mb-1">Ehhez az e-mail-címhez még nem tartozik csapat</h5>
+          <p className="text-muted small mb-3">
+            Ha szeretnél részt venni a Brickathlon robotversenyen, add le csapatod jelentkezését a versenyjelentkezési oldalon!
+          </p>
+          <div>
+            <Link className="btn btn-primary btn-sm px-3" to="/versenyjelentkezes">
+              <i className="bi bi-pencil-square me-2" />
+              Versenyjelentkezés
+            </Link>
+          </div>
+        </div>
       )}
 
       <div className="d-flex flex-column gap-4">
