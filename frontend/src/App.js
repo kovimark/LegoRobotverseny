@@ -11,6 +11,7 @@ import GameScoringPage from './pages/GameScoringPage';
 import CompetitionRegistration from './pages/CompetitionRegistration';
 import JudgeRegistration from './pages/JudgeRegistration';
 import RulesPage from './pages/RulesPage';
+import VideosPage from './pages/VideosPage';
 import StandingsPage from './pages/StandingsPage';
 import TeamDetailsPage from './pages/TeamDetailsPage';
 import Navbar from './components/Navbar';
@@ -225,6 +226,7 @@ function App() {
         <Route path="/birojelentkezes" element={<JudgeRegistration />} />
         <Route path="/biro-jelentkezes" element={<JudgeRegistration />} />
         <Route path="/szabalyzat" element={<RulesPage />} />
+        <Route path="/videok" element={<VideosPage user={user} />} />
         <Route path="/hirek" element={<NewsPage />} />
         <Route path="/hirek/:messageId" element={<NewsDetailsPage userRole={userRole} />} />
         <Route path="/hirek/cim/:messageTitle" element={<NewsDetailsPage userRole={userRole} />} />

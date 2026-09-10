@@ -161,10 +161,30 @@ const urlBase64ToUint8Array = (base64String) => {
   return Uint8Array.from([...rawData].map((character) => character.charCodeAt(0)))
 }
 
+export const requestNotificationPermission = async () => {
+  if (!('Notification' in window)) return 'denied'
+  if (Notification.permission === 'granted' || Notification.permission === 'denied') {
+    return Notification.permission
+  }
+  try {
+    const res = await Notification.requestPermission()
+    return res
+  } catch {
+    return new Promise((resolve) => {
+      Notification.requestPermission((res) => resolve(res))
+    })
+  }
+}
+
 export const getCurrentPushSubscription = async () => {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null
-  const registration = await navigator.serviceWorker.register('/push-service-worker.js')
-  return registration.pushManager.getSubscription()
+  try {
+    await navigator.serviceWorker.register('/push-service-worker.js')
+    const registration = await navigator.serviceWorker.ready
+    return await registration.pushManager.getSubscription()
+  } catch {
+    return null
+  }
 }
 
 export const unsubscribeFromPush = async () => {
@@ -174,16 +194,29 @@ export const unsubscribeFromPush = async () => {
 }
 
 export const subscribeToPush = async (userEmailOrPrivilegeId = null) => {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
-    throw new Error('Ez a böngésző nem támogatja a push értesítéseket.')
+  if (!('Notification' in window) && !('serviceWorker' in navigator)) {
+    throw new Error('Ez a böngésző vagy eszköz nem támogatja a push értesítéseket.')
   }
+
+  // Request permission immediately on user gesture before async tasks on mobile
+  let permission = 'default'
+  if ('Notification' in window) {
+    permission = await requestNotificationPermission()
+  }
+  if (permission !== 'granted') {
+    throw new Error('Az értesítési engedély nem lett megadva a böngészőben.')
+  }
+
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    throw new Error('A push szolgáltatás nem támogatott ebben a böngészőben.')
+  }
+
   const vapidPublicKey = process.env.REACT_APP_VAPID_PUBLIC_KEY
   if (!vapidPublicKey) throw new Error('A REACT_APP_VAPID_PUBLIC_KEY nincs beállítva a .env fájlban.')
 
-  const permission = await Notification.requestPermission()
-  if (permission !== 'granted') throw new Error('Az értesítési engedély nem lett megadva.')
+  await navigator.serviceWorker.register('/push-service-worker.js')
+  const registration = await navigator.serviceWorker.ready
 
-  const registration = await navigator.serviceWorker.register('/push-service-worker.js')
   const subscription = await registration.pushManager.getSubscription()
     || await registration.pushManager.subscribe({
       userVisibleOnly: true,

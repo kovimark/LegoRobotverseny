@@ -16,7 +16,13 @@ root.render(
     </BrowserRouter>
 );
 
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
+// Register service worker for push notifications on mobile and desktop
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/push-service-worker.js').catch((err) => {
+      console.warn('Service Worker regisztráció figyelmeztetés:', err)
+    })
+  })
+}
+
 reportWebVitals();
