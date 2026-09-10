@@ -6,7 +6,7 @@ self.addEventListener('push', (event) => {
     payload = { body: event.data ? event.data.text() : '' }
   }
   const notificationData = payload.notification || payload.data || payload
-  const title = notificationData.title || notificationData.Title || payload.title || payload.Title || 'Robotverseny'
+  const title = notificationData.title || notificationData.Title || payload.title || payload.Title || 'Brickathlon'
   const isAnnouncement =
     payload.type === 'message' ||
     payload.type === 'announcement' ||
@@ -22,7 +22,7 @@ self.addEventListener('push', (event) => {
       url: notificationData.url || notificationData.Url || notificationData.link || notificationData.Link || defaultUrl,
       isAnnouncement
     },
-    tag: notificationData.tag || `robotverseny-${Date.now()}`,
+    tag: notificationData.tag || `brickathlon-${Date.now()}`,
     renotify: true
   }
   event.waitUntil(self.registration.showNotification(title, options))

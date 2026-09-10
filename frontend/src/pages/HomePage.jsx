@@ -30,7 +30,7 @@ export default function HomePage() {
       <section className="home-hero">
         <div className="home-panel">
           <h1 className="home-title home-brand-title">
-            <img className="home-brand-name" src="/Images/Nev.png" alt="Robotverseny" />
+            <img className="home-brand-name" src="/Images/Nev.png" alt="Brickathlon" />
           </h1>
           <p className="home-copy">
             Készen álltok az ősz legnagyobb robotikai kihívására? Jelentkezzetek 2 fős csapatokkal, és méressétek meg magatokat a BRICKATHLON négy teljesen különböző versenyszámában!</p>
