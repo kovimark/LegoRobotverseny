@@ -226,7 +226,7 @@ function App() {
         <Route path="/birojelentkezes" element={<JudgeRegistration />} />
         <Route path="/biro-jelentkezes" element={<JudgeRegistration />} />
         <Route path="/szabalyzat" element={<RulesPage />} />
-        <Route path="/videok" element={<VideosPage user={user} />} />
+        <Route path="/videok" element={<VideosPage />} />
         <Route path="/hirek" element={<NewsPage />} />
         <Route path="/hirek/:messageId" element={<NewsDetailsPage userRole={userRole} />} />
         <Route path="/hirek/cim/:messageTitle" element={<NewsDetailsPage userRole={userRole} />} />
