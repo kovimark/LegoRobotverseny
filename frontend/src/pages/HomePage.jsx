@@ -6,6 +6,7 @@ import { getCategoryBadgeStyle } from '../utils/categoryColor'
 
 export default function HomePage() {
   const [messages, setMessages] = useState([])
+  const [posterOpen, setPosterOpen] = useState(false)
 
   useEffect(() => {
     const loadMessages = () => getActiveMessages().then((items) => {
@@ -20,6 +21,20 @@ export default function HomePage() {
     return () => window.removeEventListener(MESSAGE_BOARD_CHANGED_EVENT, loadMessages)
   }, [])
 
+  useEffect(() => {
+    if (!posterOpen) return undefined
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setPosterOpen(false)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [posterOpen])
+
   const excerpt = (text, length = 150) => {
     const normalized = stripMessageLinkMarkers(text).replace(/\s+/g, ' ').trim()
     return normalized.length > length ? `${normalized.slice(0, length).trimEnd()}…` : normalized
@@ -32,9 +47,9 @@ export default function HomePage() {
           <h1 className="home-title home-brand-title">
             <img className="home-brand-name" src="/Images/Nev.png" alt="Brickathlon" />
           </h1>
+
           <p className="home-copy">
             Készen álltok az ősz legnagyobb robotikai kihívására? Jelentkezzetek 2 fős csapatokkal, és méressétek meg magatokat a BRICKATHLON négy teljesen különböző versenyszámában!</p>
-
 
           <p className="home-description">
             Küzdjetek meg közvetlen párharcokban a Szumóban, versenyezzetek az idővel a Vonalkövetésben, hódítsátok meg a csúcsokat a Hegymászásban, és bizonyítsátok be a pontosságotokat a Kosárra dobásnál. </p>
@@ -52,6 +67,66 @@ export default function HomePage() {
         </div>
       </section>
 
+      {posterOpen && (
+        <div
+          className="modal fade show d-block"
+          tabIndex="-1"
+          role="dialog"
+          aria-modal="true"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.88)', zIndex: 1060 }}
+          onClick={() => setPosterOpen(false)}
+        >
+          {/* Lebegő bezárás gomb a képernyő jobb felső sarkában (nem a képen) */}
+          <button
+            type="button"
+            className="btn btn-dark rounded-circle d-flex align-items-center justify-content-center shadow"
+            style={{
+              position: 'fixed',
+              top: '1.25rem',
+              right: '1.25rem',
+              width: '44px',
+              height: '44px',
+              zIndex: 1070,
+              opacity: 0.95,
+              cursor: 'pointer',
+              border: '2px solid rgba(255, 255, 255, 0.6)',
+              transition: 'transform 0.2s ease, background-color 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.1)'
+              e.currentTarget.style.backgroundColor = '#dc3545'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)'
+              e.currentTarget.style.backgroundColor = '#212529'
+            }}
+            aria-label="Bezárás"
+            title="Bezárás"
+            onClick={() => setPosterOpen(false)}
+          >
+            <i className="bi bi-x-lg text-white fs-5" style={{ pointerEvents: 'none' }} />
+          </button>
+
+          <div
+            className="modal-dialog modal-dialog-centered d-flex justify-content-center align-items-center"
+            style={{ maxWidth: '95vw', margin: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src="/Images/plakat.png"
+              alt="Brickathlon plakát"
+              className="rounded-3 shadow-lg d-block"
+              style={{
+                maxHeight: '90vh',
+                maxWidth: '92vw',
+                objectFit: 'contain',
+                cursor: 'default'
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       <section className="home-about-section">
         <div className="home-about-card">
           <div className="home-about-copy">
@@ -68,9 +143,30 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Plakát szekció a hírek felett */}
+      <section className="home-poster-section container my-5">
+        <div className="home-section-heading mb-3">
+          <h2>Hivatalos plakát</h2>
+        </div>
+        <div className="text-center">
+          <img
+            src="/Images/plakat.png"
+            alt="Brickathlon hivatalos plakát"
+            className="img-fluid rounded-4 shadow-lg d-block mx-auto"
+            style={{
+              maxWidth: 'min(820px, 100%)',
+              height: 'auto',
+              cursor: 'pointer'
+            }}
+            onClick={() => setPosterOpen(true)}
+            title="Kattints a nagyításhoz!"
+          />
+        </div>
+      </section>
+
       <section className="home-carousel-section">
         <div className="home-section-heading">
-          <h2 >Hírek és információk</h2>
+          <h2>Hírek és információk</h2>
         </div>
 
         {messages.length > 0 ? (
