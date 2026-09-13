@@ -263,6 +263,38 @@ function App() {
       {!isShowPage && <FloatingRefreshButton />}
       {!isFocusPage && (
         <footer className="container py-4 mt-4 border-top text-center text-muted small">
+          <div className="d-flex justify-content-center align-items-center flex-wrap gap-2 gap-md-3 mb-3">
+            <a
+              href="https://www.instagram.com/_brickathlon_"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="footer-social-btn footer-social-instagram"
+              title="Kövess minket Instagramon!"
+            >
+              <i className="bi bi-instagram" />
+              <span>Instagram</span>
+            </a>
+            <a
+              href="https://www.tiktok.com/@brickathlon"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="footer-social-btn footer-social-tiktok"
+              title="Kövess minket TikTokon!"
+            >
+              <i className="bi bi-tiktok" />
+              <span>TikTok</span>
+            </a>
+            <a
+              href="https://www.facebook.com/people/Brickathlon/61594226854813/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="footer-social-btn footer-social-facebook"
+              title="Kövess minket Facebookon!"
+            >
+              <i className="bi bi-facebook" />
+              <span>Facebook</span>
+            </a>
+          </div>
           <p className="mb-1 fst-italic">
             © 2026 Brickathlon. Minden jog fenntartva.
           </p>
