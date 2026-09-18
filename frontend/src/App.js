@@ -27,6 +27,7 @@ import EmailManagementPage from './pages/EmailManagementPage';
 import JudgeApplicationsPage from './pages/JudgeApplicationsPage';
 import UserMessagesPage from './pages/UserMessagesPage';
 import NotificationPromptBanner from './components/NotificationPromptBanner';
+import ImportantAnnouncementBar from './components/ImportantAnnouncementBar';
 import AutoBackupRunner from './components/AutoBackupRunner';
 import { auth, authPersistenceReady, googleProvider } from './firebase';
 import { isJudgePrivilege } from './config/privilegeConfig';
@@ -214,6 +215,7 @@ function App() {
             onGoogleSignIn={handleGoogleSignIn}
             onSignOut={handleSignOut}
           />
+          <ImportantAnnouncementBar />
           <NotificationPromptBanner user={user} />
         </>
       )}
