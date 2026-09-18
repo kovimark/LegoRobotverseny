@@ -34,20 +34,40 @@ export default function UserMessagesModal({ open, onClose, user, userTeamId = nu
       const allMsgs = allMsgsRes.status === 'fulfilled' && Array.isArray(allMsgsRes.value) ? allMsgsRes.value : []
 
       let teamNotifs = []
-      if (userTeamId) {
-        teamNotifs = await getAllNotificationsByTeam(userTeamId)
-      } else {
-        try {
-          const teamRes = await fetch(`https://legocompetition.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`)
-          if (teamRes.ok) {
-            const teamData = await teamRes.json()
-            const foundId = Array.isArray(teamData) ? teamData[0]?.id : (teamData?.id || teamData?.teamId)
-            if (foundId) {
-              teamNotifs = await getAllNotificationsByTeam(foundId)
-            }
+      try {
+        const teamRes = await fetch(`https://legocompetition.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`)
+        if (teamRes.ok) {
+          const teamData = await teamRes.json()
+          const teamsArray = Array.isArray(teamData) ? teamData : [teamData]
+          const validTeamIds = teamsArray
+            .filter((t) => t && typeof t === 'object')
+            .map((t) => t.id || t.teamId)
+            .filter((id) => id !== null && id !== undefined)
+
+          if (userTeamId && !validTeamIds.includes(userTeamId)) {
+            validTeamIds.push(userTeamId)
           }
-        } catch {
-          // ignore team lookup
+
+          if (validTeamIds.length > 0) {
+            const teamNotifResults = await Promise.allSettled(
+              validTeamIds.map((tid) => getAllNotificationsByTeam(tid))
+            )
+            teamNotifResults.forEach((res) => {
+              if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+                teamNotifs.push(...res.value)
+              }
+            })
+          }
+        } else if (userTeamId) {
+          teamNotifs = await getAllNotificationsByTeam(userTeamId)
+        }
+      } catch {
+        if (userTeamId) {
+          try {
+            teamNotifs = await getAllNotificationsByTeam(userTeamId)
+          } catch {
+            // ignore
+          }
         }
       }
 

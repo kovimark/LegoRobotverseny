@@ -177,7 +177,7 @@ export default function Navbar({ user, userRole, userPrivilege, userTeamId, auth
                             ) : (
                                 <div className="d-grid gap-2">
                                     <Link className="btn btn-primary w-100 profile-menu-link" to="/sajat-csapataim" onClick={() => setIsProfileOpen(false)}>
-                                        <i className="bi bi-people-fill" aria-hidden="true" /><span>Saját csapatom</span>
+                                        <i className="bi bi-people-fill" aria-hidden="true" /><span>Saját csapataim</span>
                                     </Link>
                                     <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/allasok" onClick={() => setIsProfileOpen(false)}>
                                         <i className="bi bi-bar-chart-fill" aria-hidden="true" /><span>Állások</span>

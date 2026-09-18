@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import FloatingFeedback from '../components/FloatingFeedback'
 import PuzzleCaptcha from '../components/PuzzleCaptcha'
 import { submitApplication } from '../services/applicationApi'
@@ -12,7 +12,8 @@ const COMPETITION_OPTIONS = [
   { id: 'vonalkovetes', label: 'Vonalkövetés' },
   { id: 'hegymaszas', label: 'Hegymászás' },
   { id: 'szumo', label: 'Szumó' },
-  { id: 'kosarra-dobas', label: 'Kosárra dobás' }
+  { id: 'kosarra-dobas', label: 'Kosárra dobás' },
+  { id: 'segito', label: 'Segítő' }
 ]
 
 export default function JudgeRegistration() {
@@ -29,6 +30,17 @@ export default function JudgeRegistration() {
   const [submitMessage, setSubmitMessage] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCaptchaVerified, setIsCaptchaVerified] = useState(false)
+  const [isPosterModalOpen, setIsPosterModalOpen] = useState(false)
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isPosterModalOpen) {
+        setIsPosterModalOpen(false)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isPosterModalOpen])
 
   const requiredFields = {
     name: 'A név kitöltése kötelező.',
@@ -105,16 +117,15 @@ export default function JudgeRegistration() {
       return acc
     }, {})
 
-    // Check at least 2 competitions selected
     if (!Array.isArray(formData.competitions) || formData.competitions.length < 2) {
-      validationErrors.competitions = 'Legalább 2 versenyszámot kötelező kiválasztani.'
+      validationErrors.competitions = 'Legalább 2 opciót (versenyszámot vagy a Segítő opciót) kötelező kiválasztani.'
     }
 
     const emailValue = typeof formData.email === 'string' ? formData.email.trim() : ''
     if (emailValue) {
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       if (!emailPattern.test(emailValue)) {
-        validationErrors.email = 'Kérjük, adj meg egy érvényes email címet.'
+        validationErrors.email = 'Kérjük, adj meg egy érvényes email címét.'
       }
     }
 
@@ -165,7 +176,7 @@ export default function JudgeRegistration() {
       setErrors({})
       setSubmitMessage({
         type: 'success',
-        text: 'Sikeres regisztráció! A bírói jelentkezésedet rögzítettük.'
+        text: 'Sikeres regisztráció! A jelentkezésedet rögzítettük.'
       })
     } catch (error) {
       console.error('Hiba:', error)
@@ -179,10 +190,67 @@ export default function JudgeRegistration() {
   }
 
   return (
-    <div className="container mt-5">
+    <div className="container mt-5 mb-5">
+      {/* Plakát Lightbox Modal */}
+      {isPosterModalOpen && (
+        <div
+          className="modal fade show d-block"
+          tabIndex="-1"
+          style={{
+            backgroundColor: 'rgba(0, 0, 0, 0.88)',
+            zIndex: 2060,
+            overflowY: 'auto'
+          }}
+          onClick={() => setIsPosterModalOpen(false)}
+        >
+          <button
+            type="button"
+            className="btn-close btn-close-white"
+            aria-label="Bezárás"
+            onClick={() => setIsPosterModalOpen(false)}
+            style={{
+              position: 'fixed',
+              top: '20px',
+              right: '20px',
+              zIndex: 2070,
+              fontSize: '1.5rem',
+              cursor: 'pointer',
+              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))'
+            }}
+          />
+          <div
+            className="modal-dialog modal-dialog-centered d-flex justify-content-center align-items-center"
+            style={{ maxWidth: '95vw', margin: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src="/Images/versenybiroi_plakat.png"
+              alt="Brickathlon versenybírói és segítői plakát"
+              className="rounded-3 shadow-lg d-block"
+              style={{
+                maxHeight: '90vh',
+                maxWidth: '92vw',
+                objectFit: 'contain',
+                cursor: 'default'
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="row justify-content-center">
         <div className="col-md-8">
-          <h2 className="mb-4">Bírói Jelentkezés</h2>
+          <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+            <h2 className="mb-0">Bírói és Segítői Jelentkezés</h2>
+            <button
+              type="button"
+              className="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2"
+              onClick={() => setIsPosterModalOpen(true)}
+            >
+              <i className="bi bi-file-earmark-image" />
+              <span>Plakát megnyitása</span>
+            </button>
+          </div>
 
           <form onSubmit={handleSubmit} noValidate>
             {/* Név mező */}
@@ -279,17 +347,17 @@ export default function JudgeRegistration() {
               )}
             </div>
 
-            {/* Versenyszámok kiválasztása (legalább 2) */}
+            {/* Versenyszámok / Szerepkör kiválasztása */}
             <div className="mb-3">
               <label className="form-label d-block mb-1">
-                Versenyszámok <span className="text-danger fw-bold">*</span>
-                <span className="text-muted fw-normal ms-2 small">(legalább 2 versenyszámot kötelező választani)</span>
+                Versenyszámok és szerepkör <span className="text-danger fw-bold">*</span>
+                <span className="text-muted fw-normal ms-2 small">(legalább 2 opció kiválasztása kötelező)</span>
               </label>
 
               <div className="alert alert-info py-2 px-3 mb-2 d-flex align-items-center gap-2 small">
                 <i className="bi bi-info-circle-fill flex-shrink-0 fs-5 text-primary" />
                 <div>
-                  Kérjük, olyan versenyszámokat válassz, amelyeket <strong>preferálsz</strong>, szívesen bíráskodnál náluk, vagy a leginkább <strong>tetszenek neked</strong>! A végső <strong>bírói beosztásodról és szerepkörödről emailben küldünk értesítést</strong>.
+                  Kérjük, válaszd ki azokat a versenyszámokat vagy szerepköröket (pl. <strong>Segítő</strong>), amelyek a leginkább érdekelnek! A végső beosztásodról emailben küldünk tájékoztatást.
                 </div>
               </div>
 
@@ -297,10 +365,11 @@ export default function JudgeRegistration() {
                 <div className="row g-2">
                   {COMPETITION_OPTIONS.map((comp) => {
                     const isChecked = formData.competitions.includes(comp.id)
+                    const isHelper = comp.id === 'segito'
                     return (
-                      <div className="col-12 col-sm-6" key={comp.id}>
+                      <div className={isHelper ? 'col-12' : 'col-12 col-sm-6'} key={comp.id}>
                         <div
-                          className={`form-check p-2 border rounded bg-white ${isChecked ? 'border-primary shadow-sm' : ''}`}
+                          className={`form-check p-2 border rounded bg-white d-flex align-items-center ${isChecked ? 'border-primary shadow-sm' : ''}`}
                           style={{ cursor: 'pointer' }}
                           onClick={() => !isSubmitting && handleCompetitionToggle(comp.id)}
                         >
@@ -314,12 +383,12 @@ export default function JudgeRegistration() {
                             onClick={(e) => e.stopPropagation()}
                           />
                           <label
-                            className="form-check-label ms-2 fw-semibold"
+                            className="form-check-label ms-2 fw-semibold w-100"
                             htmlFor={`comp-${comp.id}`}
                             style={{ cursor: 'pointer' }}
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {comp.label}
+                            {isHelper ? 'Segítő (rendezvényi asszisztens)' : comp.label}
                           </label>
                         </div>
                       </div>
@@ -342,11 +411,19 @@ export default function JudgeRegistration() {
                 Kérjük, a jelentkezés előtt tekintsd át a szabályzatot és az adatkezelési tájékoztatót!
               </p>
               <div className="d-flex flex-column flex-md-row flex-wrap gap-2 mb-3">
+                <button
+                  type="button"
+                  className="btn btn-outline-primary btn-sm flex-fill d-inline-flex align-items-center justify-content-center"
+                  onClick={() => setIsPosterModalOpen(true)}
+                >
+                  <i className="bi bi-file-earmark-image me-2" />
+                  Plakát megnyitása
+                </button>
                 <a
                   href={JUDGE_DOCS_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn btn-outline-primary btn-sm flex-fill d-inline-flex align-items-center justify-content-center"
+                  className="btn btn-outline-secondary btn-sm flex-fill d-inline-flex align-items-center justify-content-center"
                 >
                   <i className="bi bi-box-arrow-up-right me-2" />
                   Bírói dokumentumok (Google Drive)
@@ -367,35 +444,32 @@ export default function JudgeRegistration() {
               <div className="alert alert-warning border-warning d-flex align-items-start gap-2 mb-3 p-3">
                 <i className="bi bi-calendar-event-fill flex-shrink-0 fs-5 mt-1 text-warning-emphasis" />
                 <div className="small">
-                  <strong>Fontos információ:</strong> A jelentkezések elbírálása után <strong>emailben értesítünk a pontos bírói beosztásodról és versenyszámodról</strong>. Körülbelül <strong>egy héttel a verseny előtt</strong> egy felkészítő <strong>oktatónapot és próbaversenyt</strong> tartunk, amelyen a <strong>részvétel kötelező</strong> minden jelentkező számára (ennek részleteiről szintén emailt küldünk).
+                  <strong>Fontos információ:</strong> A jelentkezések elbírálása után <strong>emailben értesítünk a pontos beosztásodról és feladataidról</strong>. Körülbelül <strong>egy héttel a verseny előtt</strong> egy felkészítő <strong>oktatónapot és próbaversenyt</strong> tartunk, amelyen a <strong>részvétel kötelező</strong> minden jelentkező számára (ennek részleteiről szintén emailt küldünk).
                 </div>
               </div>
 
-              {/* Fontos tudnivalók és bírói felelősség a checkbox felett */}
+              {/* Fontos tudnivalók és felelősség */}
               <div className="card border-1 border-secondary mb-3 bg-white shadow-sm">
                 <div className="card-body p-3">
                   <div className="d-flex align-items-center gap-2 mb-2 text-danger">
                     <i className="bi bi-shield-fill-exclamation fs-5" />
-                    <h6 className="mb-0 fw-bold">Fontos tudnivalók és bírói felelősség</h6>
+                    <h6 className="mb-0 fw-bold">Fontos tudnivalók és felelősségvállalás</h6>
                   </div>
                   <p className="small text-muted mb-2">
-                    A Brickathlon versenybírói a verseny tisztaságáért, a szabályzat betartásáért és a hivatalos pontok hiteles rögzítéséért felelnek. Kérjük, csak akkor nyújtsd be a jelentkezést, ha az alábbi feltételeket maradéktalanul vállalod:
+                    A Brickathlon versenybírói és segítői a verseny tisztaságáért, a szabályzat betartásáért és a rendezvény gördülékeny lebonyolításáért felelnek. Kérjük, csak akkor nyújtsd be a jelentkezést, ha az alábbi feltételeket maradéktalanul vállalod:
                   </p>
                   <ul className="small mb-0 ps-3 d-grid gap-1">
                     <li>
-                      <strong>Bírói beosztás és kötelező oktatónap:</strong> A jelentkezések feldolgozása után emailben kapod meg, hogy milyen bírói szerepkörbe / melyik versenyszámhoz kerültél beosztásra. A verseny előtt kb. egy héttel tartott oktatónapon és próbaversenyen a részvétel kötelező.
+                      <strong>Beosztás és felkészítő alkalom:</strong> A jelentkezések feldolgozása után emailben kapod meg a pontos szerepkörödet és beosztásodat. A verseny előtti felkészítőn a részvétel kötelező.
                     </li>
                     <li>
-                      <strong>Kötelező jelenlét és pontosság:</strong> A bírói feladatok ellátása a versenynap teljes időtartama alatt kötelező és felelősségteljes jelenlétet kíván.
+                      <strong>Kötelező jelenlét és pontosság:</strong> A feladatok ellátása a versenynap teljes időtartama alatt felelősségteljes jelenlétet kíván.
                     </li>
                     <li>
-                      <strong>Szigorú pártatlanság:</strong> Minden bíró köteles abszolút objektíven és befolyásmentesen bíráskodni, függetlenül az érintett csapatoktól vagy iskoláktól.
+                      <strong>Pártatlanság és sportszerűség:</strong> Minden résztvevő felé objektív, segítőkész és következetes hozzáállást várunk el.
                     </li>
                     <li>
-                      <strong>Szabályismeret kötelező:</strong> A jelentkezés feltétele a hivatalos versenyszabályzat és a bírói kézikönyv előzetes, alapos áttanulmányozása.
-                    </li>
-                    <li>
-                      <strong>Digitális pontozás és adminisztráció:</strong> A bírók önállóan és hibamentesen rögzítik a próbálkozásokat, időket és meccseredményeket a bírói felületen.
+                      <strong>Szabályismeret:</strong> A versenyszabályzat és a bírói segédlet alapos megismerése elengedhetetlen.
                     </li>
                   </ul>
                 </div>
@@ -452,7 +526,7 @@ export default function JudgeRegistration() {
 
             <button
               type="submit"
-              className="btn btn-primary w-100"
+              className="btn btn-primary w-100 py-2 fs-5 fw-bold"
               disabled={isSubmitting || !isCaptchaVerified}
             >
               {isSubmitting ? 'Regisztráció...' : 'Regisztráció'}

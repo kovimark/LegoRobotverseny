@@ -7,6 +7,7 @@ import AgeGroupBadge from '../components/AgeGroupBadge'
 
 export default function MyTeamsPage({ user }) {
   const [teams, setTeams] = useState([])
+  const [selectedTeamId, setSelectedTeamId] = useState('all')
   const [sumoMatches, setSumoMatches] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -133,15 +134,67 @@ export default function MyTeamsPage({ user }) {
     return null
   }
 
+  const displayedTeams = selectedTeamId === 'all'
+    ? teams
+    : teams.filter((t) => String(t.id) === selectedTeamId)
+
   return (
     <div className="container py-4">
       <div className="mb-4">
-        <h2 className="mb-1"><i className="bi bi-people-fill me-2" aria-hidden="true" />Saját csapatom</h2>
+        <h2 className="mb-1"><i className="bi bi-people-fill me-2" aria-hidden="true" />{teams.length > 1 ? 'Saját csapataim' : 'Saját csapatom'}</h2>
         <p className="text-muted mb-0"><i className="bi bi-envelope-fill me-1" aria-hidden="true" /> A(z) {user?.email} e-mail-címhez tartozó csapatadatok és eredmények.</p>
       </div>
       <FloatingFeedback message={pushFeedback} onClose={() => setPushFeedback(null)} />
 
       <CompetitionStatusPanel />
+
+      {!loading && teams.length > 1 && (
+        <section className="card shadow-sm border-0 bg-white p-3 rounded-3 mb-4">
+          <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+            <div>
+              <h3 className="h6 fw-bold mb-1 d-flex align-items-center gap-2">
+                <span className="badge bg-primary fs-6">{teams.length} regisztrált csapat</span>
+                <span>Csapatválasztó és szűrő:</span>
+              </h3>
+              <p className="text-muted small mb-0">
+                Válts az egyes csapatok között a gyors áttekintéshez, vagy nézd meg az összeset egyszerre.
+              </p>
+            </div>
+            {selectedTeamId !== 'all' && (
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary"
+                onClick={() => setSelectedTeamId('all')}
+              >
+                <i className="bi bi-grid-fill me-1" />
+                Összes mutatása
+              </button>
+            )}
+          </div>
+          <div className="d-flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={`btn btn-sm ${selectedTeamId === 'all' ? 'btn-primary' : 'btn-outline-secondary'}`}
+              onClick={() => setSelectedTeamId('all')}
+            >
+              <i className="bi bi-grid-fill me-1" />
+              Összes csapat ({teams.length})
+            </button>
+            {teams.map((team) => (
+              <button
+                type="button"
+                key={team.id}
+                className={`btn btn-sm ${selectedTeamId === String(team.id) ? 'btn-primary' : 'btn-outline-dark'}`}
+                onClick={() => setSelectedTeamId(String(team.id))}
+              >
+                <AgeGroupBadge category={team.category} className="me-1" />
+                <span className="fw-semibold">{team.teamName || `Csapat #${team.id}`}</span>
+                <span className="ms-1 opacity-75 small">#{team.id}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {!loading && teams.length > 0 && (
         <section className="card shadow-sm team-card no-hover-card mb-4">
@@ -149,7 +202,7 @@ export default function MyTeamsPage({ user }) {
             <div>
               <h3 className="h5 mb-1"><i className="bi bi-bell-fill me-2" aria-hidden="true" />Csapatértesítések</h3>
               <p className="text-muted mb-0">
-                {pushEnabled ? 'Az értesítések engedélyezve vannak ezen az eszközön.' : 'Kapj értesítést a csapatodnak küldött fontos információkról.'}
+                {pushEnabled ? 'Az értesítések engedélyezve vannak ezen az eszközön mindegyik csapatodhoz.' : 'Kapj értesítést a csapataidnak küldött fontos információkról.'}
               </p>
             </div>
             <button type="button" className={`btn ${pushEnabled ? 'btn-success' : 'btn-primary'}`} disabled={pushLoading || pushEnabled} onClick={enableNotifications}>
@@ -180,7 +233,7 @@ export default function MyTeamsPage({ user }) {
       )}
 
       <div className="d-flex flex-column gap-4">
-        {teams.map((team) => {
+        {displayedTeams.map((team) => {
           const competitors = getCompetitors(team)
           const coach = getCoach(team)
           const hasTeamData = competitors.length > 0 || coach

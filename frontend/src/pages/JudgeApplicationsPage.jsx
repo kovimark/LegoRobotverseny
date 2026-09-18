@@ -5,7 +5,7 @@ import FloatingFeedback from '../components/FloatingFeedback'
 import ConfirmModal from '../components/ConfirmModal'
 import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 
-const DEFAULT_ROLES = ['Vonalkövetés', 'Hegymászás', 'Szumó', 'Kosárra dobás']
+const DEFAULT_ROLES = ['Vonalkövetés', 'Hegymászás', 'Szumó', 'Kosárra dobás', 'Segítő']
 
 export default function JudgeApplicationsPage() {
   const [applications, setApplications] = useState([])
