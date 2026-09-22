@@ -4524,3 +4524,61 @@ form {
   border-color: #1877f2;
 }
 
+/* Videos page dropdown overlay and blur backdrop */
+.video-blur-backdrop {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1040;
+  animation: videoBackdropFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes videoBackdropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.video-card-elevated {
+  z-index: 1050 !important;
+  box-shadow: 0 1.25rem 3rem rgba(0, 0, 0, 0.28), 0 0.25rem 0.75rem rgba(0, 0, 0, 0.12) !important;
+  transform: translateY(-3px) scale(1.01);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.video-description-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  right: 0;
+  background-color: #ffffff;
+  padding: 1.15rem;
+  border-radius: 1rem;
+  box-shadow: 0 1.5rem 3.5rem rgba(0, 0, 0, 0.25), 0 0.35rem 1rem rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  z-index: 1060;
+  max-height: 360px;
+  overflow-y: auto;
+  transform-origin: top center;
+  animation: videoDropdownSlideDown 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes videoDropdownSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+

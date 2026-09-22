@@ -19,6 +19,7 @@ import LoginPage from './pages/LoginPage';
 import PrivilegeManagementPage from './pages/PrivilegeManagementPage';
 import MyTeamsPage from './pages/MyTeamsPage';
 import MessageManagementPage from './pages/MessageManagementPage';
+import VideoManagementPage from './pages/VideoManagementPage';
 import SettingsManagementPage from './pages/SettingsManagementPage';
 import NewsPage from './pages/NewsPage';
 import NewsDetailsPage from './pages/NewsDetailsPage';
@@ -241,6 +242,7 @@ function App() {
         <Route path="/admin/biro-jelentkezesek" element={protectedAdminPage(userRole === 'admin' ? <JudgeApplicationsPage /> : <HomePage />)} />
         <Route path="/admin/jogosultsagok" element={protectedAdminPage(userRole === 'admin' ? <PrivilegeManagementPage /> : <HomePage />)} />
         <Route path="/admin/uzenetek" element={protectedAdminPage(userRole === 'admin' ? <MessageManagementPage /> : <HomePage />)} />
+        <Route path="/admin/videok" element={protectedAdminPage(userRole === 'admin' ? <VideoManagementPage /> : <HomePage />)} />
         <Route path="/admin/ertesitesek" element={protectedAdminPage(userRole === 'admin' ? <NotificationManagementPage /> : <HomePage />)} />
         <Route path="/admin/emailek" element={protectedAdminPage(userRole === 'admin' ? <EmailManagementPage /> : <HomePage />)} />
         <Route path="/admin/beallitasok" element={protectedAdminPage(canScore ? <SettingsManagementPage groupOnly={userRole === 'judge'} /> : <HomePage />)} />
