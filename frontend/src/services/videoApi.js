@@ -1,119 +1,140 @@
 import { authFetch } from './apiClient'
 import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 
-const API_URL = 'https://legocompetition.runasp.net/api'
+const API_BASE_URL = 'https://legocompetition.runasp.net/api/Youtube'
 export const VIDEOS_CHANGED_EVENT = 'videosChanged'
-const STORAGE_KEY = 'brickathlon_videos'
 
-export const DEFAULT_VIDEOS = [
-  {
-    id: 'vid_kosarra_dobas_szabalyzat',
-    title: 'Brickathlon - Kosárra dobás szabályzat (hivatalos videó)',
-    url: 'https://youtu.be/5aBnWcYTrag',
-    description: `A Brickathlon versenyen a kosárra dobás versenyszám szabályzat videós verziója.
-A videó kiegészíti a szabálykönyvet de nem írja felül azt. A szabálykönyv elolvasása erősen ajánlott, mivel a videó nem tartalmaz minden szabályt.
-További infók: brickathlon.vercel.app`,
-    createdAt: '2026-09-22T00:00:00.000Z'
-  }
-]
-
-const getLocalVideos = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_VIDEOS))
-      return DEFAULT_VIDEOS
-    }
-    const parsed = JSON.parse(raw)
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed
-    }
-    return DEFAULT_VIDEOS
-  } catch {
-    return DEFAULT_VIDEOS
-  }
-}
-
-const setLocalVideos = (videos) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(videos))
-  } catch {
-    // ignore
-  }
-}
-
+/**
+ * Lekéri az összes YouTube videót a backendről.
+ * @returns {Promise<Array<{id: number, title: string, url: string, description: string}>>}
+ */
 export const getVideos = async () => {
-  // Próbáljuk lekérni a szerverről
   try {
-    const response = await fetch(`${API_URL}/Videos`, {
-      headers: { accept: '*/*' }
+    const response = await fetch(API_BASE_URL, {
+      headers: { accept: 'application/json, text/plain, */*' }
     })
-    if (response.ok) {
-      const data = await response.json()
-      if (Array.isArray(data) && data.length > 0) {
-        setLocalVideos(data)
-        return data
-      }
+    if (!response.ok) {
+      throw new Error(`Szerverhiba (${response.status})`)
     }
-  } catch {
-    // Végpont még nem létezik vagy hálózati hiba, lokális/alapértelmezett adatokból dolgozunk
+    const data = await response.json()
+    if (!Array.isArray(data)) {
+      return []
+    }
+    return data.map((v) => ({
+      id: v.id ?? 0,
+      title: v.title || '',
+      url: v.url || '',
+      description: v.description || ''
+    }))
+  } catch (error) {
+    console.error('Hiba a videók lekérésekor:', error)
+    return []
   }
-
-  return getLocalVideos()
 }
 
+/**
+ * Új videó feltöltése vagy meglévő módosítása a backendre.
+ * @param {{id?: number|string, title: string, url: string, description?: string, originalUrl?: string}} video
+ */
 export const saveVideo = async (video) => {
-  const current = getLocalVideos()
-  const isUpdate = Boolean(video.id)
-  const videoId = isUpdate ? video.id : `vid_${Date.now()}`
+  const isUpdate = Boolean(video.id && Number(video.id) > 0)
   const normalized = {
-    id: videoId,
+    id: isUpdate ? Number(video.id) : 0,
     title: String(video.title || '').trim(),
     url: String(video.url || '').trim(),
-    description: String(video.description || '').trim(),
-    createdAt: video.createdAt || new Date().toISOString()
+    description: String(video.description || '').trim()
   }
 
-  let updatedList
+  let response
   if (isUpdate) {
-    updatedList = current.map((v) => (String(v.id) === String(videoId) ? normalized : v))
-  } else {
-    updatedList = [normalized, ...current]
-  }
-
-  setLocalVideos(updatedList)
-
-  // Próbáljuk beküldeni a szerverre is ha elérhető
-  try {
-    const method = isUpdate ? 'PUT' : 'POST'
-    const endpoint = isUpdate ? `${API_URL}/Videos/${encodeURIComponent(videoId)}` : `${API_URL}/Videos`
-    await authFetch(endpoint, {
-      method,
-      headers: { 'Content-Type': 'application/json', accept: '*/*' },
+    const identifier = encodeURIComponent(video.originalUrl || video.url || video.id)
+    const queryParam = `?url=${encodeURIComponent(normalized.url)}`
+    response = await authFetch(`${API_BASE_URL}/${identifier}${queryParam}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        accept: '*/*'
+      },
       body: JSON.stringify(normalized)
     })
-  } catch {
-    // Végpont még készülőben, lokális mentés megtörtént
+  } else {
+    response = await authFetch(API_BASE_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        accept: '*/*'
+      },
+      body: JSON.stringify(normalized)
+    })
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(errorText || `Hiba a mentés során (${response.status})`)
   }
 
   window.dispatchEvent(new Event(VIDEOS_CHANGED_EVENT))
   window.dispatchEvent(new Event(DATA_REFRESH_EVENT))
-  return normalized
+  return true
 }
 
-export const deleteVideo = async (id) => {
-  const current = getLocalVideos()
-  const updatedList = current.filter((v) => String(v.id) !== String(id))
-  setLocalVideos(updatedList)
+/**
+ * Videó törlése a backendről.
+ * Több lehetséges paraméterezést (path + query paraméter, ID) is kipróbál a backend sikeres eléréséhez.
+ * @param {string|number|{id?: number|string, url?: string}} target
+ */
+export const deleteVideo = async (target) => {
+  const urlParam = typeof target === 'object' && target !== null
+    ? (target.url || target.id)
+    : target
+  const idParam = typeof target === 'object' && target !== null ? target.id : null
 
-  // Próbáljuk törölni a szerverről is
-  try {
-    await authFetch(`${API_URL}/Videos/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-      headers: { accept: '*/*' }
-    })
-  } catch {
-    // Végpont még készülőben
+  if (!urlParam && !idParam) {
+    throw new Error('Nincs megadva a törlendő videó azonosítója.')
+  }
+
+  const encodedUrl = encodeURIComponent(urlParam || '')
+  const urlsToTry = []
+
+  // 1. Path és query paraméter együttes átadása (így a query stringes és path-alapú route binding is teljesül)
+  if (encodedUrl) {
+    urlsToTry.push(`${API_BASE_URL}/${encodedUrl}?url=${encodedUrl}`)
+    urlsToTry.push(`${API_BASE_URL}/${encodedUrl}`)
+  }
+
+  // 2. Ha van numerikus id
+  if (idParam) {
+    urlsToTry.push(`${API_BASE_URL}/${idParam}`)
+    if (encodedUrl) {
+      urlsToTry.push(`${API_BASE_URL}/${idParam}?url=${encodedUrl}`)
+    }
+  }
+
+  let lastErrorText = ''
+  let success = false
+
+  for (const endpoint of urlsToTry) {
+    try {
+      const response = await authFetch(endpoint, {
+        method: 'DELETE',
+        headers: {
+          accept: '*/*'
+        }
+      })
+
+      if (response.ok) {
+        success = true
+        break
+      } else {
+        lastErrorText = await response.text()
+      }
+    } catch (err) {
+      lastErrorText = err.message
+    }
+  }
+
+  if (!success) {
+    throw new Error(lastErrorText || 'Hiba a törlés során. A backend nem tudta feldolgozni a törlési kérést.')
   }
 
   window.dispatchEvent(new Event(VIDEOS_CHANGED_EVENT))

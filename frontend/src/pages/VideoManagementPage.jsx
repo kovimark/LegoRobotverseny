@@ -6,7 +6,7 @@ import { getVideos, saveVideo, deleteVideo, VIDEOS_CHANGED_EVENT } from '../serv
 import { getYouTubeEmbedUrl, isValidVideoUrl } from '../utils/youtube'
 import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 
-const emptyForm = { id: '', title: '', url: '', description: '' }
+const emptyForm = { id: '', title: '', url: '', description: '', originalUrl: '' }
 
 export default function VideoManagementPage() {
   const [videos, setVideos] = useState([])
@@ -55,7 +55,8 @@ export default function VideoManagementPage() {
       id: video.id || '',
       title: video.title || '',
       url: video.url || '',
-      description: video.description || ''
+      description: video.description || '',
+      originalUrl: video.url || ''
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -93,7 +94,8 @@ export default function VideoManagementPage() {
         id: formData.id || undefined,
         title,
         url,
-        description
+        description,
+        originalUrl: formData.originalUrl || formData.url
       })
 
       setFeedback({
@@ -113,7 +115,7 @@ export default function VideoManagementPage() {
     if (!deleteTarget) return
     try {
       setIsDeleting(true)
-      await deleteVideo(deleteTarget.id)
+      await deleteVideo(deleteTarget)
       setFeedback({ type: 'success', text: 'A videó sikeresen törölve.' })
       setDeleteTarget(null)
       await loadData()
@@ -141,16 +143,19 @@ export default function VideoManagementPage() {
       <FloatingFeedback message={feedback} onClose={() => setFeedback(null)} />
 
       <ConfirmModal
-        isOpen={Boolean(deleteTarget)}
+        open={Boolean(deleteTarget)}
         title="Videó törlése"
-        message={`Biztosan törölni szeretnéd a(z) "${deleteTarget?.title || 'kiválasztott'}" videót?`}
         confirmLabel={isDeleting ? 'Törlés...' : 'Törlés'}
         cancelLabel="Mégse"
-        variant="danger"
-        disabled={isDeleting}
+        confirmVariant="danger"
+        busy={isDeleting}
         onConfirm={handleDeleteConfirm}
-        onCancel={() => setDeleteTarget(null)}
-      />
+        onClose={() => setDeleteTarget(null)}
+      >
+        <p className="mb-0">
+          Biztosan törölni szeretnéd a(z) <strong>"{deleteTarget?.title || 'kiválasztott'}"</strong> videót?
+        </p>
+      </ConfirmModal>
 
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
         <div className="d-flex align-items-center gap-2">
@@ -169,7 +174,7 @@ export default function VideoManagementPage() {
       <div className="row g-4">
         {/* Űrlap */}
         <div className="col-lg-5">
-          <div className="card shadow-sm border-0 p-4 rounded-4 bg-white sticky-lg-top" style={{ top: '5.5rem' }}>
+          <div className="card shadow-sm border-0 p-4 rounded-4 bg-white sticky-lg-top" style={{ top: '5.5rem', zIndex: 10 }}>
             <h3 className="h5 fw-bold mb-3 d-flex align-items-center gap-2">
               <i className="bi bi-camera-video text-primary" />
               <span>{isEditing ? 'Videó szerkesztése' : 'Új videó felvitele'}</span>

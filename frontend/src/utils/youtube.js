@@ -4,7 +4,9 @@
 
 /**
  * Kinyeri a YouTube videó azonosítóját (ID) a megadott URL-ből vagy beágyazó kódból.
- * Támogatja a standard, rövidített (youtu.be), beágyazott (embed), shorts és iframe formátumokat.
+ * Támogatja a standard, rövidített (youtu.be), beágyazott (embed), shorts, live és iframe formátumokat.
+ * @param {string} url
+ * @returns {string|null}
  */
 export const getYouTubeVideoId = (url) => {
   if (!url) return null
@@ -14,12 +16,12 @@ export const getYouTubeVideoId = (url) => {
   const iframeMatch = str.match(/src=["'](.*?)["']/i)
   const target = iframeMatch ? iframeMatch[1] : str
 
-  // Regex standard YouTube formátumokhoz
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|&v=)([^#&?]*).*/
+  // Regex YouTube formátumokhoz (watch, youtu.be, embed, shorts, live, v)
+  const regExp = /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?|shorts|live)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/i
   const match = target.match(regExp)
 
-  if (match && match[2] && match[2].length === 11) {
-    return match[2]
+  if (match && match[1]) {
+    return match[1]
   }
 
   // Ha közvetlenül a videó ID-t adták meg (11 karakteres alfanumerikus + _-)
@@ -32,29 +34,27 @@ export const getYouTubeVideoId = (url) => {
 
 /**
  * Előállítja a YouTube beágyazható (embed) URL-jét iframe-hez.
+ * Csak érvényes videó ID esetén ad vissza beágyazható URL-t, így elkerüli az X-Frame-Options hibákat.
+ * @param {string} url
+ * @returns {string}
  */
 export const getYouTubeEmbedUrl = (url) => {
+  if (!url) return ''
   const videoId = getYouTubeVideoId(url)
   if (videoId) {
     return `https://www.youtube.com/embed/${videoId}?rel=0`
   }
-
-  // Ha nem YouTube, de már eleve egy érvényes https link
-  if (typeof url === 'string' && (url.startsWith('https://') || url.startsWith('http://'))) {
-    return url
-  }
-
   return ''
 }
 
 /**
- * Ellenőrzi, hogy a megadott szöveg érvényes videó link-e.
+ * Ellenőrzi, hogy a megadott szöveg érvényes YouTube videó azonosítható formátum-e.
+ * @param {string} url
+ * @returns {boolean}
  */
 export const isValidVideoUrl = (url) => {
   if (!url || typeof url !== 'string') return false
   const trimmed = url.trim()
   if (!trimmed) return false
-
-  // YouTube azonosító kinyerhető vagy http(s) URL
-  return Boolean(getYouTubeVideoId(trimmed)) || /^https?:\/\/.+/i.test(trimmed)
+  return Boolean(getYouTubeVideoId(trimmed))
 }

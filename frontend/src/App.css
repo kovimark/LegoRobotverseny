@@ -56,7 +56,7 @@ h2::after {
 .custom-navbar {
   position: sticky;
   top: 0;
-  z-index: 1000;
+  z-index: 1030;
   border-bottom: 3px solid var(--yellow);
   background:
     linear-gradient(31deg,
