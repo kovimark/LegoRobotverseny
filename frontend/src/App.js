@@ -36,6 +36,7 @@ import { subscribeTeamsToPush } from './services/notificationApi';
 import FloatingRefreshButton from './components/FloatingRefreshButton';
 import AutomaticPhaseAdvancer from './components/AutomaticPhaseAdvancer';
 import TopThrees from './pages/TopThrees';
+import SchedulePage from './pages/SchedulePage';
 
 function App() {
   const location = useLocation();
@@ -224,6 +225,8 @@ function App() {
         <Route path="*" element={<HomePage />} />
         <Route path="/" element={<HomePage />} />
         <Route path="/rolunk" element={<AboutPage />} />
+        <Route path="/menetrend" element={<SchedulePage />} />
+        <Route path="/program" element={<SchedulePage />} />
         <Route path="/show" element={<ShowPage />} />
         <Route path="/versenyjelentkezes" element={<CompetitionRegistration user={user} />} />
         <Route path="/birojelentkezes" element={<JudgeRegistration />} />

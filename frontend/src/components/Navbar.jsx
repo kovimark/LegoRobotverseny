@@ -57,6 +57,11 @@ export default function Navbar({ user, userRole, userPrivilege, userTeamId, auth
                             </Link>
                         </div>
                         <div className="navbar-nav">
+                            <Link className="nav-link" to="/menetrend" onClick={closeMenu}>
+                                Menetrend
+                            </Link>
+                        </div>
+                        <div className="navbar-nav">
                             <Link className="nav-link" to="/szabalyzat" onClick={closeMenu}>
                                 Szabályzat
                             </Link>
