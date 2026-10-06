@@ -301,6 +301,9 @@ function App() {
               <i className="bi bi-facebook" />
               <span>Facebook</span>
             </a>
+
+            <span className="d-block w-100">brickathlon@gmail.com</span>
+
           </div>
           <p className="mb-1 fst-italic">
             © 2026 Brickathlon. Minden jog fenntartva.
