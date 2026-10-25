@@ -207,17 +207,19 @@ function App() {
       <AutoBackupRunner enabled={userRole === 'admin'} />
       {!isFocusPage && (
         <>
-          <Navbar
-            user={user}
-            userRole={userRole}
-            userPrivilege={userPrivilege}
-            userTeamId={userTeamId}
-            authLoading={authLoading}
-            authError={authError}
-            onGoogleSignIn={handleGoogleSignIn}
-            onSignOut={handleSignOut}
-          />
-          <ImportantAnnouncementBar />
+          <div className="sticky-top-header">
+            <Navbar
+              user={user}
+              userRole={userRole}
+              userPrivilege={userPrivilege}
+              userTeamId={userTeamId}
+              authLoading={authLoading}
+              authError={authError}
+              onGoogleSignIn={handleGoogleSignIn}
+              onSignOut={handleSignOut}
+            />
+            <ImportantAnnouncementBar />
+          </div>
           <NotificationPromptBanner user={user} />
         </>
       )}

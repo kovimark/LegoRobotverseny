@@ -1,9 +1,15 @@
+.sticky-top-header {
+  position: sticky;
+  top: 0;
+  z-index: 1030;
+}
+
 .important-announcement-bar {
   background: linear-gradient(90deg, #fff9db 0%, #fff3bf 50%, #ffe8cc 100%);
   border-bottom: 2px solid #fab005;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
   position: relative;
-  z-index: 990;
+  z-index: 1025;
   animation: announcementSlideDown 0.25s ease-out;
 }
 

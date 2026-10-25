@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import FloatingFeedback from '../components/FloatingFeedback'
 import { authFetch } from '../services/apiClient'
 import { sendWelcomeEmail } from '../services/emailApi'
+import { isRegistrationBlocked } from '../utils/maintenance'
 
 export default function CompetitionRegistration({ user }) {
   const [formData, setFormData] = useState({
@@ -25,6 +26,15 @@ export default function CompetitionRegistration({ user }) {
   const [errors, setErrors] = useState({})
   const [submitMessage, setSubmitMessage] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isBlocked, setIsBlocked] = useState(isRegistrationBlocked())
+
+  useEffect(() => {
+    setIsBlocked(isRegistrationBlocked())
+    const interval = setInterval(() => {
+      setIsBlocked(isRegistrationBlocked())
+    }, 10000)
+    return () => clearInterval(interval)
+  }, [])
 
   const requiredFields = {
     schoolName: 'Az iskola nevének kitöltése kötelező.',
@@ -94,6 +104,14 @@ export default function CompetitionRegistration({ user }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSubmitMessage(null)
+
+    if (isRegistrationBlocked()) {
+      setSubmitMessage({
+        type: 'warning',
+        text: 'A regisztráció karbantartás miatt 10.26-án 10:00 és 16:00 között szünetel.'
+      })
+      return
+    }
 
     const validationErrors = Object.entries(requiredFields).reduce((acc, [fieldName, message]) => {
       const value = formData[fieldName]
@@ -567,13 +585,22 @@ export default function CompetitionRegistration({ user }) {
               </p>
             </div>
 
-            <button
-              type="submit"
-              className="btn btn-primary w-100"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Regisztráció...' : 'Regisztráció'}
-            </button>
+            {isBlocked ? (
+              <div className="alert alert-warning border-warning d-flex align-items-center gap-2 p-3 rounded-3 mb-0" role="alert">
+                <i className="bi bi-exclamation-triangle-fill fs-5 text-warning-emphasis flex-shrink-0" />
+                <div>
+                  <strong>A regisztráció jelenleg nem elérhető:</strong> Rendszerkarbantartás miatt a verseny regisztráció 10.26-án 10:00 és 16:00 között szünetel. Kérjük, látogass vissza később!
+                </div>
+              </div>
+            ) : (
+              <button
+                type="submit"
+                className="btn btn-primary w-100"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Regisztráció...' : 'Regisztráció'}
+              </button>
+            )}
           </form>
         </div>
       </div>

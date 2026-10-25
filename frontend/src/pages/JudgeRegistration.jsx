@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import FloatingFeedback from '../components/FloatingFeedback'
 import PuzzleCaptcha from '../components/PuzzleCaptcha'
 import { submitApplication } from '../services/applicationApi'
+import { isMaintenanceActive } from '../utils/maintenance'
 
 const JUDGE_DOCS_URL = 'https://drive.google.com/drive/folders/1guUTFn7zKm5EDnPqOO1EXa6Sks6YyVR_'
 
@@ -101,6 +102,14 @@ export default function JudgeRegistration() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSubmitMessage(null)
+
+    if (isMaintenanceActive()) {
+      setSubmitMessage({
+        type: 'warning',
+        text: 'A regisztráció karbantartás miatt 10.26-án 10:00 és 16:00 között szünetel.'
+      })
+      return
+    }
 
     const validationErrors = Object.entries(requiredFields).reduce((acc, [fieldName, message]) => {
       const value = formData[fieldName]
@@ -524,13 +533,22 @@ export default function JudgeRegistration() {
 
             <FloatingFeedback message={submitMessage} onClose={() => setSubmitMessage(null)} />
 
-            <button
-              type="submit"
-              className="btn btn-primary w-100 py-2 fs-5 fw-bold"
-              disabled={isSubmitting || !isCaptchaVerified}
-            >
-              {isSubmitting ? 'Regisztráció...' : 'Regisztráció'}
-            </button>
+            {isMaintenanceActive() ? (
+              <div className="alert alert-warning border-warning d-flex align-items-center gap-2 p-3 rounded-3 mb-0" role="alert">
+                <i className="bi bi-exclamation-triangle-fill fs-5 text-warning-emphasis flex-shrink-0" />
+                <div>
+                  <strong>A regisztráció jelenleg nem elérhető:</strong> Rendszerkarbantartás miatt a regisztráció 10.26-án 10:00 és 16:00 között szünetel. Kérjük, látogass vissza később!
+                </div>
+              </div>
+            ) : (
+              <button
+                type="submit"
+                className="btn btn-primary w-100 py-2 fs-5 fw-bold"
+                disabled={isSubmitting || !isCaptchaVerified}
+              >
+                {isSubmitting ? 'Regisztráció...' : 'Regisztráció'}
+              </button>
+            )}
           </form>
         </div>
       </div>
