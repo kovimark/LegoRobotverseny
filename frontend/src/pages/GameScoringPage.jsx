@@ -9,7 +9,7 @@ import { authFetch } from '../services/apiClient'
 import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 import './GameScoringPage.css'
 
-const API_BASE = 'https://legocompetition.runasp.net/api'
+const API_BASE = 'https://brickathlon.runasp.net/api'
 const MAX_TIME_SECONDS = 120
 const MAX_BASKET_ATTEMPTS = 10
 const MAX_BASKET_HITS = 5
@@ -1400,6 +1400,13 @@ function GameSumoScoring() {
   const [allTeams, setAllTeams] = useState([])
   const [selectedMatchId, setSelectedMatchId] = useState('')
   const [matchSearch, setMatchSearch] = useState('')
+  const [showManualMatchModal, setShowManualMatchModal] = useState(false)
+  const [showNoShowModal, setShowNoShowModal] = useState(false)
+  const [manualTeam1, setManualTeam1] = useState('')
+  const [manualTeam2, setManualTeam2] = useState('')
+  const [manualTable, setManualTable] = useState('')
+  const [manualStage, setManualStage] = useState('GS')
+  const [manualSaving, setManualSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [actionMessage, setActionMessage] = useState(null)
@@ -1507,6 +1514,98 @@ function GameSumoScoring() {
     selectedMatch && selectedMatch.stage === 'GS' && selectedMatch.team1History.length >= GROUP_MATCH_RESULT_LIMIT
   )
   const isMatchLocked = isKnockoutWinner || isGroupLimitReached
+
+  const teamOptions = useMemo(() => {
+    const list = []
+    const seen = new Set()
+    allTeams.forEach((team) => {
+      const name = team.teamName || team.team_name || team.name
+      if (name && !seen.has(name)) {
+        seen.add(name)
+        list.push({ name, category: team.category })
+      }
+    })
+    matches.forEach((m) => {
+      if (m.team1Name && !seen.has(m.team1Name)) {
+        seen.add(m.team1Name)
+        list.push({ name: m.team1Name, category: undefined })
+      }
+      if (m.team2Name && !seen.has(m.team2Name)) {
+        seen.add(m.team2Name)
+        list.push({ name: m.team2Name, category: undefined })
+      }
+    })
+    return list.sort((a, b) => a.name.localeCompare(b.name, 'hu'))
+  }, [allTeams, matches])
+
+  const handleCreateManualMatch = async (e) => {
+    e.preventDefault()
+    if (!manualTeam1 || !manualTeam2) {
+      setActionMessage({ type: 'danger', text: 'Kérlek válaszd ki mindkét csapatot.' })
+      return
+    }
+    if (manualTeam1 === manualTeam2) {
+      setActionMessage({ type: 'danger', text: 'A két csapat nem lehet ugyanaz.' })
+      return
+    }
+    const tableNum = Number(manualTable) || (matches.length > 0 ? Math.max(...matches.map((m) => Number(m.table) || 0)) + 1 : 1)
+
+    try {
+      setManualSaving(true)
+      const payload = {
+        team1Name: manualTeam1,
+        team1_name: manualTeam1,
+        team2Name: manualTeam2,
+        team2_name: manualTeam2,
+        team1Point: 0,
+        team1_point: 0,
+        team2Point: 0,
+        team2_point: 0,
+        table: tableNum,
+        tournamentStage: STAGE_API_VALUES[manualStage] || 1,
+        tournament_stage: STAGE_API_VALUES[manualStage] || 1,
+        team1Result: '',
+        team1result: '',
+        team2Result: '',
+        team2result: ''
+      }
+
+      const response = await authFetch(`${API_BASE}/Sumo`, {
+        method: 'POST',
+        headers: { accept: '*/*', 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || 'Nem sikerült létrehozni a mérkőzést.')
+      }
+
+      const newMatch = {
+        id: `sumo-${manualTeam1}-${manualTeam2}-${manualStage}-${tableNum}`,
+        team1Name: manualTeam1,
+        team2Name: manualTeam2,
+        table: tableNum,
+        team1Point: 0,
+        team2Point: 0,
+        stage: manualStage,
+        team1History: [],
+        team2History: []
+      }
+
+      setMatches((prev) => [...prev, newMatch].sort((a, b) => (Number(a.table) || 0) - (Number(b.table) || 0)))
+      setSelectedMatchId(newMatch.id)
+      setMatchSearch(getMatchLabel(newMatch))
+      setShowManualMatchModal(false)
+      setManualTeam1('')
+      setManualTeam2('')
+      setActionMessage({ type: 'success', text: `A(z) ${manualTeam1} vs. ${manualTeam2} mérkőzés (#${tableNum}) sikeresen létrehozva!` })
+    } catch (err) {
+      setActionMessage({ type: 'danger', text: err.message })
+    } finally {
+      setManualSaving(false)
+    }
+  }
 
   const handleAddResult = async (outcome) => {
     if (!selectedMatch || saving) return
@@ -1620,6 +1719,109 @@ function GameSumoScoring() {
           : match
       )))
       setActionMessage({ type: 'success', text: 'Szumó eredmény rögzítve.' })
+    } catch (error) {
+      setActionMessage({ type: 'danger', text: error.message })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const executeNoShow = async () => {
+    if (!selectedMatch || saving) return
+
+    const nextTeam1History = ['L', 'L', 'L']
+    const nextTeam2History = ['L', 'L', 'L']
+    const nextTeam1ResultStr = 'L,L,L'
+    const nextTeam2ResultStr = 'L,L,L'
+
+    const payload = {
+      team1Name: selectedMatch.team1Name,
+      team1_name: selectedMatch.team1Name,
+      team2Name: selectedMatch.team2Name,
+      team2_name: selectedMatch.team2Name,
+      team1Point: 0,
+      team1_point: 0,
+      team2Point: 0,
+      team2_point: 0,
+      table: selectedMatch.table,
+      tournamentStage: STAGE_API_VALUES[selectedMatch.stage] || 1,
+      tournament_stage: STAGE_API_VALUES[selectedMatch.stage] || 1,
+      team1Result: nextTeam1ResultStr,
+      team1result: nextTeam1ResultStr,
+      team2Result: nextTeam2ResultStr,
+      team2result: nextTeam2ResultStr
+    }
+
+    const reversedPayload = {
+      team1Name: selectedMatch.team2Name,
+      team1_name: selectedMatch.team2Name,
+      team2Name: selectedMatch.team1Name,
+      team2_name: selectedMatch.team1Name,
+      team1Point: 0,
+      team1_point: 0,
+      team2Point: 0,
+      team2_point: 0,
+      table: selectedMatch.table,
+      tournamentStage: STAGE_API_VALUES[selectedMatch.stage] || 1,
+      tournament_stage: STAGE_API_VALUES[selectedMatch.stage] || 1,
+      team1Result: nextTeam2ResultStr,
+      team1result: nextTeam2ResultStr,
+      team2Result: nextTeam1ResultStr,
+      team2result: nextTeam1ResultStr
+    }
+
+    setSaving(true)
+    try {
+      let response = await authFetch(`${API_BASE}/Sumo`, {
+        method: 'PATCH',
+        headers: { accept: '*/*', 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      if (!response.ok) {
+        const postResponse = await authFetch(`${API_BASE}/Sumo`, {
+          method: 'POST',
+          headers: { accept: '*/*', 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        if (postResponse.ok) response = postResponse
+      }
+
+      if (!response.ok) {
+        const revPatchResponse = await authFetch(`${API_BASE}/Sumo`, {
+          method: 'PATCH',
+          headers: { accept: '*/*', 'Content-Type': 'application/json' },
+          body: JSON.stringify(reversedPayload)
+        })
+        if (revPatchResponse.ok) response = revPatchResponse
+      }
+
+      if (!response.ok) {
+        const revPostResponse = await authFetch(`${API_BASE}/Sumo`, {
+          method: 'POST',
+          headers: { accept: '*/*', 'Content-Type': 'application/json' },
+          body: JSON.stringify(reversedPayload)
+        })
+        if (revPostResponse.ok) response = revPostResponse
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || 'A rögzítés sikertelen volt.')
+      }
+
+      setMatches((prev) => prev.map((match) => (
+        match.id === selectedMatch.id
+          ? {
+              ...match,
+              team1History: nextTeam1History,
+              team2History: nextTeam2History,
+              team1Point: 0,
+              team2Point: 0
+            }
+          : match
+      )))
+      setActionMessage({ type: 'success', text: 'Nem jelent meg senki (0-0 pont, 3-3 vereség) rögzítve.' })
     } catch (error) {
       setActionMessage({ type: 'danger', text: error.message })
     } finally {
@@ -1760,9 +1962,23 @@ function GameSumoScoring() {
   return (
     <section className="game-scoring-panel">
       <FloatingFeedback message={actionMessage} onClose={() => setActionMessage(null)} />
-      <header className="game-scoring-panel__header">
-        <h3>Szumó</h3>
-        <p>Válassz mérkőzést a listából vagy keress rá, majd rögzíts eredményt.</p>
+      <header className="game-scoring-panel__header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+          <h3 className="mb-0">Szumó</h3>
+          <p className="text-muted mb-0">Válassz mérkőzést a listából vagy keress rá, majd rögzíts eredményt.</p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-primary fw-bold shadow-sm"
+          onClick={() => {
+            const nextTable = matches.length > 0 ? Math.max(...matches.map((m) => Number(m.table) || 0)) + 1 : 1
+            setManualTable(nextTable)
+            setShowManualMatchModal(true)
+          }}
+        >
+          <i className="bi bi-plus-circle me-1" />
+          Kézi meccs létrehozása
+        </button>
       </header>
 
       {loading ? <div className="alert alert-secondary">Meccsek betöltése...</div> : (
@@ -1809,9 +2025,24 @@ function GameSumoScoring() {
           </div>
 
           <div className="card shadow-sm border mb-3 p-3 bg-light">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <label className="form-label fw-bold mb-0">Aktív mérkőzés kiválasztása</label>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-primary fw-bold"
+                onClick={() => {
+                  const nextTable = matches.length > 0 ? Math.max(...matches.map((m) => Number(m.table) || 0)) + 1 : 1
+                  setManualTable(nextTable)
+                  setShowManualMatchModal(true)
+                }}
+              >
+                <i className="bi bi-plus-circle me-1" />
+                Kézi meccs létrehozása
+              </button>
+            </div>
             <SearchPicker
               id="sumo-match-search"
-              label="Aktív mérkőzés kiválasztása"
+              label=""
               value={matchSearch}
               onChange={(nextValue) => {
                 setMatchSearch(nextValue)
@@ -1957,12 +2188,175 @@ function GameSumoScoring() {
                 >
                   Döntetlen
                 </button>
+                <button
+                  type="button"
+                  className="btn btn-outline-danger mt-2 py-2 w-100"
+                  onClick={() => setShowNoShowModal(true)}
+                  disabled={!selectedMatch || saving || isMatchLocked}
+                  title="Mindkét csapat 0 pontot és 3 vereséget kap"
+                >
+                  <i className="bi bi-person-x me-1" />
+                  Nem jelent meg senki (0-0 pont, 3 vereség mindkettőnek)
+                </button>
               </div>
             </div>
           )}
         </>
       )}
 <br /><br />
+      {showManualMatchModal && (
+        <div
+          className="modal fade show d-block"
+          tabIndex="-1"
+          role="dialog"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content text-dark">
+              <form onSubmit={handleCreateManualMatch}>
+                <div className="modal-header">
+                  <h5 className="modal-title">
+                    <i className="bi bi-plus-circle text-primary me-2" />
+                    Kézi mérkőzés létrehozása
+                  </h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => setShowManualMatchModal(false)}
+                    aria-label="Bezárás"
+                  />
+                </div>
+                <div className="modal-body">
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">1. Csapat (Bal oldal)</label>
+                    <select
+                      className="form-select"
+                      value={manualTeam1}
+                      onChange={(e) => setManualTeam1(e.target.value)}
+                      required
+                    >
+                      <option value="">-- Válassz csapatot --</option>
+                      {teamOptions.map((t) => (
+                        <option key={t.name} value={t.name}>
+                          {t.name} {t.category !== undefined ? `(${Number(t.category) === 1 ? 'Középiskolás' : 'Általános iskola'})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">2. Csapat (Jobb oldal)</label>
+                    <select
+                      className="form-select"
+                      value={manualTeam2}
+                      onChange={(e) => setManualTeam2(e.target.value)}
+                      required
+                    >
+                      <option value="">-- Válassz csapatot --</option>
+                      {teamOptions.map((t) => (
+                        <option key={t.name} value={t.name} disabled={t.name === manualTeam1}>
+                          {t.name} {t.category !== undefined ? `(${Number(t.category) === 1 ? 'Középiskolás' : 'Általános iskola'})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="row g-2 mb-3">
+                    <div className="col-6">
+                      <label className="form-label fw-semibold">Sorszám</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        min="1"
+                        value={manualTable}
+                        onChange={(e) => setManualTable(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="col-6">
+                      <label className="form-label fw-semibold">Versenyszakasz</label>
+                      <select
+                        className="form-select"
+                        value={manualStage}
+                        onChange={(e) => setManualStage(e.target.value)}
+                      >
+                        <option value="GS">Alapszakasz (Csoportkör)</option>
+                        <option value="RO16">Legjobb 16</option>
+                        <option value="QF">Negyeddöntő</option>
+                        <option value="SF">Elődöntő</option>
+                        <option value="BM">Bronzmeccs</option>
+                        <option value="F">Döntő</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowManualMatchModal(false)}
+                    disabled={manualSaving}
+                  >
+                    Mégse
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary fw-bold"
+                    disabled={manualSaving || !manualTeam1 || !manualTeam2 || manualTeam1 === manualTeam2}
+                  >
+                    {manualSaving ? 'Létrehozás...' : 'Mérkőzés rögzítése'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+      {showNoShowModal && selectedMatch && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.45)', zIndex: 1060, backdropFilter: 'blur(2px)' }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="modal-dialog modal-dialog-centered modal-sm m-0" style={{ maxWidth: '450px', width: '92%' }} role="document">
+            <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden bg-white text-dark">
+              <div className="modal-header border-bottom px-4 py-3 bg-warning-subtle text-dark">
+                <h5 className="modal-title fw-bold d-flex align-items-center gap-2 mb-0">
+                  <i className="bi bi-person-x-fill text-warning" />
+                  Megerősítés
+                </h5>
+                <button type="button" className="btn-close" aria-label="Close" onClick={() => setShowNoShowModal(false)}></button>
+              </div>
+              <div className="modal-body px-4 py-4">
+                <p className="mb-2 text-dark">Biztosan rögzíted, hogy egyik csapat sem jelent meg a mérkőzésre?</p>
+                <div className="p-3 bg-light rounded border mb-3">
+                  <div className="badge text-bg-dark mb-2">#{selectedMatch.table}. mérkőzés</div>
+                  <div className="fw-bold fs-6 text-dark">{selectedMatch.team1Name} vs {selectedMatch.team2Name}</div>
+                  <div className="small text-muted mt-1">Szakasz: {STAGE_LABELS[selectedMatch.stage] || selectedMatch.stage}</div>
+                </div>
+                <div className="alert alert-warning py-2 mb-0 small text-dark border-warning">
+                  <i className="bi bi-info-circle me-1 text-warning" />
+                  Ez a művelet mindkét csapatnak <strong>0 pontot</strong> és <strong>3-3 vereséget (L,L,L)</strong> rögzít erre a mérkőzésre.
+                </div>
+              </div>
+              <div className="modal-footer border-top px-4 py-3 bg-light d-flex justify-content-end gap-2">
+                <button type="button" className="btn btn-secondary px-3" onClick={() => setShowNoShowModal(false)}>Mégse</button>
+                <button
+                  type="button"
+                  className="btn btn-warning px-4 fw-bold text-dark"
+                  onClick={() => {
+                    setShowNoShowModal(false)
+                    executeNoShow()
+                  }}
+                  disabled={saving}
+                >
+                  <i className="bi bi-check2 me-1" />
+                  Megerősítés
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <JudgeScenarioHelper competitionId="sumo" />
     </section>
   )

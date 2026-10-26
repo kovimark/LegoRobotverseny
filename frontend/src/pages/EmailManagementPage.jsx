@@ -3,7 +3,7 @@ import ConfirmModal from '../components/ConfirmModal'
 import FloatingFeedback from '../components/FloatingFeedback'
 import AgeGroupBadge from '../components/AgeGroupBadge'
 
-const API_URL = 'https://legocompetition.runasp.net/api'
+const API_URL = 'https://brickathlon.runasp.net/api'
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const contactKey = (contact) => `${contact.email.trim().toLocaleLowerCase('hu-HU')}|${contact.teamName.trim().toLocaleLowerCase('hu-HU')}`
 

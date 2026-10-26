@@ -27,7 +27,7 @@ export default function HillClimbingScoring() {
       setOpenTeamName(null)
 
       try {
-        const [response, teamsResponse] = await Promise.all([fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`), fetch('https://legocompetition.runasp.net/api/Teams')])
+        const [response, teamsResponse] = await Promise.all([fetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}`), fetch('https://brickathlon.runasp.net/api/Teams')])
         if (!response.ok) throw new Error('Nem sikerült betölteni a csapatokat.')
         const data = await response.json()
         const teamsData = teamsResponse.ok ? await teamsResponse.json() : []
@@ -136,13 +136,13 @@ export default function HillClimbingScoring() {
       const hasRaceStateChange = raceStateValue !== currentRaceState
 
       if (hasLevelTimeChange) {
-        await authFetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(teamName)}/${level}/${timeSpent}`, {
+        await authFetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(teamName)}/${level}/${timeSpent}`, {
           method: 'PATCH'
         })
       }
 
       if (hasRaceStateChange) {
-        await authFetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(teamName)}/${raceStateValue}`, {
+        await authFetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(teamName)}/${raceStateValue}`, {
           method: 'PATCH'
         })
       }
@@ -154,7 +154,7 @@ export default function HillClimbingScoring() {
         return next
       })
 
-      const response = await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`)
+      const response = await fetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}`)
       const data = await response.json()
       setTeams(Array.isArray(data) ? data : [])
     } catch (err) {

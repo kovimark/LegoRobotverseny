@@ -31,12 +31,16 @@ import NotificationPromptBanner from './components/NotificationPromptBanner';
 import ImportantAnnouncementBar from './components/ImportantAnnouncementBar';
 import AutoBackupRunner from './components/AutoBackupRunner';
 import { auth, authPersistenceReady, googleProvider } from './firebase';
-import { isJudgePrivilege } from './config/privilegeConfig';
+import { isJudgePrivilege, isHelperPrivilege } from './config/privilegeConfig';
 import { subscribeTeamsToPush } from './services/notificationApi';
 import FloatingRefreshButton from './components/FloatingRefreshButton';
 import AutomaticPhaseAdvancer from './components/AutomaticPhaseAdvancer';
 import TopThrees from './pages/TopThrees';
 import SchedulePage from './pages/SchedulePage';
+import HelperTombolaPage from './pages/HelperTombolaPage';
+import AdminTombolaDrawPage from './pages/AdminTombolaDrawPage';
+import PostCompetitionSurveyPage from './pages/PostCompetitionSurveyPage';
+import HallOfFamePage from './pages/HallOfFamePage';
 
 function App() {
   const location = useLocation();
@@ -78,8 +82,8 @@ function App() {
       try {
         const encodedEmail = encodeURIComponent(currentUser.email);
         const [privilegeResult, legacyResult] = await Promise.allSettled([
-          fetch(`https://legocompetition.runasp.net/api/Privilege/${encodedEmail}`),
-          fetch(`https://legocompetition.runasp.net/api/Teams/privilege/${encodedEmail}`)
+          fetch(`https://brickathlon.runasp.net/api/Privilege/${encodedEmail}`),
+          fetch(`https://brickathlon.runasp.net/api/Teams/privilege/${encodedEmail}`)
         ]);
 
         let roleValue = 0;
@@ -106,7 +110,7 @@ function App() {
         const effectivePrivilege = isLegacyAdmin ? 1 : roleValue;
         setUserPrivilege(effectivePrivilege);
         setUserTeamId(teamIdValue);
-        setUserRole(effectivePrivilege === 1 ? 'admin' : isJudgePrivilege(effectivePrivilege) ? 'judge' : 'competitor');
+        setUserRole(effectivePrivilege === 1 ? 'admin' : isJudgePrivilege(effectivePrivilege) ? 'judge' : isHelperPrivilege(effectivePrivilege) ? 'helper' : 'competitor');
       } catch (error) {
         console.warn('Error fetching privilege:', error);
         setUserPrivilege(0);
@@ -131,7 +135,7 @@ function App() {
         let teamIds = [];
         try {
           const response = await fetch(
-            `https://legocompetition.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`,
+            `https://brickathlon.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`,
             { headers: { accept: '*/*' }, signal: controller.signal }
           );
           if (response.ok) {
@@ -267,6 +271,11 @@ function App() {
             />
           }
         />
+        <Route path="/segito" element={<HelperTombolaPage user={user} userRole={userRole} />} />
+        <Route path="/admin/tombola" element={protectedAdminPage(userRole === 'admin' ? <AdminTombolaDrawPage /> : <HomePage />)} />
+        <Route path="/rekordok" element={<HallOfFamePage userRole={userRole} />} />
+        <Route path="/hall-of-fame" element={<HallOfFamePage userRole={userRole} />} />
+        <Route path="/kerdoiv" element={<PostCompetitionSurveyPage user={user} />} />
         <Route path="/admin/eredmenyhirdetes" element={protectedAdminPage(userRole === 'admin' ? <TopThrees userPrivilege={userPrivilege} /> : <HomePage />)} />
       </Routes>
       {!isShowPage && <FloatingRefreshButton />}

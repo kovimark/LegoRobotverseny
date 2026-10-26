@@ -3,7 +3,7 @@ import ConfirmModal from './ConfirmModal'
 import FloatingFeedback from './FloatingFeedback'
 import { authFetch } from '../services/apiClient'
 
-const API_URL = 'https://legocompetition.runasp.net/api/Teams'
+const API_URL = 'https://brickathlon.runasp.net/api/Teams'
 const GROUP_OPTIONS = Array.from({ length: 26 }, (_, index) => String.fromCharCode(65 + index))
 
 const toUpdatePayload = (team, group) => ({

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 
-const API_URL = 'https://legocompetition.runasp.net/api/Statistics/getAllStats'
+const API_URL = 'https://brickathlon.runasp.net/api/Statistics/getAllStats'
 
 const TeamList = ({ teams, emptyText }) => {
   const values = Array.isArray(teams) ? teams : []

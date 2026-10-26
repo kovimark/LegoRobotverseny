@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getAllCompetitionPhases, getAllSettings } from '../services/sumoScheduleConfigApi'
 
-const API = 'https://legocompetition.runasp.net/api'
+const API = 'https://brickathlon.runasp.net/api'
 const SLIDE_SECONDS = 20
 const SLIDE_OPTIONS = [
   { id: 'overview', label: 'Verseny állapota és menetrend', icon: 'bi-clock-history' },

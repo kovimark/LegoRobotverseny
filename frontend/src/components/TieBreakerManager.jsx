@@ -3,7 +3,7 @@ import FloatingFeedback from './FloatingFeedback'
 import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 import { authFetch } from '../services/apiClient'
 
-const API_URL = 'https://legocompetition.runasp.net/api/TieBreaker'
+const API_URL = 'https://brickathlon.runasp.net/api/TieBreaker'
 
 const parseTeams = (value) => String(value || '').split(',').map((team) => team.trim()).filter(Boolean)
 

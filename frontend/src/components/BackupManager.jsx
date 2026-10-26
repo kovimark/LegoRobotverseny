@@ -406,7 +406,7 @@ export default function BackupManager({ onStatus, onSettingsRestored }) {
 
         <div className="alert alert-info py-2 px-3 mt-4 mb-0 small">
           <i className="bi bi-info-circle me-2" />
-          <strong>Megjegyzés:</strong> Az automatikus biztonsági mentés percenként ellenőrzi az eltelt időt, és közvetlenül JSON fájlként menti le az adatokat a böngészőből. Automatikus visszatöltés vagy felülírás nincs: az adatok visszaállítása mindig kizárólag kézi feltöltéssel történhet.
+          <strong>Megjegyzés:</strong> Az automatikus biztonsági mentés percenként ellenőrzi az eltelt időt, és közvetlenül JSON fájlként menti le az adatokat a böngészőből. Automatikus visszatöltés vagy felülírás nincs: az adatok visszaállítása mindig kizárólag manuális feltöltéssel történhet.
         </div>
       </div>
 

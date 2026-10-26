@@ -36,7 +36,7 @@ export default function NotificationPromptBanner({ user }) {
     if (!user?.email) return []
     let teamIds = []
     try {
-      const response = await fetch(`https://legocompetition.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`, {
+      const response = await fetch(`https://brickathlon.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`, {
         headers: { accept: '*/*' }
       })
       if (response.ok) {

@@ -7,7 +7,7 @@ import {
 } from './sumoScheduleConfigApi'
 import { authFetch } from './apiClient'
 
-const API_URL = 'https://legocompetition.runasp.net/api'
+const API_URL = 'https://brickathlon.runasp.net/api'
 
 export const AUTO_BACKUP_CONFIG_CHANGED_EVENT = 'robotverseny_auto_backup_changed'
 export const AUTO_BACKUP_TRIGGERED_EVENT = 'robotverseny_auto_backup_triggered'

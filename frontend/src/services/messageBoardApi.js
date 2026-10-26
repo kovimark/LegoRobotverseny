@@ -1,6 +1,6 @@
 import { authFetch } from './apiClient'
 
-const API_URL = 'https://legocompetition.runasp.net/api/Message'
+const API_URL = 'https://brickathlon.runasp.net/api/Message'
 export const MESSAGE_BOARD_CHANGED_EVENT = 'messageBoardChanged'
 
 const request = async (path, options = {}) => {

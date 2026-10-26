@@ -1,6 +1,6 @@
 import { authFetch } from './apiClient'
 
-const API_URL = 'https://legocompetition.runasp.net/api'
+const API_URL = 'https://brickathlon.runasp.net/api'
 
 const readResponse = async (response) => {
   const text = await response.text()

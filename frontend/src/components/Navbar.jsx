@@ -9,6 +9,7 @@ export default function Navbar({ user, userRole, userPrivilege, userTeamId, auth
     const [isProfileOpen, setIsProfileOpen] = useState(false)
     const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false)
     const isAdmin = userRole === 'admin' || Number(userPrivilege) === 1
+    const isHelper = userRole === 'helper' || Number(userPrivilege) === 6
 
     const closeMenu = () => {
         setIsMenuOpen(false)
@@ -81,6 +82,7 @@ export default function Navbar({ user, userRole, userPrivilege, userTeamId, auth
                                 Versenyjelentkezés
                             </Link>
                         </div>
+
                         <div className="navbar-nav navbar-auth">
                             {user ? (
                                 <button className="profile-button" type="button" onClick={handleProfileToggle} aria-expanded={isProfileOpen}>
@@ -110,6 +112,8 @@ export default function Navbar({ user, userRole, userPrivilege, userTeamId, auth
                                     <span className="badge text-bg-danger"><i className="bi bi-shield-lock-fill me-1" aria-hidden="true" />Adminisztrátor</span>
                                 ) : userRole === 'judge' ? (
                                     <span className="badge text-bg-warning text-dark"><i className="bi bi-person-badge-fill me-1" aria-hidden="true" />Bíró</span>
+                                ) : isHelper ? (
+                                    <span className="badge text-bg-info text-dark"><i className="bi bi-person-heart me-1" aria-hidden="true" />Segítő</span>
                                 ) : (
                                     <span className="badge text-bg-primary"><i className="bi bi-person-fill me-1" aria-hidden="true" />Versenyző</span>
                                 )}
@@ -169,6 +173,12 @@ export default function Navbar({ user, userRole, userPrivilege, userTeamId, auth
                                     <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/eredmenyhirdetes" onClick={() => setIsProfileOpen(false)}>
                                         <i className="bi bi-award-fill" aria-hidden="true" /><span>Eredményhirdetés</span>
                                     </Link>
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/tombola" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-dice-5-fill" aria-hidden="true" /><span>Tombolasorsolás</span>
+                                    </Link>
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/segito" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-ticket-perforated-fill" aria-hidden="true" /><span>Tombolajegyek kiadása</span>
+                                    </Link>
                                 </div>
                             ) : userRole === 'judge' ? (
                                 <div className="d-grid gap-2">
@@ -180,6 +190,15 @@ export default function Navbar({ user, userRole, userPrivilege, userTeamId, auth
                                     </Link>
                                     <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/beallitasok" onClick={() => setIsProfileOpen(false)}>
                                         <i className="bi bi-diagram-3-fill" aria-hidden="true" /><span>Csapatcsoportok</span>
+                                    </Link>
+                                </div>
+                            ) : isHelper ? (
+                                <div className="d-grid gap-2">
+                                    <Link className="btn btn-primary w-100 profile-menu-link" to="/segito" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-ticket-perforated-fill" aria-hidden="true" /><span>Tombolajegyek kiadása</span>
+                                    </Link>
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/allasok" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-bar-chart-fill" aria-hidden="true" /><span>Állások</span>
                                     </Link>
                                 </div>
                             ) : (

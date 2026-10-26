@@ -1,7 +1,7 @@
 import { authFetch } from './apiClient'
 import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 
-const API_BASE_URL = 'https://legocompetition.runasp.net/api/Youtube'
+const API_BASE_URL = 'https://brickathlon.runasp.net/api/Youtube'
 export const VIDEOS_CHANGED_EVENT = 'videosChanged'
 
 /**

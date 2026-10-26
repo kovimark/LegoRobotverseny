@@ -247,10 +247,10 @@ export default function LineFollowingScoring() {
 
       try {
         const [response, lineFollowingTeamNamesResponse, teamNamesResponse, allTeamsResponse] = await Promise.all([
-          fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`),
-          fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/teamnames`),
-          fetch('https://legocompetition.runasp.net/api/Teams/teamnames'),
-          fetch('https://legocompetition.runasp.net/api/Teams')
+          fetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}`),
+          fetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}/teamnames`),
+          fetch('https://brickathlon.runasp.net/api/Teams/teamnames'),
+          fetch('https://brickathlon.runasp.net/api/Teams')
         ])
         if (!response.ok) throw new Error('Nem sikerült betölteni a csapatokat.')
 
@@ -450,7 +450,7 @@ export default function LineFollowingScoring() {
     try {
       const bestTime = getBestTime(firstTime, secondTime)
 
-      await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(teamName)}/${bestTime}`, {
+      await fetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(teamName)}/${bestTime}`, {
         method: 'PATCH'
       })
 
@@ -508,7 +508,7 @@ export default function LineFollowingScoring() {
     }
 
     try {
-      const response = await authFetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}`, {
+      const response = await authFetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}`, {
         method: 'POST',
         headers: {
           accept: '*/*',
@@ -611,7 +611,7 @@ export default function LineFollowingScoring() {
     }
 
     try {
-      const response = await authFetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(result.teamName)}/${time}/${stage}`, {
+      const response = await authFetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(result.teamName)}/${time}/${stage}`, {
         method: 'DELETE',
         headers: {
           accept: '*/*'
@@ -735,7 +735,7 @@ export default function LineFollowingScoring() {
     }
 
     try {
-      const response = await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/remainingteams`, {
+      const response = await fetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}/remainingteams`, {
         method: 'POST',
         headers: {
           accept: '*/*',
@@ -749,7 +749,7 @@ export default function LineFollowingScoring() {
         throw new Error(errorText || 'A továbbjutók feltöltése sikertelen volt.')
       }
 
-      const teamNamesResponse = await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}/teamnames`, {
+      const teamNamesResponse = await fetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}/teamnames`, {
         headers: {
           accept: '*/*'
         }

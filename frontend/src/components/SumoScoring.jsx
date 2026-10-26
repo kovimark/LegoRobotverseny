@@ -426,6 +426,13 @@ export default function SumoScoring({ userPrivilege }) {
   const [openMatches, setOpenMatches] = useState({})
   const [actionMessage, setActionMessage] = useState(null)
   const [matchToDelete, setMatchToDelete] = useState(null)
+  const [matchForNoShow, setMatchForNoShow] = useState(null)
+  const [showManualMatchModal, setShowManualMatchModal] = useState(false)
+  const [manualTeam1, setManualTeam1] = useState('')
+  const [manualTeam2, setManualTeam2] = useState('')
+  const [manualTable, setManualTable] = useState('')
+  const [manualStage, setManualStage] = useState('GS')
+  const [manualSaving, setManualSaving] = useState(false)
   const eligibleTeams = useMemo(() => teams.filter((team) => !team.isDisqualified), [teams])
 
   useEffect(() => {
@@ -463,9 +470,9 @@ export default function SumoScoring({ userPrivilege }) {
 
       try {
         const [teamsResponse, matchesResponse, groupStandingsResponse] = await Promise.all([
-          fetch('https://legocompetition.runasp.net/api/Teams'),
-          fetch('https://legocompetition.runasp.net/api/Sumo/matches'),
-          fetch('https://legocompetition.runasp.net/api/Sumo/group')
+          fetch('https://brickathlon.runasp.net/api/Teams'),
+          fetch('https://brickathlon.runasp.net/api/Sumo/matches'),
+          fetch('https://brickathlon.runasp.net/api/Sumo/group')
         ])
 
         if (!teamsResponse.ok) {
@@ -652,7 +659,7 @@ export default function SumoScoring({ userPrivilege }) {
   }
 
   const refreshMatches = async () => {
-    const response = await fetch('https://legocompetition.runasp.net/api/Sumo/matches')
+    const response = await fetch('https://brickathlon.runasp.net/api/Sumo/matches')
     if (!response.ok) {
       return
     }
@@ -662,7 +669,7 @@ export default function SumoScoring({ userPrivilege }) {
   }
 
   const refreshGroupStandings = async () => {
-    const response = await fetch('https://legocompetition.runasp.net/api/Sumo/group')
+    const response = await fetch('https://brickathlon.runasp.net/api/Sumo/group')
     if (!response.ok) {
       return
     }
@@ -921,7 +928,7 @@ export default function SumoScoring({ userPrivilege }) {
 
     if (startKnockout) {
       try {
-        const tieResponse = await authFetch('https://legocompetition.runasp.net/api/TieBreaker/check-all-ties', {
+        const tieResponse = await authFetch('https://brickathlon.runasp.net/api/TieBreaker/check-all-ties', {
           method: 'POST',
           headers: { accept: '*/*' }
         })
@@ -972,7 +979,7 @@ export default function SumoScoring({ userPrivilege }) {
 
         logSumoPayload('POST payload', payload)
 
-        const response = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
+        const response = await authFetch('https://brickathlon.runasp.net/api/Sumo', {
           method: 'POST',
           headers: {
             accept: '*/*',
@@ -1027,7 +1034,7 @@ export default function SumoScoring({ userPrivilege }) {
 
     try {
       let response = await authFetch(
-        `https://legocompetition.runasp.net/api/Sumo/${encodeURIComponent(match.team1Name)}/${encodeURIComponent(match.team2Name)}/${encodeURIComponent(getApiTournamentStage(match.tournamentStage))}`,
+        `https://brickathlon.runasp.net/api/Sumo/${encodeURIComponent(match.team1Name)}/${encodeURIComponent(match.team2Name)}/${encodeURIComponent(getApiTournamentStage(match.tournamentStage))}`,
         {
           method: 'DELETE',
           headers: {
@@ -1039,7 +1046,7 @@ export default function SumoScoring({ userPrivilege }) {
       if (!response.ok) {
         // Fallback: megfordított csapat sorrend próbálása
         const fallbackResponse = await authFetch(
-          `https://legocompetition.runasp.net/api/Sumo/${encodeURIComponent(match.team2Name)}/${encodeURIComponent(match.team1Name)}/${encodeURIComponent(getApiTournamentStage(match.tournamentStage))}`,
+          `https://brickathlon.runasp.net/api/Sumo/${encodeURIComponent(match.team2Name)}/${encodeURIComponent(match.team1Name)}/${encodeURIComponent(getApiTournamentStage(match.tournamentStage))}`,
           {
             method: 'DELETE',
             headers: {
@@ -1081,6 +1088,130 @@ export default function SumoScoring({ userPrivilege }) {
     } catch (err) {
       setActionMessage({ type: 'danger', text: err.message })
       setMatchToDelete(null)
+    }
+  }
+
+  const executeNoShow = async (match) => {
+    if (!match) return
+
+    const payload = createSumoPayload({
+      team1Name: match.team1Name,
+      team2Name: match.team2Name,
+      team1Point: 0,
+      team2Point: 0,
+      table: match.table,
+      tournamentStage: match.tournamentStage,
+      team1Result: 'L,L,L',
+      team2Result: 'L,L,L'
+    })
+
+    const reversedPayload = createSumoPayload({
+      team1Name: match.team2Name,
+      team2Name: match.team1Name,
+      team1Point: 0,
+      team2Point: 0,
+      table: match.table,
+      tournamentStage: match.tournamentStage,
+      team1Result: 'L,L,L',
+      team2Result: 'L,L,L'
+    })
+
+    try {
+      let response = await authFetch('https://brickathlon.runasp.net/api/Sumo', {
+        method: 'PATCH',
+        headers: { accept: '*/*', 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      if (!response.ok) {
+        const postResponse = await authFetch('https://brickathlon.runasp.net/api/Sumo', {
+          method: 'POST',
+          headers: { accept: '*/*', 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        if (postResponse.ok) response = postResponse
+      }
+
+      if (!response.ok) {
+        const revPatchResponse = await authFetch('https://brickathlon.runasp.net/api/Sumo', {
+          method: 'PATCH',
+          headers: { accept: '*/*', 'Content-Type': 'application/json' },
+          body: JSON.stringify(reversedPayload)
+        })
+        if (revPatchResponse.ok) response = revPatchResponse
+      }
+
+      if (!response.ok) {
+        const revPostResponse = await authFetch('https://brickathlon.runasp.net/api/Sumo', {
+          method: 'POST',
+          headers: { accept: '*/*', 'Content-Type': 'application/json' },
+          body: JSON.stringify(reversedPayload)
+        })
+        if (revPostResponse.ok) response = revPostResponse
+      }
+
+      if (!response.ok) {
+        throw new Error('Nem sikerült rögzíteni a távolmaradást.')
+      }
+
+      setActionMessage({ type: 'success', text: 'Nem jelent meg senki (0-0 pont, 3-3 vereség) sikeresen elmentve.' })
+      await refreshMatches()
+      await refreshGroupStandings()
+    } catch (err) {
+      setActionMessage({ type: 'danger', text: err.message })
+    }
+  }
+
+  const handleCreateManualMatch = async (e) => {
+    e.preventDefault()
+    if (!manualTeam1 || !manualTeam2) {
+      setActionMessage({ type: 'danger', text: 'Kérjük válassz két csapatot!' })
+      return
+    }
+    if (manualTeam1 === manualTeam2) {
+      setActionMessage({ type: 'danger', text: 'A két csapat nem lehet azonos!' })
+      return
+    }
+    const tableNum = Number(manualTable)
+    if (!tableNum || tableNum < 1) {
+      setActionMessage({ type: 'danger', text: 'Kérjük adj meg érvényes pályaszámot!' })
+      return
+    }
+
+    setManualSaving(true)
+    try {
+      const payload = createSumoPayload({
+        team1Name: manualTeam1,
+        team2Name: manualTeam2,
+        team1Point: 0,
+        team2Point: 0,
+        table: tableNum,
+        tournamentStage: manualStage,
+        team1Result: '',
+        team2Result: ''
+      })
+
+      const response = await authFetch('https://brickathlon.runasp.net/api/Sumo', {
+        method: 'POST',
+        headers: { accept: '*/*', 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || 'Nem sikerült létrehozni a mérkőzést.')
+      }
+
+      setShowManualMatchModal(false)
+      setManualTeam1('')
+      setManualTeam2('')
+      setActionMessage({ type: 'success', text: `A(z) ${manualTeam1} vs. ${manualTeam2} mérkőzés (#${tableNum}) sikeresen létrehozva!` })
+      await refreshMatches()
+      await refreshGroupStandings()
+    } catch (err) {
+      setActionMessage({ type: 'danger', text: err.message })
+    } finally {
+      setManualSaving(false)
     }
   }
 
@@ -1135,7 +1266,7 @@ export default function SumoScoring({ userPrivilege }) {
     logSumoPayload('PATCH payload', payload)
 
     try {
-      let response = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
+      let response = await authFetch('https://brickathlon.runasp.net/api/Sumo', {
         method: 'PATCH',
         headers: {
           accept: '*/*',
@@ -1146,7 +1277,7 @@ export default function SumoScoring({ userPrivilege }) {
 
       if (!response.ok) {
         logSumoPayload('PATCH failed, trying POST', payload)
-        const postResponse = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
+        const postResponse = await authFetch('https://brickathlon.runasp.net/api/Sumo', {
           method: 'POST',
           headers: {
             accept: '*/*',
@@ -1161,7 +1292,7 @@ export default function SumoScoring({ userPrivilege }) {
 
       if (!response.ok) {
         logSumoPayload('POST failed, trying reversed PATCH', reversedPayload)
-        const revPatchResponse = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
+        const revPatchResponse = await authFetch('https://brickathlon.runasp.net/api/Sumo', {
           method: 'PATCH',
           headers: {
             accept: '*/*',
@@ -1176,7 +1307,7 @@ export default function SumoScoring({ userPrivilege }) {
 
       if (!response.ok) {
         logSumoPayload('Reversed PATCH failed, trying reversed POST', reversedPayload)
-        const revPostResponse = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
+        const revPostResponse = await authFetch('https://brickathlon.runasp.net/api/Sumo', {
           method: 'POST',
           headers: {
             accept: '*/*',
@@ -1271,7 +1402,7 @@ export default function SumoScoring({ userPrivilege }) {
     logSumoPayload('PATCH delete payload', payload)
 
     try {
-      let response = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
+      let response = await authFetch('https://brickathlon.runasp.net/api/Sumo', {
         method: 'PATCH',
         headers: {
           accept: '*/*',
@@ -1282,7 +1413,7 @@ export default function SumoScoring({ userPrivilege }) {
 
       if (!response.ok) {
         logSumoPayload('PATCH delete failed, trying POST', payload)
-        const postResponse = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
+        const postResponse = await authFetch('https://brickathlon.runasp.net/api/Sumo', {
           method: 'POST',
           headers: {
             accept: '*/*',
@@ -1297,7 +1428,7 @@ export default function SumoScoring({ userPrivilege }) {
 
       if (!response.ok) {
         logSumoPayload('POST delete failed, trying reversed PATCH', reversedPayload)
-        const revPatchResponse = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
+        const revPatchResponse = await authFetch('https://brickathlon.runasp.net/api/Sumo', {
           method: 'PATCH',
           headers: {
             accept: '*/*',
@@ -1312,7 +1443,7 @@ export default function SumoScoring({ userPrivilege }) {
 
       if (!response.ok) {
         logSumoPayload('Reversed PATCH delete failed, trying reversed POST', reversedPayload)
-        const revPostResponse = await authFetch('https://legocompetition.runasp.net/api/Sumo', {
+        const revPostResponse = await authFetch('https://brickathlon.runasp.net/api/Sumo', {
           method: 'POST',
           headers: {
             accept: '*/*',
@@ -1399,11 +1530,24 @@ export default function SumoScoring({ userPrivilege }) {
                     A generálás a jelenlegi állás alapján történik, visszavágó nélkül. {ageGroupBreakdown ? 'A két korosztály külön ágon játszik. Az általános és a középiskolás ág döntőinek győztesei mérkőznek meg az abszolút döntőben.' : 'A két korosztály közös mezőnyben szerepel.'}
                   </p>
                 </div>
-                {isAdmin && (
-                  <>
-                    <button
-                      type="button"
-                      className="btn btn-primary px-4"
+                <div className="d-flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-primary px-3 fw-bold shadow-sm"
+                    onClick={() => {
+                      const nextTable = matches.length > 0 ? Math.max(...matches.map((m) => Number(m.table) || 0)) + 1 : 1
+                      setManualTable(nextTable)
+                      setShowManualMatchModal(true)
+                    }}
+                  >
+                    <i className="bi bi-plus-circle me-1" />
+                    Meccs manuális létrehozása
+                  </button>
+                  {isAdmin && (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-outline-primary px-4"
                       onClick={() => handleGenerateMatches(false)}
                       disabled={!eligibleTeams.length || isKnockoutComplete || isGroupGenerationLocked || (!isKnockoutView && !latestGroupRoundComplete)}
                     >
@@ -1429,10 +1573,11 @@ export default function SumoScoring({ userPrivilege }) {
                       >
                         Egyenes kiesés indítása
                       </button>
+                                  
                     )}
                   </>
                 )}
-              </div>
+              </div></div>
 
               <div className="row g-3 align-items-end mb-3">
                 <div className="col-12">
@@ -1752,6 +1897,16 @@ export default function SumoScoring({ userPrivilege }) {
                                     <i className="bi bi-check-circle me-1" />
                                     Mentés
                                   </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline-warning py-1 small d-flex align-items-center justify-content-center"
+                                    onClick={() => setMatchForNoShow(match)}
+                                    disabled={isMatchComplete || groupResultLimitReached}
+                                    title="Mindkét csapat 0 pontot és 3 vereséget kap"
+                                  >
+                                    <i className="bi bi-person-x me-1" />
+                                    Nem jelent meg senki
+                                  </button>
                                   {isAdmin && (
                                     <button
                                       type="button"
@@ -1776,6 +1931,154 @@ export default function SumoScoring({ userPrivilege }) {
             )
           })}
           {visibleRoundGroups.length === 0 && <div className="alert alert-secondary mb-0">Nincs a keresésnek megfelelő szumómeccs.</div>}
+        </div>
+      )}
+      {showManualMatchModal && (
+        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <form onSubmit={handleCreateManualMatch}>
+                <div className="modal-header">
+                  <h5 className="modal-title">
+                    <i className="bi bi-plus-circle text-primary me-2" />
+                    Meccs manuális létrehozása
+                  </h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => setShowManualMatchModal(false)}
+                    aria-label="Bezárás"
+                  />
+                </div>
+                <div className="modal-body">
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">1. Csapat (Bal oldal)</label>
+                    <select
+                      className="form-select"
+                      value={manualTeam1}
+                      onChange={(e) => setManualTeam1(e.target.value)}
+                      required
+                    >
+                      <option value="">-- Válassz csapatot --</option>
+                      {(eligibleTeams.length > 0 ? eligibleTeams : teams).map((t) => (
+                        <option key={t.id || t.name} value={t.name}>
+                          {t.name} ({t.category === 1 ? 'Középiskolás' : 'Általános iskola'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">2. Csapat (Jobb oldal)</label>
+                    <select
+                      className="form-select"
+                      value={manualTeam2}
+                      onChange={(e) => setManualTeam2(e.target.value)}
+                      required
+                    >
+                      <option value="">-- Válassz csapatot --</option>
+                      {(eligibleTeams.length > 0 ? eligibleTeams : teams).map((t) => (
+                        <option key={t.id || t.name} value={t.name} disabled={t.name === manualTeam1}>
+                          {t.name} ({t.category === 1 ? 'Középiskolás' : 'Általános iskola'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="row g-2 mb-3">
+                    <div className="col-6">
+                      <label className="form-label fw-semibold">Sorszám</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        min="1"
+                        value={manualTable}
+                        onChange={(e) => setManualTable(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="col-6">
+                      <label className="form-label fw-semibold">Versenyszakasz</label>
+                      <select
+                        className="form-select"
+                        value={manualStage}
+                        onChange={(e) => setManualStage(e.target.value)}
+                      >
+                        <option value="GS">Alapszakasz (Csoportkör)</option>
+                        <option value="RO16">Legjobb 16</option>
+                        <option value="QF">Negyeddöntő</option>
+                        <option value="SF">Elődöntő</option>
+                        <option value="BM">Bronzmeccs</option>
+                        <option value="F">Döntő</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowManualMatchModal(false)}
+                    disabled={manualSaving}
+                  >
+                    Mégse
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={manualSaving || !manualTeam1 || !manualTeam2 || manualTeam1 === manualTeam2}
+                  >
+                    {manualSaving ? 'Létrehozás...' : 'Mérkőzés rögzítése'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+      {matchForNoShow && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.45)', zIndex: 1060, backdropFilter: 'blur(2px)' }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="modal-dialog modal-dialog-centered modal-sm m-0" style={{ maxWidth: '450px', width: '92%' }} role="document">
+            <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden bg-white text-dark">
+              <div className="modal-header border-bottom px-4 py-3 bg-warning-subtle text-dark">
+                <h5 className="modal-title fw-bold d-flex align-items-center gap-2 mb-0">
+                  <i className="bi bi-person-x-fill text-warning" />
+                  Biztos nem jelent meg senki?
+                </h5>
+                <button type="button" className="btn-close" aria-label="Close" onClick={() => setMatchForNoShow(null)}></button>
+              </div>
+              <div className="modal-body px-4 py-4">
+                <p className="mb-2 text-dark">Biztosan rögzíted, hogy egyik csapat sem jelent meg a mérkőzésre?</p>
+                <div className="p-3 bg-light rounded border mb-3">
+                  <div className="badge text-bg-dark mb-2">#{matchForNoShow.table}. mérkőzés</div>
+                  <div className="fw-bold fs-6 text-dark">{matchForNoShow.team1Name} vs {matchForNoShow.team2Name}</div>
+                  <div className="small text-muted mt-1">Szakasz: {getStageLabel(getMatchStage(matchForNoShow))}</div>
+                </div>
+                <div className="alert alert-warning py-2 mb-0 small text-dark border-warning">
+                  <i className="bi bi-info-circle me-1 text-warning" />
+                  Ez a művelet mindkét csapatnak <strong>0 pontot</strong> és <strong>3-3 vereséget (L,L,L)</strong> rögzít erre a mérkőzésre.
+                </div>
+              </div>
+              <div className="modal-footer border-top px-4 py-3 bg-light d-flex justify-content-end gap-2">
+                <button type="button" className="btn btn-secondary px-3" onClick={() => setMatchForNoShow(null)}>Mégse</button>
+                <button
+                  type="button"
+                  className="btn btn-warning px-4 fw-bold text-dark"
+                  onClick={() => {
+                    const target = matchForNoShow
+                    setMatchForNoShow(null)
+                    executeNoShow(target)
+                  }}
+                >
+                  <i className="bi bi-check2 me-1" />
+                  Megerősítés
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
       {matchToDelete && (

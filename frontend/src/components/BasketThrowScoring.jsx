@@ -87,7 +87,7 @@ export default function BasketThrowScoring() {
   const [modifying, setModifying] = useState(false)
 
   const refreshResults = async () => {
-    const response = await fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}?_t=${Date.now()}`)
+    const response = await fetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}?_t=${Date.now()}`)
     if (!response.ok) {
       throw new Error('Nem sikerült betölteni a kosárra dobás eredményeit.')
     }
@@ -105,9 +105,9 @@ export default function BasketThrowScoring() {
 
       try {
         const [resultsResponse, teamNamesResponse, allTeamsResponse] = await Promise.all([
-          fetch(`https://legocompetition.runasp.net/api/${competitionConfig.apiPath}?_t=${Date.now()}`),
-          fetch(`https://legocompetition.runasp.net/api/Teams/teamnames?_t=${Date.now()}`),
-          fetch(`https://legocompetition.runasp.net/api/Teams?_t=${Date.now()}`)
+          fetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}?_t=${Date.now()}`),
+          fetch(`https://brickathlon.runasp.net/api/Teams/teamnames?_t=${Date.now()}`),
+          fetch(`https://brickathlon.runasp.net/api/Teams?_t=${Date.now()}`)
         ])
 
         if (!resultsResponse.ok) {
@@ -297,7 +297,7 @@ export default function BasketThrowScoring() {
 
     try {
       // 1. Try modifyExistingAttempt first (since teams already exist in DB)
-      let response = await authFetch(`https://legocompetition.runasp.net/api/Basketball/modifyExistingAttempt`, {
+      let response = await authFetch(`https://brickathlon.runasp.net/api/Basketball/modifyExistingAttempt`, {
         method: 'PUT',
         headers: {
           accept: '*/*',
@@ -308,7 +308,7 @@ export default function BasketThrowScoring() {
 
       // 2. Fallback to /Basketball if modifyExistingAttempt fails
       if (!response.ok) {
-        const altResponse = await authFetch(`https://legocompetition.runasp.net/api/Basketball`, {
+        const altResponse = await authFetch(`https://brickathlon.runasp.net/api/Basketball`, {
           method: 'PUT',
           headers: {
             accept: '*/*',
@@ -422,7 +422,7 @@ export default function BasketThrowScoring() {
       }
 
       let response = await authFetch(
-        `https://legocompetition.runasp.net/api/Basketball/modifyExistingAttempt`,
+        `https://brickathlon.runasp.net/api/Basketball/modifyExistingAttempt`,
         {
           method: 'PUT',
           headers: { accept: '*/*', 'Content-Type': 'application/json' },
@@ -432,7 +432,7 @@ export default function BasketThrowScoring() {
 
       if (!response.ok) {
         const fallbackResponse = await authFetch(
-          `https://legocompetition.runasp.net/api/Basketball`,
+          `https://brickathlon.runasp.net/api/Basketball`,
           {
             method: 'PUT',
             headers: { accept: '*/*', 'Content-Type': 'application/json' },

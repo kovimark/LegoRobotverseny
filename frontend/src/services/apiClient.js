@@ -9,6 +9,7 @@ export const isBackendUrl = (url) => {
   if (!url) return false
   const strUrl = typeof url === 'string' ? url : (url?.url || url?.href || String(url))
   return (
+    strUrl.includes('brickathlon.runasp.net') ||
     strUrl.includes('legocompetition.runasp.net') ||
     strUrl.startsWith('/api') ||
     strUrl.includes('localhost:')

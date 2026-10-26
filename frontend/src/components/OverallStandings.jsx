@@ -28,8 +28,8 @@ export default function OverallStandings() {
         setLoading(true)
         setError('')
         const [response, teamsResponse] = await Promise.all([
-          fetch('https://legocompetition.runasp.net/api/Points'),
-          fetch('https://legocompetition.runasp.net/api/Teams')
+          fetch('https://brickathlon.runasp.net/api/Points'),
+          fetch('https://brickathlon.runasp.net/api/Teams')
         ])
         if (!response.ok) throw new Error('Nem sikerült betölteni az összesített ponttáblázatot.')
         const data = await response.json()

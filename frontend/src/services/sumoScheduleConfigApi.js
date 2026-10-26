@@ -1,6 +1,6 @@
 import { authFetch } from './apiClient'
 
-const API_URL = 'https://legocompetition.runasp.net/api/Settings'
+const API_URL = 'https://brickathlon.runasp.net/api/Settings'
 export const SUMO_CONFIG_CHANGED_EVENT = 'sumoScheduleConfigChanged'
 
 const request = async (path, options = {}) => {
@@ -98,7 +98,7 @@ export const deleteCompetitionPhase = async (phaseId) => request(`/deletePhase/$
 export const resetSettings = async () => request('/resetSettings', { method: 'DELETE' })
 export const resetEveryScore = async () => request('/resetEveryScore', { method: 'DELETE' })
 export const cleanTestData = async () => {
-  const response = await authFetch('https://legocompetition.runasp.net/api/Teams/tesztadattakaritas', {
+  const response = await authFetch('https://brickathlon.runasp.net/api/Teams/tesztadattakaritas', {
     method: 'DELETE',
     headers: { accept: '*/*' }
   })

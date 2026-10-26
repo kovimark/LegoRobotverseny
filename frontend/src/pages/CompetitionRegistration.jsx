@@ -191,7 +191,7 @@ export default function CompetitionRegistration({ user }) {
         group: formData.group || '-'
       }
 
-      const response = await authFetch('https://legocompetition.runasp.net/api/Teams/registerteam', {
+      const response = await authFetch('https://brickathlon.runasp.net/api/Teams/registerteam', {
         method: 'POST',
         headers: {
           accept: '*/*',
@@ -254,8 +254,8 @@ export default function CompetitionRegistration({ user }) {
       setSubmitMessage({
         type: 'success',
         text: emailSentCount > 0
-          ? 'Sikeres regisztráció! A visszaigazoló e-mailt elküldtük a megadott címekre.'
-          : 'Sikeres regisztráció!'
+          ? 'Sikeres nevezés! A visszaigazoló e-mailt elküldtük a megadott címekre.'
+          : 'Sikeres nevezés!'
       })
     } catch (error) {
       console.error('Hiba:', error)
@@ -598,7 +598,7 @@ export default function CompetitionRegistration({ user }) {
                 className="btn btn-primary w-100"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Regisztráció...' : 'Regisztráció'}
+                {isSubmitting ? 'Nevezés...' : 'Nevezés'}
               </button>
             )}
           </form>

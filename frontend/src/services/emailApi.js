@@ -1,6 +1,6 @@
 import { authFetch } from './apiClient'
 
-const API_URL = 'https://legocompetition.runasp.net/api/Email'
+const API_URL = 'https://brickathlon.runasp.net/api/Email'
 
 /**
  * Automatikus üdvözlő / visszaigazoló email küldése a csapat regisztrációja után.

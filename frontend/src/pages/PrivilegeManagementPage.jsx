@@ -4,8 +4,8 @@ import ConfirmModal from '../components/ConfirmModal'
 import FloatingFeedback from '../components/FloatingFeedback'
 import { authFetch } from '../services/apiClient'
 
-const API_URL = 'https://legocompetition.runasp.net/api/Privilege'
-const TEAMS_API_URL = 'https://legocompetition.runasp.net/api/Teams'
+const API_URL = 'https://brickathlon.runasp.net/api/Privilege'
+const TEAMS_API_URL = 'https://brickathlon.runasp.net/api/Teams'
 
 export default function PrivilegeManagementPage() {
   const queryEmail = new URLSearchParams(window.location.search).get('email') || ''

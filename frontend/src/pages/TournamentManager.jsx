@@ -58,7 +58,7 @@ export default function TournamentManager() {
     const fetchTeams = async () => {
       try {
         setLoading(true);
-        const response = await fetch('https://legocompetition.runasp.net/api/Teams');
+        const response = await fetch('https://brickathlon.runasp.net/api/Teams');
         if (!response.ok) {
           throw new Error('Nem sikerült betölteni a csapatokat.');
         }

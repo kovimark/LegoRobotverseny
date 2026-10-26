@@ -35,7 +35,7 @@ export default function UserMessagesModal({ open, onClose, user, userTeamId = nu
 
       let teamNotifs = []
       try {
-        const teamRes = await fetch(`https://legocompetition.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`)
+        const teamRes = await fetch(`https://brickathlon.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`)
         if (teamRes.ok) {
           const teamData = await teamRes.json()
           const teamsArray = Array.isArray(teamData) ? teamData : [teamData]

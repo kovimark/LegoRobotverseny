@@ -5,7 +5,7 @@ import ConfirmModal from '../components/ConfirmModal'
 import { authFetch } from '../services/apiClient'
 import { cleanTestData } from '../services/sumoScheduleConfigApi'
 
-const API_BASE_URL = 'https://legocompetition.runasp.net'
+const API_BASE_URL = 'https://brickathlon.runasp.net'
 
 const normalizeMembers = (team) => {
   if (!team) {

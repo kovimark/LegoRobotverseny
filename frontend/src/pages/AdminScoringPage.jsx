@@ -28,7 +28,7 @@ export default function AdminScoringPage({ userPrivilege }) {
     try {
       setCheckingTies(true)
       setTieCheckMessage(null)
-      const response = await fetch('https://legocompetition.runasp.net/api/TieBreaker/check-all-ties', {
+      const response = await fetch('https://brickathlon.runasp.net/api/TieBreaker/check-all-ties', {
         method: 'POST',
         headers: { accept: '*/*' }
       })

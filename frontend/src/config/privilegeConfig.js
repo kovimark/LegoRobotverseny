@@ -4,7 +4,8 @@ export const privilegeOptions = [
   { value: 2, label: 'Hegymászás bíró' },
   { value: 3, label: 'Vonalkövetés bíró' },
   { value: 4, label: 'Kosárra dobás bíró' },
-  { value: 5, label: 'Szumó bíró' }
+  { value: 5, label: 'Szumó bíró' },
+  { value: 6, label: 'Segítő' }
 ]
 
 export const judgeCompetitionByPrivilege = {
@@ -19,3 +20,5 @@ export const getPrivilegeLabel = (value) => (
 )
 
 export const isJudgePrivilege = (value) => Boolean(judgeCompetitionByPrivilege[Number(value)])
+
+export const isHelperPrivilege = (value) => Number(value) === 6

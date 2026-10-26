@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { getActiveMessages, MESSAGE_BOARD_CHANGED_EVENT } from '../services/messageBoardApi'
 import { stripMessageLinkMarkers } from '../utils/messageContent'
 import { getCategoryBadgeStyle } from '../utils/categoryColor'
+import FaqSection from '../components/FaqSection'
+import CompetitionCountdown from '../components/CompetitionCountdown'
 
 export default function HomePage() {
   const [messages, setMessages] = useState([])
@@ -42,6 +44,7 @@ export default function HomePage() {
 
   return (
     <main className="home-page">
+      <CompetitionCountdown />
       <section className="home-hero">
         <div className="home-panel">
           <h1 className="home-title home-brand-title">
@@ -192,6 +195,9 @@ export default function HomePage() {
         ) : <div className="home-news-empty">Jelenleg nincs közzétett hír.</div>}
         <div className="text-end mt-3"><Link className="btn btn-outline-dark" to="/hirek">Összes hír</Link></div>
       </section>
+
+      {/* Gyakran Ismételt Kérdések a főoldal alján */}
+      <FaqSection />
     </main>
   )
 }

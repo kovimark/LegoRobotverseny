@@ -4,7 +4,7 @@ import FloatingFeedback from '../components/FloatingFeedback'
 import ConfirmModal from '../components/ConfirmModal'
 import { authFetch } from '../services/apiClient'
 
-const API_BASE_URL = 'https://legocompetition.runasp.net'
+const API_BASE_URL = 'https://brickathlon.runasp.net'
 
 const readApiError = async (response, fallbackMessage) => {
   const errorText = await response.text()

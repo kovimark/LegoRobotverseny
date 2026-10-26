@@ -1,6 +1,20 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+// -------- GOOGLE DRIVE ÉS KÉP TÁMOGATÁS --------
+export function getGoogleDriveImageUrl(url) {
+  if (!url || typeof url !== 'string') return url;
+  const trimmed = url.trim();
+  const match = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+                trimmed.match(/id=([a-zA-Z0-9_-]+)/) ||
+                trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (match && match[1]) {
+    return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1600`;
+  }
+  return trimmed;
+}
+
+
 // -------- RANGSOROLÓ FÜGGVÉNYEK (változatlan) --------
 
 const getLineRanking = (teams, results) => {
@@ -86,6 +100,19 @@ const competitions = [
 
 const categoryLabels = ['Általános iskola', 'Középiskola'];
 
+const DEFAULT_SLIDE_SEQUENCE = [
+  { id: 'seq-1', compId: 'line', cat: 0, label: 'Vonalkövetés • Általános iskola' },
+  { id: 'seq-2', compId: 'line', cat: 1, label: 'Vonalkövetés • Középiskola' },
+  { id: 'seq-3', compId: 'hill', cat: 0, label: 'Hegymászás • Általános iskola' },
+  { id: 'seq-4', compId: 'hill', cat: 1, label: 'Hegymászás • Középiskola' },
+  { id: 'seq-5', compId: 'basket', cat: 0, label: 'Kosárra dobás • Általános iskola' },
+  { id: 'seq-6', compId: 'basket', cat: 1, label: 'Kosárra dobás • Középiskola' },
+  { id: 'seq-7', compId: 'sumo', cat: 0, label: 'Szumó • Általános iskola' },
+  { id: 'seq-8', compId: 'sumo', cat: 1, label: 'Szumó • Középiskola' },
+  { id: 'seq-9', compId: 'combined', cat: 0, label: 'Összesített díjátadó' },
+];
+
+
 export default function TopThrees({ userPrivilege }) {
   const navigate = useNavigate();
 
@@ -127,6 +154,17 @@ export default function TopThrees({ userPrivilege }) {
   const [combinedData, setCombinedData] = useState(null);
   // Megjelenítési lépés: 0 = nincs, 1 = 3. hely, 2 = 2. hely, 3 = 1. hely
   const [revealStep, setRevealStep] = useState(0);
+  const [slideSequence, setSlideSequence] = useState(() => {
+    try {
+      const saved = localStorage.getItem('brickathlon_top3_sequence');
+      return saved ? JSON.parse(saved) : DEFAULT_SLIDE_SEQUENCE;
+    } catch {
+      return DEFAULT_SLIDE_SEQUENCE;
+    }
+  });
+  const [currentSeqIndex, setCurrentSeqIndex] = useState(0);
+  const [isSequenceMode, setIsSequenceMode] = useState(false);
+  const [showSeqManager, setShowSeqManager] = useState(false);
   // Összesített nézetben az aktuális dia indexe
   const [currentSlide, setCurrentSlide] = useState(0);
   // Összesített nézetben az egyes versenyszámokhoz tartozó lépések
@@ -141,7 +179,7 @@ export default function TopThrees({ userPrivilege }) {
     setCombinedSteps({});
 
     try {
-      const teamsRes = await fetch('https://legocompetition.runasp.net/api/Teams');
+      const teamsRes = await fetch('https://brickathlon.runasp.net/api/Teams');
       if (!teamsRes.ok) throw new Error('Nem sikerült betölteni a csapatokat.');
       const teamsData = await teamsRes.json();
       setAllTeams(teamsData);
@@ -154,7 +192,7 @@ export default function TopThrees({ userPrivilege }) {
         const teamNames = new Set(filteredTeams.map(t => t.teamName));
         for (const comp of competitions) {
           try {
-            const res = await fetch(`https://legocompetition.runasp.net${comp.api}`);
+            const res = await fetch(`https://brickathlon.runasp.net/${comp.api}`);
             if (res.ok) {
               const data = await res.json();
               let results = Array.isArray(data) ? data : [];
@@ -175,7 +213,7 @@ export default function TopThrees({ userPrivilege }) {
         setIsCombined(false);
         const comp = competitions.find(c => c.id === selectedCompetition);
         if (!comp) throw new Error('Ismeretlen versenyszám.');
-        const res = await fetch(`https://legocompetition.runasp.net${comp.api}`);
+        const res = await fetch(`https://brickathlon.runasp.net/${comp.api}`);
         if (!res.ok) throw new Error(`Nem sikerült betölteni a(z) ${comp.label} adatokat.`);
         const data = await res.json();
 
@@ -280,6 +318,44 @@ export default function TopThrees({ userPrivilege }) {
     <div style={fullscreenStyle}>
       <div style={controlsStyle}>
         <div style={controlGroupStyle}>
+          <button
+            onClick={() => setShowSeqManager(true)}
+            style={{
+              ...controlButtonStyle,
+              background: isSequenceMode ? '#4cc9f0' : 'rgba(255,255,255,0.1)',
+              color: isSequenceMode ? '#0a1a2b' : '#fff',
+              border: '2px solid ' + (isSequenceMode ? '#4cc9f0' : 'rgba(255,255,255,0.3)'),
+            }}
+          >
+            <i className="bi bi-list-ol me-1"></i>
+            {isSequenceMode ? `Vetítés (${currentSeqIndex + 1}/${slideSequence.length})` : 'Sorrend testreszabása'}
+          </button>
+          {isSequenceMode && (
+            <button
+              onClick={() => {
+                if (currentSeqIndex < slideSequence.length - 1) {
+                  const nextIdx = currentSeqIndex + 1;
+                  setCurrentSeqIndex(nextIdx);
+                  const nextSlide = slideSequence[nextIdx];
+                  setSelectedCompetition(nextSlide.compId);
+                  setSelectedCategory(nextSlide.cat);
+                  setRevealStep(0);
+                } else {
+                  setIsSequenceMode(false);
+                }
+              }}
+              style={{
+                ...controlButtonStyle,
+                background: '#80ed99',
+                color: '#0a1a2b',
+                border: '2px solid #80ed99',
+              }}
+            >
+              Következő dia <i className="bi bi-chevron-right ms-1"></i>
+            </button>
+          )}
+        </div>
+        <div style={controlGroupStyle}>
           {[...competitions, { id: 'combined', label: 'Összesített' }].map(comp => (
             <button
               key={comp.id}
@@ -367,6 +443,122 @@ export default function TopThrees({ userPrivilege }) {
         )}
       </div>
 
+            {showSeqManager && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.85)',
+          zIndex: 10000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1.5rem',
+        }}>
+          <div style={{
+            background: '#0d2238',
+            borderRadius: '1rem',
+            padding: '2rem',
+            maxWidth: '650px',
+            width: '100%',
+            color: '#fff',
+            border: '2px solid #fde74c',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.7)',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ margin: 0, color: '#fde74c', fontSize: '1.5rem' }}>
+                <i className="bi bi-sliders me-2"></i>Eredményhirdetés Sorrend
+              </h3>
+              <button
+                onClick={() => setShowSeqManager(false)}
+                style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '1.5rem', cursor: 'pointer' }}
+              >
+                &times;
+              </button>
+            </div>
+            <p style={{ color: '#ccc', fontSize: '0.9rem', marginBottom: '1rem' }}>
+              Állítsd be a vetítés sorrendjét a gombokkal. A vetítés módban a Space vagy a Jobbra nyíl automatikusan végiglépteti a dobogósokat és a diákat!
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
+              {slideSequence.map((item, idx) => (
+                <div
+                  key={item.id || idx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0.6rem 1rem',
+                    background: 'rgba(255,255,255,0.08)',
+                    borderRadius: '0.5rem',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                  }}
+                >
+                  <span style={{ fontWeight: 'bold' }}>
+                    <span style={{ color: '#fde74c', marginRight: '0.75rem' }}>{idx + 1}.</span>
+                    {item.label}
+                  </span>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <button
+                      disabled={idx === 0}
+                      onClick={() => {
+                        const copy = [...slideSequence];
+                        const temp = copy[idx - 1];
+                        copy[idx - 1] = copy[idx];
+                        copy[idx] = temp;
+                        setSlideSequence(copy);
+                        localStorage.setItem('brickathlon_top3_sequence', JSON.stringify(copy));
+                      }}
+                      style={{ padding: '0.2rem 0.6rem', borderRadius: '4px', background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', cursor: 'pointer' }}
+                    >
+                      &uarr;
+                    </button>
+                    <button
+                      disabled={idx === slideSequence.length - 1}
+                      onClick={() => {
+                        const copy = [...slideSequence];
+                        const temp = copy[idx + 1];
+                        copy[idx + 1] = copy[idx];
+                        copy[idx] = temp;
+                        setSlideSequence(copy);
+                        localStorage.setItem('brickathlon_top3_sequence', JSON.stringify(copy));
+                      }}
+                      style={{ padding: '0.2rem 0.6rem', borderRadius: '4px', background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', cursor: 'pointer' }}
+                    >
+                      &darr;
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setSlideSequence(DEFAULT_SLIDE_SEQUENCE);
+                  localStorage.removeItem('brickathlon_top3_sequence');
+                }}
+                style={{ padding: '0.6rem 1.2rem', borderRadius: '2rem', background: 'transparent', border: '1px solid #aaa', color: '#fff', cursor: 'pointer' }}
+              >
+                Alaphelyzet
+              </button>
+              <button
+                onClick={() => {
+                  setShowSeqManager(false);
+                  setIsSequenceMode(true);
+                  setCurrentSeqIndex(0);
+                  const firstSlide = slideSequence[0];
+                  setSelectedCompetition(firstSlide.compId);
+                  setSelectedCategory(firstSlide.cat);
+                  setRevealStep(0);
+                }}
+                style={{ padding: '0.6rem 1.4rem', borderRadius: '2rem', background: '#fde74c', border: 'none', color: '#0a1a2b', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                <i className="bi bi-play-fill me-1"></i>Vetítés indítása innen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={footerStyle}>
         Brickathlon • Eredményhirdetés        
       </div>

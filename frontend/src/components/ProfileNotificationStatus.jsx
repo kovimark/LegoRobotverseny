@@ -31,7 +31,7 @@ export default function ProfileNotificationStatus({ user }) {
   const loadTeamIds = async () => {
     if (!user?.email) return []
     try {
-      const response = await fetch(`https://legocompetition.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`, {
+      const response = await fetch(`https://brickathlon.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`, {
         headers: { accept: '*/*' }
       })
       if (!response.ok) return []

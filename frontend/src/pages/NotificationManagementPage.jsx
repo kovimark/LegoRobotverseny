@@ -290,10 +290,10 @@ export default function NotificationManagementPage() {
       return
     }
     if (manualTargets.some((item) => item.email.toLowerCase() === cleanEmail)) {
-      setFeedback({ type: 'warning', text: 'Ez az e-mail-cím már szerepel a kézi címzettek között.' })
+      setFeedback({ type: 'warning', text: 'Ez az e-mail-cím már szerepel a címzettek között.' })
       return
     }
-    setManualTargets((current) => [...current, { email: cleanEmail, name: manualName.trim(), teamName: 'Kézi címzett' }])
+    setManualTargets((current) => [...current, { email: cleanEmail, name: manualName.trim(), teamName: 'Címzett' }])
     setManualEmail('')
     setManualName('')
     setFeedback({ type: 'success', text: `A(z) ${cleanEmail} cím hozzáadva a címzettekhez.` })
@@ -572,7 +572,7 @@ export default function NotificationManagementPage() {
                 </div>
               )}
 
-              {/* Kézi e-mail hozzáadás */}
+              {/*e-mail hozzáadás */}
               <div className="mt-3 pt-3 border-top">
                 <label className="form-label small fw-bold mb-1">Egyedi e-mail-cím hozzáadása:</label>
                 <div className="row g-2">
