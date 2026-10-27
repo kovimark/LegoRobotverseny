@@ -16,9 +16,9 @@ export default function MyTeamsPage({ user }) {
   const [teams, setTeams] = useState([])
   const [selectedTeamId, setSelectedTeamId] = useState('all')
   const [sumoMatches, setSumoMatches] = useState([])
-  const [lineResults] = useState([])
-  const [hillResults] = useState([])
-  const [basketResults] = useState([])
+  const [lineResults, setLineResults] = useState([])
+  const [hillResults, setHillResults] = useState([])
+  const [basketResults, setBasketResults] = useState([])
   const [tombolaTickets, setTombolaTickets] = useState([])
     const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -39,13 +39,25 @@ export default function MyTeamsPage({ user }) {
         setLoading(true)
         setError('')
 
-        const [teamsResponse, matchesResponse] = await Promise.allSettled([
+        const [teamsResponse, matchesResponse, lineResponse, hillResponse, basketResponse] = await Promise.allSettled([
           fetch(
             `https://brickathlon.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`,
             { headers: { accept: '*/*' }, signal: controller.signal }
           ),
           fetch(
             'https://brickathlon.runasp.net/api/Sumo/matches',
+            { headers: { accept: '*/*' }, signal: controller.signal }
+          ),
+          fetch(
+            'https://brickathlon.runasp.net/api/LineFollowing',
+            { headers: { accept: '*/*' }, signal: controller.signal }
+          ),
+          fetch(
+            'https://brickathlon.runasp.net/api/HillClimbing/allattempts',
+            { headers: { accept: '*/*' }, signal: controller.signal }
+          ),
+          fetch(
+            'https://brickathlon.runasp.net/api/Basketball',
             { headers: { accept: '*/*' }, signal: controller.signal }
           )
         ])
@@ -69,6 +81,33 @@ export default function MyTeamsPage({ user }) {
             setSumoMatches(Array.isArray(matchesData) ? matchesData : [])
           } catch {
             setSumoMatches([])
+          }
+        }
+
+        if (lineResponse?.status === 'fulfilled' && lineResponse.value.ok) {
+          try {
+            const lData = await lineResponse.value.json()
+            setLineResults(Array.isArray(lData) ? lData : [])
+          } catch {
+            setLineResults([])
+          }
+        }
+
+        if (hillResponse?.status === 'fulfilled' && hillResponse.value.ok) {
+          try {
+            const hData = await hillResponse.value.json()
+            setHillResults(Array.isArray(hData) ? hData : [])
+          } catch {
+            setHillResults([])
+          }
+        }
+
+        if (basketResponse?.status === 'fulfilled' && basketResponse.value.ok) {
+          try {
+            const bData = await basketResponse.value.json()
+            setBasketResults(Array.isArray(bData) ? bData : [])
+          } catch {
+            setBasketResults([])
           }
         }
       } catch (requestError) {

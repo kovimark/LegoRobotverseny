@@ -122,7 +122,7 @@ export const exportScoresBackup = async (options = {}) => {
   const [points, lineFollowing, hillClimbing, basketball, sumoMatches, tieBreakers, teams, statistics] = await Promise.all([
     fetchJson('/Points').catch(() => []),
     fetchJson('/LineFollowing').catch(() => []),
-    fetchJson('/HillClimbing').catch(() => []),
+    fetchJson('/HillClimbing/allattempts').catch(() => []),
     fetchJson('/Basketball').catch(() => []),
     fetchJson('/Sumo/matches').catch(() => []),
     fetchJson('/TieBreaker').catch(() => []),
@@ -260,8 +260,11 @@ export const restoreScoresBackup = async (backup) => {
   }
   for (const result of hillClimbing) {
     const teamName = result.team_name || result.teamName
-    await postJson(`/HillClimbing/${encodeURIComponent(teamName)}/${Number(result.completed_level || 0)}/${Number(result.time_spent_on_level || 0)}`, null, 'PATCH')
-    await postJson(`/HillClimbing/${encodeURIComponent(teamName)}/${Number(result.eliminated || 0)}`, null, 'PATCH')
+    await postJson(`/HillClimbing/${encodeURIComponent(teamName)}/update`, {
+      completedLevel: Number(result.completed_level || 0),
+      timeSpentOnLevel: Number(result.time_spent_on_level || 0),
+      eliminated: Number(result.eliminated || 0)
+    }, 'PATCH')
   }
   for (const result of basketball) {
     const basketballKey = `${result.team_name || result.teamName}|${Number(result.throwNumber ?? result.throw_number ?? 1)}`

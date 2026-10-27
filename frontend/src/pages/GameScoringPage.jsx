@@ -242,11 +242,31 @@ function StepperInput({ value, onChange, min = 0, max = undefined, step = 1, inp
         inputMode={inputMode}
         className="form-control"
         value={value ?? ''}
+        placeholder={min !== undefined ? String(min) : '0'}
         disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
+        onFocus={(event) => event.target.select()}
+        onClick={(event) => event.target.select()}
+        onChange={(event) => {
+          let raw = event.target.value
+          if (raw === '') {
+            onChange('')
+            return
+          }
+          if (/^0\d/.test(raw)) {
+            raw = raw.replace(/^0+/, '') || '0'
+          }
+          if (integer) {
+            const parsed = Number.parseInt(raw, 10)
+            onChange(Number.isNaN(parsed) ? '' : (max !== undefined ? Math.min(max, Math.max(min, parsed)) : Math.max(min, parsed)))
+          } else {
+            onChange(raw)
+          }
+        }}
         onBlur={(event) => {
           if (event.target.value !== '') {
             onChange(normalize(event.target.value))
+          } else if (min !== undefined) {
+            onChange(min)
           }
         }}
       />
@@ -1136,42 +1156,46 @@ function GameLineFollowingScoring() {
 }
 
 function GameHillClimbingScoring() {
-  const [teams, setTeams] = useState([])
+  const [allAttempts, setAllAttempts] = useState([])
   const [allTeams, setAllTeams] = useState([])
+  const [settings, setSettings] = useState(null)
   const [selectedTeamName, setSelectedTeamName] = useState('')
   const [selectedTeamCategory, setSelectedTeamCategory] = useState(null)
   const [completedLevel, setCompletedLevel] = useState(0)
   const [timeSpent, setTimeSpent] = useState('')
-  const [eliminated, setEliminated] = useState(0)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [actionMessage, setActionMessage] = useState(null)
   const [teamSearch, setTeamSearch] = useState('')
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true)
-      try {
-        const [response, allTeamsResponse] = await Promise.all([
-          fetch(`${API_BASE}/HillClimbing`),
-          fetch(`${API_BASE}/Teams`)
-        ])
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const [allRes, teamsRes, settingsRes] = await Promise.all([
+        fetch(`${API_BASE}/HillClimbing/allattempts`),
+        fetch(`${API_BASE}/Teams`),
+        fetch(`${API_BASE}/Settings/getAllSettings`).catch(() => null)
+      ])
 
-        if (!response.ok) {
-          throw new Error('Nem sikerült betölteni a hegymászás adatokat.')
-        }
-
-        const data = await response.json()
-        const allTeamsData = allTeamsResponse.ok ? await allTeamsResponse.json() : []
-        setTeams(Array.isArray(data) ? data : [])
-        setAllTeams(Array.isArray(allTeamsData) ? allTeamsData : [])
-      } catch (error) {
-        setActionMessage({ type: 'danger', text: error.message })
-      } finally {
-        setLoading(false)
+      const allData = allRes.ok ? await allRes.json() : []
+      const teamsData = teamsRes.ok ? await teamsRes.json() : []
+      let settingsData = null
+      if (settingsRes && settingsRes.ok) {
+        const s = await settingsRes.json()
+        settingsData = Array.isArray(s) ? s[0] : s
       }
-    }
 
+      setAllAttempts(Array.isArray(allData) ? allData : [])
+      setAllTeams(Array.isArray(teamsData) ? teamsData : [])
+      if (settingsData) setSettings(settingsData)
+    } catch (error) {
+      setActionMessage({ type: 'danger', text: error.message })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
     loadData()
     window.addEventListener(DATA_REFRESH_EVENT, loadData)
     return () => window.removeEventListener(DATA_REFRESH_EVENT, loadData)
@@ -1183,38 +1207,48 @@ function GameHillClimbingScoring() {
     return () => window.clearTimeout(timeoutId)
   }, [actionMessage])
 
-  useEffect(() => {
-    if (!selectedTeamName) return
-    const selected = teams.find((team) => (team.team_name || team.teamName) === selectedTeamName)
-    if (!selected) return
-    setCompletedLevel(Number(selected.completed_level || 0))
-    setTimeSpent(Number(selected.time_spent_on_level || 0))
-    setEliminated(Number(selected.eliminated || 0))
-  }, [selectedTeamName, teams])
+  // Team attempts history
+  const teamAttempts = selectedTeamName
+    ? allAttempts.filter((a) => (a.team_name || a.teamName || '').toLowerCase() === selectedTeamName.toLowerCase())
+    : []
+
+  const closedAttempts = teamAttempts.filter((a) => Number(a.eliminated) === 1)
+  const closedCount = closedAttempts.length
+  const maxTries = Number(settings?.maxTryHillclimbing ?? settings?.maxTryHillClimbing) || 2
+  const currentAttemptNumber = Math.min(closedCount + 1, maxTries)
+  const isMaxReached = closedCount >= maxTries
 
   useEffect(() => {
     if (!selectedTeamName) {
       setSelectedTeamCategory(null)
+      setCompletedLevel(0)
+      setTimeSpent(0)
       return
     }
 
     const foundTeam = allTeams.find((team) => (team.teamName || team.team_name) === selectedTeamName)
     setSelectedTeamCategory(foundTeam ? (Number(foundTeam.category) === 1 ? 1 : 0) : null)
-  }, [allTeams, selectedTeamName])
 
-  const handleSave = async () => {
+    // Check if there is an unclosed attempt currently in progress
+    const latestAttempt = teamAttempts.length > 0 ? teamAttempts[teamAttempts.length - 1] : null
+    if (latestAttempt && Number(latestAttempt.eliminated) === 0) {
+      setCompletedLevel(Number(latestAttempt.completed_level || 0))
+      setTimeSpent(Number(latestAttempt.time_spent_on_level || 0))
+    } else {
+      setCompletedLevel(0)
+      setTimeSpent(0)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTeamName, allTeams, allAttempts])
+
+  // Save intermediate progress (level + time) without closing attempt
+  const handleSaveProgress = async () => {
     const parsedLevel = Number.parseInt(completedLevel, 10)
     const parsedTime = Number(timeSpent)
-    const apiTime = Math.round(parsedTime)
-    const parsedEliminated = Number(eliminated) === 1 ? 1 : 0
+    const apiTime = Number.isFinite(parsedTime) ? Number(parsedTime.toFixed(3)) : 0
 
     if (!selectedTeamName) {
       setActionMessage({ type: 'danger', text: 'Válassz csapatot.' })
-      return
-    }
-
-    if (!teams.some((team) => (team.team_name || team.teamName) === selectedTeamName)) {
-      setActionMessage({ type: 'danger', text: 'A csapatot kereséssel válaszd ki a listából.' })
       return
     }
 
@@ -1229,38 +1263,80 @@ function GameHillClimbingScoring() {
     }
 
     setSaving(true)
-
     try {
-      const levelResponse = await authFetch(`${API_BASE}/HillClimbing/${encodeURIComponent(selectedTeamName)}/${parsedLevel}/${apiTime}`, {
-        method: 'PATCH'
+      const response = await authFetch(`${API_BASE}/HillClimbing/${encodeURIComponent(selectedTeamName)}/update`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          completedLevel: parsedLevel,
+          timeSpentOnLevel: apiTime
+        })
       })
 
-      if (!levelResponse.ok) {
-        const errorText = await levelResponse.text()
-        throw new Error(errorText || 'A szint/idő mentés sikertelen volt.')
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || 'A hegymászás mentése sikertelen volt.')
       }
 
-      const statusResponse = await authFetch(`${API_BASE}/HillClimbing/${encodeURIComponent(selectedTeamName)}/${parsedEliminated}`, {
-        method: 'PATCH'
-      })
-
-      if (!statusResponse.ok) {
-        const errorText = await statusResponse.text()
-        throw new Error(errorText || 'A versenyállapot mentése sikertelen volt.')
-      }
-
-      setTeams((prev) => prev.map((team) => (
-        (team.team_name || team.teamName) === selectedTeamName
-          ? { ...team, completed_level: parsedLevel, time_spent_on_level: apiTime, eliminated: parsedEliminated }
-          : team
-      )))
-      setTimeSpent(apiTime)
       setActionMessage({
-        type: Math.abs(apiTime - parsedTime) > 0.0005 ? 'info' : 'success',
-        text: Math.abs(apiTime - parsedTime) > 0.0005
-          ? `A hegymászás backend egész másodpercet fogad, ezért ${parsedTime.toFixed(3)} mp helyett ${apiTime} mp lett mentve.`
-          : 'Hegymászás eredmény frissítve.'
+        type: 'success',
+        text: `A(z) ${selectedTeamName} csapat ${currentAttemptNumber}. próbájának szintje és ideje elmentve (${parsedLevel}. szint, ${apiTime} mp).`
       })
+      await loadData()
+    } catch (error) {
+      setActionMessage({ type: 'danger', text: error.message })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Close attempt (finish run / eliminated)
+  const handleFinishAttempt = async () => {
+    const parsedLevel = Number.parseInt(completedLevel, 10)
+    const parsedTime = Number(timeSpent)
+    const apiTime = Number.isFinite(parsedTime) ? Number(parsedTime.toFixed(3)) : 0
+
+    if (!selectedTeamName) {
+      setActionMessage({ type: 'danger', text: 'Válassz csapatot.' })
+      return
+    }
+
+    if (!Number.isInteger(parsedLevel) || parsedLevel < 0 || parsedLevel > 4) {
+      setActionMessage({ type: 'danger', text: 'A teljesített szint 0-4 közötti egész lehet.' })
+      return
+    }
+
+    if (!Number.isFinite(parsedTime) || parsedTime < 0) {
+      setActionMessage({ type: 'danger', text: 'Az idő nem lehet negatív.' })
+      return
+    }
+
+    setSaving(true)
+    try {
+      const response = await authFetch(`${API_BASE}/HillClimbing/${encodeURIComponent(selectedTeamName)}/update`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          completedLevel: parsedLevel,
+          timeSpentOnLevel: apiTime,
+          eliminated: 1
+        })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || 'A próba lezárása sikertelen volt.')
+      }
+
+      setActionMessage({
+        type: 'success',
+        text: `A(z) ${selectedTeamName} csapat ${currentAttemptNumber}. próbája sikeresen LEZÁRVA (${parsedLevel}. szint, ${apiTime} mp)! ${
+          closedCount + 1 >= maxTries ? 'Mind a ' + maxTries + ' próbálkozás befejezve.' : ''
+        }`
+      })
+      setCompletedLevel(0)
+      setTimeSpent(0)
+      await loadData()
     } catch (error) {
       setActionMessage({ type: 'danger', text: error.message })
     } finally {
@@ -1272,24 +1348,50 @@ function GameHillClimbingScoring() {
     <section className="game-scoring-panel">
       <FloatingFeedback message={actionMessage} onClose={() => setActionMessage(null)} />
       <header className="game-scoring-panel__header">
-        <h3>Hegymászás</h3>
-        <p>Frissítsd egyetlen blokkból a szintet, az időt és a versenyállapotot.</p>
+        <h3>Hegymászás pontozás</h3>
+        <p>Rögzítsd a szintet és az időt menet közben, majd a próba végén zárd le a futamot.</p>
       </header>
 
-      {loading ? <div className="alert alert-secondary">Csapatok betöltése...</div> : (
+      {loading ? <div className="alert alert-secondary">Adatok betöltése...</div> : (
         <>
+          {/* Próbálkozás státusz doboz */}
+          {selectedTeamName && (
+            <div className={`p-3 rounded-3 mb-3 border ${isMaxReached ? 'bg-secondary-subtle border-secondary' : 'bg-primary-subtle border-primary'}`}>
+              <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                  <span className={`badge ${isMaxReached ? 'text-bg-secondary' : 'text-bg-primary'} fw-bold mb-1`}>
+                    {isMaxReached ? 'Minden próbálkozás befejezve' : `${currentAttemptNumber}. próbálkozás / ${maxTries}`}
+                  </span>
+                  <div className="fw-semibold text-dark fs-6">
+                    {selectedTeamName} – {isMaxReached ? `Mind a ${maxTries} próba lezárva.` : `Éppen a(z) ${currentAttemptNumber}. próba rögzítése zajlik.`}
+                  </div>
+                  <div className="small text-muted">
+                    {isMaxReached
+                      ? 'Ez a csapat már nem indíthat több próbát.'
+                      : 'Amíg a robot a hegyen halad, menthetsz részeredményt. Amikor kiesett vagy felért a 4-es szintre, nyomd meg a „Próba lezárása (Befejezve)” gombot!'}
+                  </div>
+                </div>
+                <div className="text-end">
+                  <span className="badge text-bg-dark fs-6">
+                    {closedCount} / {maxTries} próba kész
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="row g-3">
-            <div className="col-12 col-lg-4">
+            <div className="col-12 col-lg-5">
               <SearchPicker
                 id="hill-team-search"
-                label="Csapat keresése"
+                label="Csapat kiválasztása"
                 value={teamSearch}
                 onChange={(nextValue) => {
                   setTeamSearch(nextValue)
-                  const exactMatch = teams.find((team) => (team.team_name || team.teamName) === nextValue)
+                  const exactMatch = allTeams.find((team) => (team.team_name || team.teamName) === nextValue)
                   setSelectedTeamName(exactMatch ? (exactMatch.team_name || exactMatch.teamName) : '')
                 }}
-                options={teams.map((team, index) => team.team_name || team.teamName || `Csapat ${index + 1}`)}
+                options={allTeams.map((team, index) => team.team_name || team.teamName || `Csapat ${index + 1}`)}
                 placeholder="Kezdd el írni a csapat nevét..."
                 renderOption={(teamName) => {
                   const team = allTeams.find((item) => (item.teamName || item.team_name) === teamName)
@@ -1298,11 +1400,15 @@ function GameHillClimbingScoring() {
                 }}
               />
               {selectedTeamName && (
-                <div className="small mt-2 text-muted"><AgeGroupBadge category={selectedTeamCategory} className="me-2" />Aktív csapat: {selectedTeamName}</div>
+                <div className="small mt-2 text-muted">
+                  <AgeGroupBadge category={selectedTeamCategory} className="me-2" />
+                  Aktív csapat: <strong>{selectedTeamName}</strong>
+                </div>
               )}
             </div>
-            <div className="col-6 col-lg-2">
-              <label className="form-label">Teljesített szint</label>
+
+            <div className="col-6 col-lg-3">
+              <label className="form-label fw-bold">Elért szint (0-4)</label>
               <StepperInput
                 value={completedLevel}
                 min={0}
@@ -1311,9 +1417,11 @@ function GameHillClimbingScoring() {
                 integer
                 onChange={setCompletedLevel}
               />
+              <div className="form-text">0: nem indult el, 4: felért a tetejére</div>
             </div>
-            <div className="col-6 col-lg-3">
-              <label className="form-label">Idő a szinten (mp)</label>
+
+            <div className="col-6 col-lg-4">
+              <label className="form-label fw-bold">Idő a szinten (mp)</label>
               <StepperInput
                 value={timeSpent}
                 min={0}
@@ -1322,13 +1430,7 @@ function GameHillClimbingScoring() {
                 inputMode="decimal"
                 onChange={setTimeSpent}
               />
-            </div>
-            <div className="col-12 col-lg-3">
-              <label className="form-label">Állapot</label>
-              <select className="form-select" value={eliminated} onChange={(event) => setEliminated(Number(event.target.value))}>
-                <option value="0">Versenyben</option>
-                <option value="1">Kiesett</option>
-              </select>
+              <div className="form-text">A szint elérésének ideje</div>
             </div>
           </div>
 
@@ -1338,14 +1440,82 @@ function GameHillClimbingScoring() {
             </div>
           </div>
 
-          <div className="d-flex justify-content-end mt-4">
-            <button type="button" className="btn btn-lg btn-warning game-scoring-save-btn" onClick={handleSave} disabled={saving}>
-              {saving ? 'Mentés...' : 'Eredmény frissítése'}
+          {/* Mentés gombok */}
+          <div className="d-flex flex-wrap justify-content-end gap-2 mt-4">
+            <button
+              type="button"
+              className="btn btn-outline-primary"
+              onClick={handleSaveProgress}
+              disabled={saving || !selectedTeamName}
+              title="Szint és idő elmentése a próba lezárása nélkül (amíg a robot mászik)"
+            >
+              <i className="bi bi-save me-1" />
+              {saving ? 'Mentés...' : 'Részeredmény mentése (mászik a robot)'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary game-scoring-save-btn fw-bold px-4"
+              onClick={handleFinishAttempt}
+              disabled={saving || !selectedTeamName}
+              title="A próba véget ért (kiesett a hegyről vagy elérte a 4. szintet)"
+            >
+              <i className="bi bi-check2-circle me-1" />
+              {saving ? 'Mentés...' : 'Próba lezárása (Befejezve)'}
             </button>
           </div>
+
+          {/* Kiválasztott csapat próbálkozásainak története */}
+          {selectedTeamName && (
+            <div className="card border-0 bg-light mt-4 p-3 rounded-3 shadow-sm">
+              <h5 className="h6 fw-bold mb-2 text-dark">
+                <i className="bi bi-clock-history me-2" style={{ color: "var(--orange)" }} />
+                {selectedTeamName} – Rögzített próbálkozások előzményei ({teamAttempts.length} bejegyzés)
+              </h5>
+              {teamAttempts.length === 0 ? (
+                <div className="small text-muted fst-italic">Még nincs rögzített próbálkozás ehhez a csapathoz.</div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table table-sm table-bordered bg-white mb-0 small">
+                    <thead className="table-light">
+                      <tr>
+                        <th>#</th>
+                        <th>Elért szint</th>
+                        <th>Időeredmény</th>
+                        <th>Státusz</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {teamAttempts.map((att, idx) => (
+                        <tr key={idx} className={Number(att.eliminated) === 1 ? 'table-light' : 'table-warning'}>
+                          <td className="fw-bold">{idx + 1}. bejegyzés</td>
+                          <td>
+                            <span className="badge" style={{ background: 'var(--yellow)', color: 'var(--black)', border: '1px solid var(--black)' }}>{att.completed_level}. szint</span>
+                          </td>
+                          <td className="fw-semibold">{att.time_spent_on_level} mp</td>
+                          <td>
+                            {Number(att.eliminated) === 1 ? (
+                              <span className="badge text-bg-success">
+                                <i className="bi bi-check-circle-fill me-1" />
+                                Befejezve (Lezárva)
+                              </span>
+                            ) : (
+                              <span className="badge text-bg-warning text-dark">
+                                <i className="bi bi-hourglass-split me-1" />
+                                Részeredmény (Folyamatban)
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
-<br /><br />
+      <br /><br />
       <JudgeScenarioHelper competitionId="hill" />
     </section>
   )

@@ -29,7 +29,19 @@ const toTimeInput = (value) => {
 }
 
 export default function SettingsManagementPage({ groupOnly = false }) {
-  const [settings, setSettings] = useState({ ageGroupBreakdown: 0, competitionPhase: '', minSumoRoundTime: '', maxSumoRoundTime: '', psGroupAdvance: 0, hsGroupAdvance: 0, allGroupAdvance: 0 })
+  const [settings, setSettings] = useState({
+    ageGroupBreakdown: 0,
+    competitionPhase: '',
+    minSumoRoundTime: '',
+    maxSumoRoundTime: '',
+    psGroupAdvance: 0,
+    hsGroupAdvance: 0,
+    allGroupAdvance: 0,
+    maxTryLinefollowing: 3,
+    maxTryHillclimbing: 2,
+    maxTryBasketball: 3,
+    sumoRematch: 0
+  })
   const [phases, setPhases] = useState([])
   const [phaseDraft, setPhaseDraft] = useState(emptyPhase)
   const [editingPhaseName, setEditingPhaseName] = useState(null)
@@ -61,7 +73,11 @@ export default function SettingsManagementPage({ groupOnly = false }) {
         maxSumoRoundTime: settingsData?.maxSumoRoundTime ?? '',
         psGroupAdvance: settingsData?.psGroupAdvance ?? 0,
         hsGroupAdvance: settingsData?.hsGroupAdvance ?? 0,
-        allGroupAdvance: settingsData?.allGroupAdvance ?? 0
+        allGroupAdvance: settingsData?.allGroupAdvance ?? 0,
+        maxTryLinefollowing: settingsData?.maxTryLinefollowing ?? settingsData?.maxTryLineFollow ?? 3,
+        maxTryHillclimbing: settingsData?.maxTryHillclimbing ?? settingsData?.maxTryHillClimbing ?? 2,
+        maxTryBasketball: settingsData?.maxTryBasketball ?? 3,
+        sumoRematch: Number(settingsData?.sumoRematch) === 1 ? 1 : 0
       })
     } catch (error) {
       setStatus({ type: 'danger', text: error.message })
@@ -78,7 +94,31 @@ export default function SettingsManagementPage({ groupOnly = false }) {
   const updateSettings = (name, value) => setSettings((current) => ({ ...current, [name]: value }))
   const updatePhase = (name, value) => setPhaseDraft((current) => ({ ...current, [name]: value }))
 
-  const saveMainSettings = async (event) => {
+  const getCleanPhaseValue = (rawPhase) => {
+    if (!rawPhase || typeof rawPhase !== 'string' || !rawPhase.trim()) return null
+    const exists = phases.some((phase) => phaseNameOf(phase).toLowerCase() === rawPhase.trim().toLowerCase())
+    return exists ? rawPhase.trim() : null
+  }
+
+  const savePhaseAndAgeSettings = async (event) => {
+    event.preventDefault()
+    try {
+      setSaving(true)
+      const phaseValue = getCleanPhaseValue(settings.competitionPhase)
+      await modifySettings({
+        ...settings,
+        competitionPhase: phaseValue
+      })
+      setStatus({ type: 'success', text: 'A versenyszakasz és korosztálybontás mentése sikerült.' })
+      await loadData()
+    } catch (error) {
+      setStatus({ type: 'danger', text: error.message })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const saveRulesAndAttemptsSettings = async (event) => {
     event.preventDefault()
     const min = settings.minSumoRoundTime === '' ? null : Number(settings.minSumoRoundTime)
     const max = settings.maxSumoRoundTime === '' ? null : Number(settings.maxSumoRoundTime)
@@ -90,12 +130,26 @@ export default function SettingsManagementPage({ groupOnly = false }) {
       setStatus({ type: 'danger', text: 'A szumóforduló minimum ideje nem lehet nagyobb a maximum idejénél.' })
       return
     }
+    const payloadToSave = {
+      ...settings,
+      competitionPhase: getCleanPhaseValue(settings.competitionPhase),
+      maxTryLinefollowing: settings.maxTryLinefollowing === '' ? 3 : Number(settings.maxTryLinefollowing),
+      maxTryHillclimbing: settings.maxTryHillclimbing === '' ? 2 : Number(settings.maxTryHillclimbing),
+      maxTryBasketball: settings.maxTryBasketball === '' ? 3 : Number(settings.maxTryBasketball),
+      allGroupAdvance: Number(settings.allGroupAdvance) || 0,
+      psGroupAdvance: Number(settings.psGroupAdvance) || 0,
+      hsGroupAdvance: Number(settings.hsGroupAdvance) || 0
+    }
     try {
       setSaving(true)
-      await modifySettings(settings)
-      setStatus({ type: 'success', text: 'A beállítások mentése sikerült.' })
+      await modifySettings(payloadToSave)
+      setStatus({ type: 'success', text: 'A versenyszabályok, időkeretek és próbálkozások mentése sikerült.' })
       await loadData()
-    } catch (error) { setStatus({ type: 'danger', text: error.message }) } finally { setSaving(false) }
+    } catch (error) {
+      setStatus({ type: 'danger', text: error.message })
+    } finally {
+      setSaving(false)
+    }
   }
 
   const savePhase = async (event) => {
@@ -287,14 +341,156 @@ export default function SettingsManagementPage({ groupOnly = false }) {
       <p className="text-muted mb-4">Korosztály, aktuális szakasz, időintervallumok és a teljes szumóforduló időkerete.</p>
       <FloatingFeedback message={status} onClose={() => setStatus(null)} />
       {loading ? <div className="alert alert-info">Beállítások betöltése...</div> : <>
-        <form className="card shadow-sm team-card no-hover-card mb-4" onSubmit={saveMainSettings}>
-          <div className="card-body p-4"><h3 className="h5 mb-3">Aktuális beállítások</h3><div className="row g-3">
-            <div className="col-md-6"><label className="form-label" htmlFor="age-breakdown">Korosztálybontás</label><select id="age-breakdown" className="form-select" value={settings.ageGroupBreakdown} onChange={(event) => updateSettings('ageGroupBreakdown', Number(event.target.value))}><option value="0">Nincs korosztálybontás</option><option value="1">Van korosztálybontás</option></select></div>
-            <div className="col-md-6"><label className="form-label" htmlFor="competition-phase">Aktuális versenyszakasz</label><select id="competition-phase" className="form-select" value={settings.competitionPhase} onChange={(event) => updateSettings('competitionPhase', event.target.value)}><option value="">Nincs kiválasztva</option>{phases.map((phase) => { const name = phaseNameOf(phase); return <option value={name} key={phase.id ?? name}>{name}</option> })}</select></div>
-            <div className="col-md-6"><label className="form-label" htmlFor="min-sumo-time">Egy teljes szumóforduló minimum ideje</label><div className="input-group"><input id="min-sumo-time" type="number" min="0" step="1" className="form-control" value={settings.minSumoRoundTime} onChange={(event) => updateSettings('minSumoRoundTime', event.target.value)} /><span className="input-group-text">perc</span></div><div className="form-text">Az adott forduló összes mérkőzésének lejátszására szánt minimum idő, egész percben.</div></div>
-            <div className="col-md-6"><label className="form-label" htmlFor="max-sumo-time">Egy teljes szumóforduló maximum ideje</label><div className="input-group"><input id="max-sumo-time" type="number" min="0" step="1" className="form-control" value={settings.maxSumoRoundTime} onChange={(event) => updateSettings('maxSumoRoundTime', event.target.value)} /><span className="input-group-text">perc</span></div><div className="form-text">Az adott forduló összes mérkőzésének lejátszására szánt maximum idő, egész percben.</div></div>
-            <div className="col-12 text-end"><button className="btn btn-primary" disabled={saving}>Beállítások mentése</button></div>
-          </div></div>
+        <form className="card shadow-sm team-card no-hover-card mb-4" onSubmit={savePhaseAndAgeSettings}>
+          <div className="card-body p-4">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h3 className="h5 mb-1">Versenyszakasz és korosztálybontás</h3>
+                <p className="text-muted small mb-0">Az aktuálisan futó szakasz és a kategóriabontás beállítása.</p>
+              </div>
+            </div>
+            <div className="row g-3">
+              <div className="col-md-6">
+                <label className="form-label" htmlFor="age-breakdown">Korosztálybontás</label>
+                <select id="age-breakdown" className="form-select" value={settings.ageGroupBreakdown} onChange={(event) => updateSettings('ageGroupBreakdown', Number(event.target.value))}>
+                  <option value="0">Nincs korosztálybontás</option>
+                  <option value="1">Van korosztálybontás</option>
+                </select>
+                <div className="form-text">Meghatározza, hogy a kategóriák (általános / középiskolás) külön versenyeznek-e.</div>
+              </div>
+              <div className="col-md-6">
+                <label className="form-label" htmlFor="competition-phase">Aktuális versenyszakasz</label>
+                <select id="competition-phase" className="form-select" value={settings.competitionPhase} onChange={(event) => updateSettings('competitionPhase', event.target.value)}>
+                  <option value="">Nincs kiválasztva</option>
+                  {phases.map((phase) => { const name = phaseNameOf(phase); return <option value={name} key={phase.id ?? name}>{name}</option> })}
+                </select>
+                <div className="form-text">A kiválasztott szakasz jelenik meg a versenyzői felületeken.</div>
+              </div>
+              <div className="col-12 text-end">
+                <button type="submit" className="btn btn-primary" disabled={saving}>Szakasz és korosztály mentése</button>
+              </div>
+            </div>
+          </div>
+        </form>
+
+        <form className="card shadow-sm team-card no-hover-card mb-4" onSubmit={saveRulesAndAttemptsSettings}>
+          <div className="card-body p-4">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h3 className="h5 mb-1">Versenyszabályok, időkeretek és próbálkozások száma</h3>
+                <p className="text-muted small mb-0">Szumó menetidők, visszavágó és az egyes versenyszámok maximális próbálkozási korlátai.</p>
+              </div>
+            </div>
+            <div className="row g-3">
+              <div className="col-md-6">
+                <label className="form-label" htmlFor="min-sumo-time">Egy teljes szumóforduló minimum ideje</label>
+                <div className="input-group">
+                  <input id="min-sumo-time" type="number" min="0" step="1" className="form-control" value={settings.minSumoRoundTime} onChange={(event) => updateSettings('minSumoRoundTime', event.target.value)} />
+                  <span className="input-group-text">perc</span>
+                </div>
+                <div className="form-text">Az adott forduló összes mérkőzésének lejátszására szánt minimum idő, egész percben.</div>
+              </div>
+              <div className="col-md-6">
+                <label className="form-label" htmlFor="max-sumo-time">Egy teljes szumóforduló maximum ideje</label>
+                <div className="input-group">
+                  <input id="max-sumo-time" type="number" min="0" step="1" className="form-control" value={settings.maxSumoRoundTime} onChange={(event) => updateSettings('maxSumoRoundTime', event.target.value)} />
+                  <span className="input-group-text">perc</span>
+                </div>
+                <div className="form-text">Az adott forduló összes mérkőzésének lejátszására szánt maximum idő, egész percben.</div>
+              </div>
+              <div className="col-md-3">
+                <label className="form-label" htmlFor="max-try-line">Vonalkövetés max. próba</label>
+                <div className="input-group">
+                  <input
+                    id="max-try-line"
+                    type="number"
+                    min="1"
+                    max="10"
+                    step="1"
+                    className="form-control"
+                    value={settings.maxTryLinefollowing ?? ''}
+                    onChange={(event) => {
+                      const val = event.target.value
+                      updateSettings('maxTryLinefollowing', val === '' ? '' : Math.max(1, Math.min(10, Number(val))))
+                    }}
+                    onBlur={() => {
+                      if (settings.maxTryLinefollowing === '' || Number(settings.maxTryLinefollowing) < 1) {
+                        updateSettings('maxTryLinefollowing', 3)
+                      }
+                    }}
+                  />
+                  <span className="input-group-text">próba</span>
+                </div>
+                <div className="form-text">Csapatonkénti limit (alap: 3)</div>
+              </div>
+              <div className="col-md-3">
+                <label className="form-label" htmlFor="max-try-hill">Hegymászás max. próba</label>
+                <div className="input-group">
+                  <input
+                    id="max-try-hill"
+                    type="number"
+                    min="1"
+                    max="10"
+                    step="1"
+                    className="form-control"
+                    value={settings.maxTryHillclimbing ?? ''}
+                    onChange={(event) => {
+                      const val = event.target.value
+                      updateSettings('maxTryHillclimbing', val === '' ? '' : Math.max(1, Math.min(10, Number(val))))
+                    }}
+                    onBlur={() => {
+                      if (settings.maxTryHillclimbing === '' || Number(settings.maxTryHillclimbing) < 1) {
+                        updateSettings('maxTryHillclimbing', 2)
+                      }
+                    }}
+                  />
+                  <span className="input-group-text">próba</span>
+                </div>
+                <div className="form-text">Csapatonkénti limit (alap: 2)</div>
+              </div>
+              <div className="col-md-3">
+                <label className="form-label" htmlFor="max-try-basket">Kosárra dobás max. próba</label>
+                <div className="input-group">
+                  <input
+                    id="max-try-basket"
+                    type="number"
+                    min="1"
+                    max="10"
+                    step="1"
+                    className="form-control"
+                    value={settings.maxTryBasketball ?? ''}
+                    onChange={(event) => {
+                      const val = event.target.value
+                      updateSettings('maxTryBasketball', val === '' ? '' : Math.max(1, Math.min(10, Number(val))))
+                    }}
+                    onBlur={() => {
+                      if (settings.maxTryBasketball === '' || Number(settings.maxTryBasketball) < 1) {
+                        updateSettings('maxTryBasketball', 3)
+                      }
+                    }}
+                  />
+                  <span className="input-group-text">próba</span>
+                </div>
+                <div className="form-text">Csapatonkénti limit (alap: 3)</div>
+              </div>
+              <div className="col-md-3">
+                <label className="form-label" htmlFor="sumo-rematch">Szumó visszavágó</label>
+                <select
+                  id="sumo-rematch"
+                  className="form-select"
+                  value={settings.sumoRematch}
+                  onChange={(event) => updateSettings('sumoRematch', Number(event.target.value))}
+                >
+                  <option value="0">Nincs visszavágó (0)</option>
+                  <option value="1">Visszavágó engedélyezve (1)</option>
+                </select>
+                <div className="form-text">Lehet-e visszavágó meccs</div>
+              </div>
+              <div className="col-12 text-end">
+                <button type="submit" className="btn btn-primary" disabled={saving}>Szabályok és próbák mentése</button>
+              </div>
+            </div>
+          </div>
         </form>
 
         <section className="card shadow-sm team-card no-hover-card mb-4">
@@ -309,11 +505,11 @@ export default function SettingsManagementPage({ groupOnly = false }) {
               <div className="col-md-4"><div className="border rounded-3 p-3 h-100 bg-body-tertiary"><div className="small text-muted">Összesen</div><div className="fs-3 fw-bold">{teamCounts.total}</div><div className="small">nevezett csapat</div></div></div>
             </div>
             <div className="row g-3">
-              <div className="col-md-4"><label className="form-label" htmlFor="advance-all">Továbbjutók – korosztálybontás nélkül</label><input id="advance-all" type="number" min="0" max={teamCounts.total} step="1" className="form-control" disabled={Number(settings.ageGroupBreakdown) === 1} value={settings.allGroupAdvance} onChange={(event) => updateSettings('allGroupAdvance', Math.min(teamCounts.total, Math.max(0, Number(event.target.value))))} /><div className="form-text">Maximum {teamCounts.total} csapat.</div></div>
-              <div className="col-md-4"><label className="form-label" htmlFor="advance-primary">Továbbjutók – általános iskolás</label><input id="advance-primary" type="number" min="0" max={teamCounts.primary} step="1" className="form-control" disabled={Number(settings.ageGroupBreakdown) !== 1} value={settings.psGroupAdvance} onChange={(event) => updateSettings('psGroupAdvance', Math.min(teamCounts.primary, Math.max(0, Number(event.target.value))))} /><div className="form-text">Maximum {teamCounts.primary} csapat.</div></div>
-              <div className="col-md-4"><label className="form-label" htmlFor="advance-secondary">Továbbjutók – középiskolás</label><input id="advance-secondary" type="number" min="0" max={teamCounts.secondary} step="1" className="form-control" disabled={Number(settings.ageGroupBreakdown) !== 1} value={settings.hsGroupAdvance} onChange={(event) => updateSettings('hsGroupAdvance', Math.min(teamCounts.secondary, Math.max(0, Number(event.target.value))))} /><div className="form-text">Maximum {teamCounts.secondary} csapat.</div></div>
+              <div className="col-md-4"><label className="form-label" htmlFor="advance-all">Továbbjutók – korosztálybontás nélkül</label><input id="advance-all" type="number" min="0" max={teamCounts.total} step="1" className="form-control" disabled={Number(settings.ageGroupBreakdown) === 1} value={settings.allGroupAdvance ?? ''} onChange={(event) => { const v = event.target.value; updateSettings('allGroupAdvance', v === '' ? '' : Math.min(teamCounts.total, Math.max(0, Number(v)))) }} onBlur={() => { if (settings.allGroupAdvance === '') updateSettings('allGroupAdvance', 0) }} /><div className="form-text">Maximum {teamCounts.total} csapat.</div></div>
+              <div className="col-md-4"><label className="form-label" htmlFor="advance-primary">Továbbjutók – általános iskolás</label><input id="advance-primary" type="number" min="0" max={teamCounts.primary} step="1" className="form-control" disabled={Number(settings.ageGroupBreakdown) !== 1} value={settings.psGroupAdvance ?? ''} onChange={(event) => { const v = event.target.value; updateSettings('psGroupAdvance', v === '' ? '' : Math.min(teamCounts.primary, Math.max(0, Number(v)))) }} onBlur={() => { if (settings.psGroupAdvance === '') updateSettings('psGroupAdvance', 0) }} /><div className="form-text">Maximum {teamCounts.primary} csapat.</div></div>
+              <div className="col-md-4"><label className="form-label" htmlFor="advance-secondary">Továbbjutók – középiskolás</label><input id="advance-secondary" type="number" min="0" max={teamCounts.secondary} step="1" className="form-control" disabled={Number(settings.ageGroupBreakdown) !== 1} value={settings.hsGroupAdvance ?? ''} onChange={(event) => { const v = event.target.value; updateSettings('hsGroupAdvance', v === '' ? '' : Math.min(teamCounts.secondary, Math.max(0, Number(v)))) }} onBlur={() => { if (settings.hsGroupAdvance === '') updateSettings('hsGroupAdvance', 0) }} /><div className="form-text">Maximum {teamCounts.secondary} csapat.</div></div>
               <div className="col-12"><div className="form-text">Ugyanezeket a létszámokat használja a vonalkövetés és a szumó csoportköre.</div></div>
-              <div className="col-12 text-end"><button type="button" className="btn btn-primary" disabled={saving} onClick={async () => { try { setSaving(true); await modifySettings(settings); setStatus({ type: 'success', text: 'A továbbjutási beállítások mentve.' }); await loadData() } catch (error) { setStatus({ type: 'danger', text: error.message }) } finally { setSaving(false) } }}>Továbbjutási beállítások mentése</button></div>
+              <div className="col-12 text-end"><button type="button" className="btn btn-primary" disabled={saving} onClick={async () => { try { setSaving(true); await modifySettings({ ...settings, competitionPhase: getCleanPhaseValue(settings.competitionPhase) }); setStatus({ type: 'success', text: 'A továbbjutási beállítások mentve.' }); await loadData() } catch (error) { setStatus({ type: 'danger', text: error.message }) } finally { setSaving(false) } }}>Továbbjutási beállítások mentése</button></div>
             </div>
           </div>
         </section>

@@ -806,7 +806,7 @@ export default function ShowPage() {
   const load = useCallback(async () => {
     const requests = await Promise.allSettled([
       getAllSettings(), getAllCompetitionPhases(), json('/Teams'), json('/Points'),
-      json('/LineFollowing'), json('/HillClimbing'), json('/Basketball'), json('/Sumo/group'), json('/Sumo/matches')
+      json('/LineFollowing'), json('/HillClimbing/bestattempts'), json('/Basketball'), json('/Sumo/group'), json('/Sumo/matches')
     ])
     const value = (index, fallback) => requests[index].status === 'fulfilled' ? requests[index].value : fallback
     setData({ settings: value(0, null), phases: value(1, []), teams: value(2, []), points: value(3, []), line: value(4, []), hill: value(5, []), basketball: value(6, []), sumo: value(7, []), matches: value(8, []) })

@@ -42,12 +42,16 @@ export const modifySettings = async (settings) => {
   }
   const payload = {
     ageGroupBreakdown: Number(settings.ageGroupBreakdown) === 1 ? 1 : 0,
-    competitionPhase: settings.competitionPhase || '',
+    competitionPhase: typeof settings.competitionPhase === 'string' && settings.competitionPhase.trim().length > 0 ? settings.competitionPhase.trim() : null,
     minSumoRoundTime: toNullableInteger(settings.minSumoRoundTime),
     maxSumoRoundTime: toNullableInteger(settings.maxSumoRoundTime),
     psGroupAdvance: toNullableInteger(settings.psGroupAdvance) ?? 0,
     hsGroupAdvance: toNullableInteger(settings.hsGroupAdvance) ?? 0,
-    allGroupAdvance: toNullableInteger(settings.allGroupAdvance) ?? 0
+    allGroupAdvance: toNullableInteger(settings.allGroupAdvance) ?? 0,
+    maxTryLineFollow: toNullableInteger(settings.maxTryLineFollow ?? settings.maxTryLinefollowing) ?? 3,
+    maxTryHillClimbing: toNullableInteger(settings.maxTryHillClimbing ?? settings.maxTryHillclimbing) ?? 2,
+    maxTryBasketball: toNullableInteger(settings.maxTryBasketball) ?? 3,
+    sumoRematch: Number(settings.sumoRematch) === 1 ? 1 : 0
   }
   const result = await request('/modifySettings', { method: 'PUT', body: JSON.stringify(payload) })
   window.dispatchEvent(new CustomEvent(SUMO_CONFIG_CHANGED_EVENT, { detail: payload }))
@@ -119,6 +123,10 @@ export const loadSumoScheduleConfig = async () => {
     maxSumoRoundTime: settings?.maxSumoRoundTime ?? null,
     psGroupAdvance: Number(settings?.psGroupAdvance) || 0,
     hsGroupAdvance: Number(settings?.hsGroupAdvance) || 0,
-    allGroupAdvance: Number(settings?.allGroupAdvance) || 0
+    allGroupAdvance: Number(settings?.allGroupAdvance) || 0,
+    maxTryLinefollowing: Number(settings?.maxTryLinefollowing ?? settings?.maxTryLineFollow) || 3,
+    maxTryHillclimbing: Number(settings?.maxTryHillclimbing ?? settings?.maxTryHillClimbing) || 2,
+    maxTryBasketball: Number(settings?.maxTryBasketball) || 3,
+    sumoRematch: Number(settings?.sumoRematch) === 1 ? 1 : 0
   }
 }

@@ -20,7 +20,7 @@ export default function HallOfFamePage({ userRole }) {
     try {
       const [lineRes, hillRes, basketRes, sumoRes, teamsRes] = await Promise.allSettled([
         fetch('https://brickathlon.runasp.net/api/LineFollowing'),
-        fetch('https://brickathlon.runasp.net/api/HillClimbing'),
+        fetch('https://brickathlon.runasp.net/api/HillClimbing/bestattempts'),
         fetch('https://brickathlon.runasp.net/api/Basketball'),
         fetch('https://brickathlon.runasp.net/api/Sumo/matches'),
         fetch('https://brickathlon.runasp.net/api/Teams')

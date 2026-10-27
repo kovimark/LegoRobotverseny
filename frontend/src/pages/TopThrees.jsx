@@ -92,10 +92,10 @@ const getBasketRanking = (teams, results) => {
 // -------- KOMPONENS --------
 
 const competitions = [
-  { id: 'line', label: 'Vonalkövetés', api: '/api/LineFollowing', rankFn: getLineRanking },
-  { id: 'hill', label: 'Hegymászás', api: '/api/HillClimbing', rankFn: getHillRanking },
-  { id: 'sumo', label: 'Szumó', api: '/api/Sumo/matches', rankFn: getSumoRanking },
-  { id: 'basket', label: 'Kosárra dobás', api: '/api/Basketball', rankFn: getBasketRanking },
+  { id: 'line', label: 'Vonalkövetés', api: 'api/LineFollowing', rankFn: getLineRanking },
+  { id: 'hill', label: 'Hegymászás', api: 'api/HillClimbing/bestattempts', rankFn: getHillRanking },
+  { id: 'sumo', label: 'Szumó', api: 'api/Sumo/matches', rankFn: getSumoRanking },
+  { id: 'basket', label: 'Kosárra dobás', api: 'api/Basketball', rankFn: getBasketRanking },
 ];
 
 const categoryLabels = ['Általános iskola', 'Középiskola'];
@@ -192,7 +192,8 @@ export default function TopThrees({ userPrivilege }) {
         const teamNames = new Set(filteredTeams.map(t => t.teamName));
         for (const comp of competitions) {
           try {
-            const res = await fetch(`https://brickathlon.runasp.net/${comp.api}`);
+            const endpoint = comp.api.replace(/^\/+/, '');
+            const res = await fetch(`https://brickathlon.runasp.net/${endpoint}`);
             if (res.ok) {
               const data = await res.json();
               let results = Array.isArray(data) ? data : [];
@@ -213,7 +214,8 @@ export default function TopThrees({ userPrivilege }) {
         setIsCombined(false);
         const comp = competitions.find(c => c.id === selectedCompetition);
         if (!comp) throw new Error('Ismeretlen versenyszám.');
-        const res = await fetch(`https://brickathlon.runasp.net/${comp.api}`);
+        const endpoint = comp.api.replace(/^\/+/, '');
+        const res = await fetch(`https://brickathlon.runasp.net/${endpoint}`);
         if (!res.ok) throw new Error(`Nem sikerült betölteni a(z) ${comp.label} adatokat.`);
         const data = await res.json();
 
