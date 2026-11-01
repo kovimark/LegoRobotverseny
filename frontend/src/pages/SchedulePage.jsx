@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getAllSettings } from '../services/sumoScheduleConfigApi'
+import { getAllSettings, getAllCompetitionPhases } from '../services/sumoScheduleConfigApi'
 
 const scheduleItems = [
   {
@@ -54,9 +54,17 @@ export default function SchedulePage() {
     let mounted = true
     const loadPhase = async () => {
       try {
-        const settings = await getAllSettings()
-        if (mounted && settings && settings.competitionPhase) {
-          setCurrentPhase(settings.competitionPhase)
+        const [settings, phases] = await Promise.all([
+          getAllSettings(),
+          getAllCompetitionPhases().catch(() => [])
+        ])
+        if (mounted && settings) {
+          let phaseName = typeof settings.competitionPhase === 'string' ? settings.competitionPhase : ''
+          if (!phaseName && settings.competitionPhaseId && Array.isArray(phases)) {
+            const matched = phases.find((p) => Number(p.id) === Number(settings.competitionPhaseId))
+            if (matched) phaseName = matched.phaseName || matched.name || ''
+          }
+          if (phaseName) setCurrentPhase(phaseName)
         }
       } catch {
         // Opció, ha még nincs beállítva szakasz

@@ -87,7 +87,7 @@ export default function BasketThrowScoring() {
   const [modifying, setModifying] = useState(false)
 
   const refreshResults = async () => {
-    const response = await fetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}?_t=${Date.now()}`)
+    const response = await fetch(`https://brickathlon.runasp.net/api/Basketball/bestattempts?_t=${Date.now()}`)
     if (!response.ok) {
       throw new Error('Nem sikerült betölteni a kosárra dobás eredményeit.')
     }
@@ -105,7 +105,7 @@ export default function BasketThrowScoring() {
 
       try {
         const [resultsResponse, teamNamesResponse, allTeamsResponse] = await Promise.all([
-          fetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}?_t=${Date.now()}`),
+          fetch(`https://brickathlon.runasp.net/api/Basketball/bestattempts?_t=${Date.now()}`),
           fetch(`https://brickathlon.runasp.net/api/Teams/teamnames?_t=${Date.now()}`),
           fetch(`https://brickathlon.runasp.net/api/Teams?_t=${Date.now()}`)
         ])

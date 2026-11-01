@@ -247,7 +247,7 @@ export default function LineFollowingScoring() {
 
       try {
         const [response, lineFollowingTeamNamesResponse, teamNamesResponse, allTeamsResponse] = await Promise.all([
-          fetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}`),
+          fetch('https://brickathlon.runasp.net/api/LineFollowing/allattempts'),
           fetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}/teamnames`),
           fetch('https://brickathlon.runasp.net/api/Teams/teamnames'),
           fetch('https://brickathlon.runasp.net/api/Teams')
@@ -450,8 +450,9 @@ export default function LineFollowingScoring() {
     try {
       const bestTime = getBestTime(firstTime, secondTime)
 
-      await fetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(teamName)}/${bestTime}`, {
-        method: 'PATCH'
+      const stage = getStageValueFromRoundId(roundId) || 1
+      await authFetch(`https://brickathlon.runasp.net/api/LineFollowing/${encodeURIComponent(teamName)}/${bestTime}/${stage}`, {
+        method: 'PUT'
       })
 
       setActionMessage({ type: 'success', text: 'A frissítés sikeres volt.' })

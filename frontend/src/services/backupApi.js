@@ -121,9 +121,9 @@ export const exportScoresBackup = async (options = {}) => {
   const isAuto = Boolean(options.isAuto)
   const [points, lineFollowing, hillClimbing, basketball, sumoMatches, tieBreakers, teams, statistics] = await Promise.all([
     fetchJson('/Points').catch(() => []),
-    fetchJson('/LineFollowing').catch(() => []),
+    fetchJson('/LineFollowing/allattempts').catch(() => []),
     fetchJson('/HillClimbing/allattempts').catch(() => []),
-    fetchJson('/Basketball').catch(() => []),
+    fetchJson('/Basketball/allattempts').catch(() => []),
     fetchJson('/Sumo/matches').catch(() => []),
     fetchJson('/TieBreaker').catch(() => []),
     fetchJson('/Teams').catch(() => []),
@@ -239,8 +239,8 @@ export const restoreScoresBackup = async (backup) => {
   const basketball = Array.isArray(backup.basketball) ? backup.basketball : []
   const sumoMatches = Array.isArray(backup.sumoMatches) ? backup.sumoMatches : []
   const [currentLine, currentBasketball, currentSumo] = await Promise.all([
-    fetchJson('/LineFollowing').catch(() => []),
-    fetchJson('/Basketball').catch(() => []),
+    fetchJson('/LineFollowing/allattempts').catch(() => []),
+    fetchJson('/Basketball/allattempts').catch(() => []),
     fetchJson('/Sumo/matches').catch(() => [])
   ])
   const lineKeys = new Set((Array.isArray(currentLine) ? currentLine : []).map((item) => `${item.team_name || item.teamName}|${Number(item.time)}|${normalizeStage(item.stage ?? item.tournamentStage)}`))

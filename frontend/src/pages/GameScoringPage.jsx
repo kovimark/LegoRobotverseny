@@ -770,7 +770,7 @@ function GameLineFollowingScoring() {
     setLoading(true)
     try {
       const [lineResultsResponse, lineTeamNamesResponse, teamNamesResponse, allTeamsResponse] = await Promise.all([
-        fetch(`${API_BASE}/LineFollowing`),
+        fetch(`${API_BASE}/LineFollowing/allattempts`),
         fetch(`${API_BASE}/LineFollowing/teamnames`),
         fetch(`${API_BASE}/Teams/teamnames`),
         fetch(`${API_BASE}/Teams`)
@@ -871,7 +871,7 @@ function GameLineFollowingScoring() {
       setActionMessage({ type: 'success', text: 'Vonalkövetés eredmény rögzítve.' })
 
       // Reload results
-      const res = await fetch(`${API_BASE}/LineFollowing`)
+      const res = await fetch(`${API_BASE}/LineFollowing/allattempts`)
       if (res.ok) {
         const data = await res.json()
         setLineResults(Array.isArray(data) ? data : [])

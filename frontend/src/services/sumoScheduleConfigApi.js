@@ -114,11 +114,23 @@ export const cleanTestData = async () => {
 }
 
 export const loadSumoScheduleConfig = async () => {
-  const settings = await getAllSettings()
+  const [settings, phases] = await Promise.all([
+    getAllSettings(),
+    getAllCompetitionPhases().catch(() => [])
+  ])
+  let activePhaseName = ''
+  if (typeof settings?.competitionPhase === 'string' && settings.competitionPhase) {
+    activePhaseName = settings.competitionPhase
+  } else if (settings?.competitionPhaseId && Array.isArray(phases)) {
+    const matched = phases.find((p) => Number(p.id) === Number(settings.competitionPhaseId))
+    if (matched) activePhaseName = matched.phaseName || matched.name || ''
+  } else if (settings?.competitionPhase?.phaseName) {
+    activePhaseName = settings.competitionPhase.phaseName
+  }
   return {
     minimumRounds: 4,
     ageGroupBreakdown: Number(settings?.ageGroupBreakdown) === 1 ? 1 : 0,
-    competitionPhase: typeof settings?.competitionPhase === 'string' ? settings.competitionPhase : (settings?.competitionPhase?.phaseName || ''),
+    competitionPhase: activePhaseName,
     minSumoRoundTime: settings?.minSumoRoundTime ?? null,
     maxSumoRoundTime: settings?.maxSumoRoundTime ?? null,
     psGroupAdvance: Number(settings?.psGroupAdvance) || 0,

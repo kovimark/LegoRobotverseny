@@ -49,7 +49,7 @@ export default function MyTeamsPage({ user }) {
             { headers: { accept: '*/*' }, signal: controller.signal }
           ),
           fetch(
-            'https://brickathlon.runasp.net/api/LineFollowing',
+            'https://brickathlon.runasp.net/api/LineFollowing/allattempts',
             { headers: { accept: '*/*' }, signal: controller.signal }
           ),
           fetch(
@@ -57,7 +57,7 @@ export default function MyTeamsPage({ user }) {
             { headers: { accept: '*/*' }, signal: controller.signal }
           ),
           fetch(
-            'https://brickathlon.runasp.net/api/Basketball',
+            'https://brickathlon.runasp.net/api/Basketball/allattempts',
             { headers: { accept: '*/*' }, signal: controller.signal }
           )
         ])

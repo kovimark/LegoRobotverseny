@@ -73,7 +73,7 @@ const getSumoRanking = (teams, matches) => {
 const getBasketRanking = (teams, results) => {
   const teamMap = new Map();
   results.forEach((item) => {
-    const name = item.teamName;
+    const name = item.team_name || item.teamName;
     if (!name) return;
     const hits = (parseInt(item.hoop1) || 0) + (parseInt(item.hoop2) || 0) +
                  (parseInt(item.hoop3) || 0) + (parseInt(item.hoop4) || 0) +
@@ -92,10 +92,10 @@ const getBasketRanking = (teams, results) => {
 // -------- KOMPONENS --------
 
 const competitions = [
-  { id: 'line', label: 'Vonalkövetés', api: 'api/LineFollowing', rankFn: getLineRanking },
+  { id: 'line', label: 'Vonalkövetés', api: 'api/LineFollowing/bestattempts', rankFn: getLineRanking },
   { id: 'hill', label: 'Hegymászás', api: 'api/HillClimbing/bestattempts', rankFn: getHillRanking },
   { id: 'sumo', label: 'Szumó', api: 'api/Sumo/matches', rankFn: getSumoRanking },
-  { id: 'basket', label: 'Kosárra dobás', api: 'api/Basketball', rankFn: getBasketRanking },
+  { id: 'basket', label: 'Kosárra dobás', api: 'api/Basketball/bestattempts', rankFn: getBasketRanking },
 ];
 
 const categoryLabels = ['Általános iskola', 'Középiskola'];
