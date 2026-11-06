@@ -17,40 +17,86 @@ const request = async (path, options = {}) => {
   return contentType.includes('application/json') ? response.json() : response.text()
 }
 
+const CACHE_KEY = 'brickathlon_cached_message_types'
+
+const getCachedTypes = () => {
+  try {
+    const raw = typeof window !== 'undefined' ? window.localStorage.getItem(CACHE_KEY) : null
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+const saveCachedTypes = (types) => {
+  try {
+    if (typeof window !== 'undefined' && Array.isArray(types) && types.length > 0) {
+      window.localStorage.setItem(CACHE_KEY, JSON.stringify(types))
+    }
+  } catch {}
+}
+
+const getFallbackTypeMap = () => ({
+  5: { name: 'Hír', hex: '#fa7921' },
+  9: { name: 'Fontos hír', hex: '#e55934' },
+  10: { name: 'Menetrend', hex: '#9bc53d' }
+})
+
+const buildTypeDetailsMap = (typeData = []) => {
+  const map = { ...getFallbackTypeMap() }
+  const cached = getCachedTypes()
+  if (Array.isArray(cached)) {
+    cached.forEach((t) => {
+      if (t && t.id) {
+        map[t.id] = { name: t.name || '', hex: t.hex || null }
+      }
+    })
+  }
+  if (Array.isArray(typeData) && typeData.length > 0) {
+    saveCachedTypes(typeData)
+    typeData.forEach((t) => {
+      if (t && typeof t === 'object' && t.id) {
+        map[t.id] = { name: t.name || '', hex: t.hex || null }
+      }
+    })
+  }
+  return map
+}
+
 const normalizeMessage = (message, typeDetailsById = {}) => {
   const rawType = message.type ?? message.messageType
   const typeDetails = typeDetailsById[message.typeId] || {}
+  const resolvedType = typeof rawType === 'object'
+    ? (rawType?.name || '')
+    : (rawType || typeDetails.name || '')
+  const resolvedHex = message.typeHex ?? rawType?.hex ?? typeDetails.hex ?? null
+
   return {
     ...message,
     id: message.id ?? message.messageId ?? message.messageID,
     title: message.title || '',
     text: message.text ?? message.body ?? '',
     links: message.links ?? '',
-    type: typeof rawType === 'object' ? (rawType?.name || '') : (rawType || typeDetails.name || ''),
+    type: resolvedType,
     typeId: message.typeId ?? rawType?.id ?? null,
-    typeHex: message.typeHex ?? rawType?.hex ?? typeDetails.hex ?? null,
+    typeHex: resolvedHex,
     start: message.start ?? message.messageStart ?? message.startTime ?? null,
     end: message.end ?? message.messageEnd ?? message.endTime ?? null
   }
 }
 
-export const getMessages = async (includeTypes = false) => {
-  let typeDetailsById = {}
+export const getMessages = async (includeTypes = true) => {
+  let typeData = []
   let data = []
 
   if (includeTypes) {
     try {
-      const [messagesData, typeData] = await Promise.all([
+      const [messagesData, typesResponse] = await Promise.all([
         request('/getAllMessage'),
         request('/allType').catch(() => [])
       ])
       data = messagesData
-      typeDetailsById = (Array.isArray(typeData) ? typeData : []).reduce((result, type) => {
-        if (type && typeof type === 'object') {
-          result[type.id] = { name: type.name || '', hex: type.hex || null }
-        }
-        return result
-      }, {})
+      typeData = typesResponse
     } catch {
       data = await request('/getAllMessage').catch(() => [])
     }
@@ -58,12 +104,25 @@ export const getMessages = async (includeTypes = false) => {
     data = await request('/getAllMessage').catch(() => [])
   }
 
+  const typeDetailsById = buildTypeDetailsMap(typeData)
   return (Array.isArray(data) ? data : []).map((message) => normalizeMessage(message, typeDetailsById))
 }
 
 export const getMessageTypes = async () => {
-  const data = await request('/allType')
-  return (Array.isArray(data) ? data : []).map((type) => ({ id: type.id, name: type.name || String(type), hex: type.hex || null }))
+  try {
+    const data = await request('/allType')
+    const list = Array.isArray(data) ? data : []
+    if (list.length > 0) {
+      saveCachedTypes(list)
+    }
+    return list.map((type) => ({ id: type.id, name: type.name || String(type), hex: type.hex || null }))
+  } catch {
+    const cached = getCachedTypes()
+    if (Array.isArray(cached) && cached.length > 0) {
+      return cached.map((type) => ({ id: type.id, name: type.name || String(type), hex: type.hex || null }))
+    }
+    return Object.entries(getFallbackTypeMap()).map(([id, t]) => ({ id: Number(id), name: t.name, hex: t.hex }))
+  }
 }
 
 export const addMessageType = async (name, hex) => request('/addType', {
@@ -106,7 +165,7 @@ export const deleteMessage = async (messageId) => {
 
 export const getActiveMessages = async () => {
   const now = Date.now()
-  return (await getMessages()).filter((message) => {
+  return (await getMessages(true)).filter((message) => {
     const hasStarted = !message.start || new Date(message.start).getTime() <= now
     const hasNotEnded = !message.end || new Date(message.end).getTime() >= now
     return hasStarted && hasNotEnded
@@ -114,9 +173,13 @@ export const getActiveMessages = async () => {
 }
 
 export const getMessageByTitle = async (messageTitle) => {
-  const data = await request(`/getMessageByTitle/${encodeURIComponent(messageTitle)}`)
+  const [data, typeData] = await Promise.all([
+    request(`/getMessageByTitle/${encodeURIComponent(messageTitle)}`),
+    request('/allType').catch(() => [])
+  ])
+  const typeDetailsById = buildTypeDetailsMap(typeData)
   const message = Array.isArray(data) ? data[0] : data
-  return message ? normalizeMessage(message) : null
+  return message ? normalizeMessage(message, typeDetailsById) : null
 }
 
 export const toLocalDateTimeInput = (utcValue) => {

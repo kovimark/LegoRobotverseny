@@ -41,6 +41,7 @@ import HelperTombolaPage from './pages/HelperTombolaPage';
 import AdminTombolaDrawPage from './pages/AdminTombolaDrawPage';
 import PostCompetitionSurveyPage from './pages/PostCompetitionSurveyPage';
 import HallOfFamePage from './pages/HallOfFamePage';
+import WeightManagementPage from './pages/WeightManagementPage';
 
 function App() {
   const location = useLocation();
@@ -248,6 +249,7 @@ function App() {
         <Route path="/csapat/:teamName" element={<TeamDetailsPage userRole={userRole} userPrivilege={userPrivilege} />} />
         <Route path="/sajat-csapataim" element={user ? <MyTeamsPage user={user} /> : <LoginPage user={user} authLoading={authLoading} authError={authError} onGoogleSignIn={handleGoogleSignIn} onSignOut={handleSignOut} />} />
         <Route path="/admin" element={protectedAdminPage(userRole === 'admin' ? <AdminPage /> : <HomePage />)} />
+        <Route path="/admin/merlegeles" element={protectedAdminPage(canScore ? <WeightManagementPage userRole={userRole} /> : <HomePage />)} />
         <Route path="/admin/biro-jelentkezesek" element={protectedAdminPage(userRole === 'admin' ? <JudgeApplicationsPage /> : <HomePage />)} />
         <Route path="/admin/jogosultsagok" element={protectedAdminPage(userRole === 'admin' ? <PrivilegeManagementPage /> : <HomePage />)} />
         <Route path="/admin/uzenetek" element={protectedAdminPage(userRole === 'admin' ? <MessageManagementPage /> : <HomePage />)} />

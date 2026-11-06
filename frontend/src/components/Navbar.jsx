@@ -140,6 +140,9 @@ export default function Navbar({ user, userRole, userPrivilege, userTeamId, auth
                                     <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin" onClick={() => setIsProfileOpen(false)}>
                                         <i className="bi bi-people-fill" aria-hidden="true" /><span>Csapatok</span>
                                     </Link>
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/merlegeles" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-speedometer2" aria-hidden="true" /><span>Mérlegelés</span>
+                                    </Link>
                                     <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/pontozas" onClick={() => setIsProfileOpen(false)}>
                                         <i className="bi bi-trophy-fill" aria-hidden="true" /><span>Pontozás kezelése</span>
                                     </Link>
@@ -182,6 +185,9 @@ export default function Navbar({ user, userRole, userPrivilege, userTeamId, auth
                                 </div>
                             ) : userRole === 'judge' ? (
                                 <div className="d-grid gap-2">
+                                    <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/merlegeles" onClick={() => setIsProfileOpen(false)}>
+                                        <i className="bi bi-speedometer2" aria-hidden="true" /><span>Mérlegelés</span>
+                                    </Link>
                                     <Link className="btn btn-outline-primary w-100 profile-menu-link" to="/admin/pontozas" onClick={() => setIsProfileOpen(false)}>
                                         <i className="bi bi-trophy-fill" aria-hidden="true" /><span>Saját versenyszám pontozása</span>
                                     </Link>
