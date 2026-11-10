@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import FloatingFeedback from './FloatingFeedback'
 import CategorizedResultsStandings from './CategorizedResultsStandings'
 import AgeGroupBadge from './AgeGroupBadge'
@@ -6,17 +6,40 @@ import { authFetch } from '../services/apiClient'
 import { getCompetitionConfig } from '../config/adminScoringConfig'
 import { loadSumoScheduleConfig, SUMO_CONFIG_CHANGED_EVENT } from '../services/sumoScheduleConfigApi'
 import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
+import {
+  LINE_STAGE_CONFIG_CHANGED_EVENT,
+  getCustomLineStageLabels,
+  setCustomLineStageLabel,
+  buildLineFollowingStages
+} from '../services/lineFollowingStageConfig'
+
+const readApiError = async (response, fallbackText) => {
+  if (!response) return fallbackText
+  try {
+    const raw = await response.text()
+    if (!raw) return fallbackText
+    try {
+      const parsed = JSON.parse(raw)
+      if (typeof parsed === 'string') return parsed
+      if (parsed?.message) return parsed.message
+      if (parsed?.title) return parsed.title
+      if (parsed?.errors && typeof parsed.errors === 'object') {
+        const firstErr = Object.values(parsed.errors).flat()[0]
+        if (firstErr) return String(firstErr)
+      }
+    } catch {
+      // not json
+    }
+    return raw
+  } catch {
+    return fallbackText
+  }
+}
 
 const competitionConfig = getCompetitionConfig('vonalkovetes')
-const MIN_FINAL_TEAMS = 4
+const MIN_FINAL_TEAMS = 2
 const MAX_TIME_SECONDS = 120
 const LINE_FOLLOWING_STAGE_STORAGE_KEY = 'lineFollowingCurrentStage'
-const LINE_FOLLOWING_STAGES = [
-  { value: 1, label: 'Csoportkör' },
-  { value: 2, label: 'Legjobb 16' },
-  { value: 3, label: 'Negyeddöntő' },
-  { value: 4, label: 'Legjobb 4 (final four)' }
-]
 
 const createEmptyTimeDraft = () => ({
   firstTime: '',
@@ -128,7 +151,7 @@ const getAdvancingEntriesForRound = (round, roundEntries, groupAdvance, category
   return getUniqueAdvancingEntries(roundEntries, Math.max(1, Math.ceil(uniqueTeamCount / 2)))
 }
 
-const createCurrentStagePlaceholderRound = (results, teamNames, storedStage) => {
+const createCurrentStagePlaceholderRound = (results, teamNames, storedStage, lineStages = [], customRoundLabels = {}) => {
   if (!Array.isArray(teamNames) || teamNames.length === 0) {
     return null
   }
@@ -151,13 +174,14 @@ const createCurrentStagePlaceholderRound = (results, teamNames, storedStage) => 
     : maxResultStage === 0
       ? 1
       : shouldMoveToNextStage
-        ? Math.min(LINE_FOLLOWING_STAGES.length, maxResultStage + 1)
+        ? maxResultStage + 1
         : maxResultStage
-  const stageConfig = LINE_FOLLOWING_STAGES.find((stage) => stage.value === stageValue)
+  const stageConfig = lineStages.find((stage) => stage.value === stageValue) || { value: stageValue, label: `${stageValue}. kör` }
+  const stageLabel = customRoundLabels[stageValue] || stageConfig.label
 
   return {
     id: `round-${stageValue}`,
-    label: stageConfig?.label || `${stageValue}. kör`,
+    label: stageLabel,
     teams: [],
     advancingCount: getAdvancingCount(teamNames.length)
   }
@@ -181,25 +205,33 @@ const normalizeLineFollowingResult = (result, index) => {
   }
 }
 
-const createRoundsFromLineFollowingResults = (results) => LINE_FOLLOWING_STAGES
-  .map((stageConfig) => {
-    const teams = results
-      .filter((result) => result.stage === stageConfig.value)
-      .map((result) => ({
-        id: result.id,
-        resultKey: result.resultKey,
-        team_name: result.team_name,
-        savedTime: result.time
-      }))
+const createRoundsFromLineFollowingResults = (results, lineStages = [], customRoundLabels = {}) => {
+  const resultStages = Array.from(new Set(results.map((result) => result.stage))).sort((a, b) => a - b)
+  const effectiveStages = lineStages.length > 0 ? lineStages : [{ value: 1, label: 'Csoportkör' }]
+  const stageValues = Array.from(new Set([...effectiveStages.map((s) => s.value), ...resultStages])).sort((a, b) => a - b)
 
-    return {
-      id: `round-${stageConfig.value}`,
-      label: stageConfig.label,
-      teams,
-      advancingCount: getAdvancingCount(teams.length)
-    }
-  })
-  .filter((round) => round.teams.length > 0)
+  return stageValues
+    .map((stageVal) => {
+      const stageConfig = lineStages.find((s) => s.value === stageVal) || { value: stageVal, label: `${stageVal}. kör` }
+      const stageLabel = customRoundLabels[stageVal] || stageConfig.label
+      const teams = results
+        .filter((result) => result.stage === stageVal)
+        .map((result) => ({
+          id: result.id,
+          resultKey: result.resultKey,
+          team_name: result.team_name,
+          savedTime: result.time
+        }))
+
+      return {
+        id: `round-${stageVal}`,
+        label: stageLabel,
+        teams,
+        advancingCount: getAdvancingCount(teams.length)
+      }
+    })
+    .filter((round) => round.teams.length > 0)
+}
 
 const createRoundResultsFromLineFollowingResults = (results) => results.reduce((acc, result) => {
   const roundId = `round-${result.stage}`
@@ -239,6 +271,36 @@ export default function LineFollowingScoring() {
   const [allTeams, setAllTeams] = useState([])
   const [collapsedRoundIds, setCollapsedRoundIds] = useState([])
   const [groupAdvance, setGroupAdvance] = useState({ ageGroupBreakdown: 0, psGroupAdvance: 0, hsGroupAdvance: 0, allGroupAdvance: 0 })
+  const [customRoundLabels, setCustomRoundLabels] = useState(() => getCustomLineStageLabels())
+  const [selectedStage, setSelectedStage] = useState(null)
+  const [editingStageId, setEditingStageId] = useState(null)
+  const [editingStageLabel, setEditingStageLabel] = useState('')
+  const [rawResults, setRawResults] = useState([])
+
+  const lineStages = useMemo(() => {
+    return buildLineFollowingStages(groupAdvance, customRoundLabels, rawResults)
+  }, [groupAdvance, customRoundLabels, rawResults])
+
+  useEffect(() => {
+    const handleLabelsChanged = (event) => {
+      setCustomRoundLabels(event.detail || getCustomLineStageLabels())
+    }
+    window.addEventListener(LINE_STAGE_CONFIG_CHANGED_EVENT, handleLabelsChanged)
+    window.addEventListener('storage', handleLabelsChanged)
+    return () => {
+      window.removeEventListener(LINE_STAGE_CONFIG_CHANGED_EVENT, handleLabelsChanged)
+      window.removeEventListener('storage', handleLabelsChanged)
+    }
+  }, [])
+
+  useEffect(() => {
+    setRounds((prevRounds) => prevRounds.map((round) => {
+      const stageVal = getStageValueFromRoundId(round.id)
+      const stageConfig = lineStages.find((s) => s.value === stageVal)
+      const label = customRoundLabels[stageVal] || stageConfig?.label || round.label
+      return { ...round, label }
+    }))
+  }, [lineStages, customRoundLabels])
 
   useEffect(() => {
     const loadTeams = async () => {
@@ -258,9 +320,10 @@ export default function LineFollowingScoring() {
         const lineFollowingTeamNamesData = lineFollowingTeamNamesResponse.ok ? await lineFollowingTeamNamesResponse.json() : []
         const teamNamesData = teamNamesResponse.ok ? await teamNamesResponse.json() : []
         const allTeamsData = allTeamsResponse.ok ? await allTeamsResponse.json() : []
-        const normalizedResults = Array.isArray(data)
-          ? data.map(normalizeLineFollowingResult).filter(Boolean)
-          : []
+        const rawResultsData = Array.isArray(data) ? data : []
+        setRawResults(rawResultsData)
+
+        const normalizedResults = rawResultsData.map(normalizeLineFollowingResult).filter(Boolean)
         const normalizedTeams = Array.from(new Map(normalizedResults.map((result) => [
           result.team_name,
           {
@@ -275,8 +338,17 @@ export default function LineFollowingScoring() {
         const fallbackTeamNames = Array.isArray(teamNamesData) && teamNamesData.length > 0
           ? teamNamesData.filter(Boolean)
           : normalizedTeams.map((team) => team.team_name).filter(Boolean)
-        const loadedRounds = createRoundsFromLineFollowingResults(normalizedResults)
-        const placeholderRound = createCurrentStagePlaceholderRound(normalizedResults, activeLineFollowingTeamNames, getStoredLineFollowingStage())
+
+        const currentCustomLabels = getCustomLineStageLabels()
+        const currentStages = buildLineFollowingStages(groupAdvance, currentCustomLabels, rawResultsData)
+        const loadedRounds = createRoundsFromLineFollowingResults(normalizedResults, currentStages, currentCustomLabels)
+        const placeholderRound = createCurrentStagePlaceholderRound(
+          normalizedResults,
+          activeLineFollowingTeamNames,
+          getStoredLineFollowingStage(),
+          currentStages,
+          currentCustomLabels
+        )
         const nextRounds = placeholderRound && !loadedRounds.some((round) => round.id === placeholderRound.id)
           ? [...loadedRounds, placeholderRound]
           : loadedRounds
@@ -303,7 +375,7 @@ export default function LineFollowingScoring() {
     loadTeams()
     window.addEventListener(DATA_REFRESH_EVENT, loadTeams)
     return () => window.removeEventListener(DATA_REFRESH_EVENT, loadTeams)
-  }, [])
+  }, [groupAdvance])
 
   useEffect(() => {
     const refreshAdvancement = async () => {
@@ -378,9 +450,27 @@ export default function LineFollowingScoring() {
   }
 
   const currentRound = rounds[rounds.length - 1] || null
-  const currentResultStage = currentRound ? getStageValueFromRoundId(currentRound.id) : 1
-  const currentStageConfig = LINE_FOLLOWING_STAGES.find((stage) => stage.value === currentResultStage) || LINE_FOLLOWING_STAGES[0]
+  const defaultCurrentStage = currentRound ? getStageValueFromRoundId(currentRound.id) : 1
+  const currentResultStage = selectedStage !== null ? selectedStage : defaultCurrentStage
+  const currentStageConfig = lineStages.find((stage) => stage.value === currentResultStage) || {
+    value: currentResultStage,
+    label: customRoundLabels[currentResultStage] || `${currentResultStage}. kör`
+  }
   const selectedStageRoundId = `round-${currentResultStage}`
+
+  const handleSaveStageLabel = (stageValue, newLabel) => {
+    const updated = setCustomLineStageLabel(stageValue, newLabel)
+    setCustomRoundLabels(updated)
+    setEditingStageId(null)
+    setActionMessage({ type: 'success', text: `A(z) ${stageValue}. szakasz neve sikeresen mentve: "${newLabel}"` })
+  }
+
+  const handleResetStageLabel = (stageValue) => {
+    const updated = setCustomLineStageLabel(stageValue, '')
+    setCustomRoundLabels(updated)
+    setEditingStageId(null)
+    setActionMessage({ type: 'success', text: `A(z) ${stageValue}. szakasz neve visszaállítva az alapértelmezettre.` })
+  }
   const resultSearchResults = resultSearchTerm.trim()
     ? teamNames
         .filter((teamName) => teamName.toLowerCase().includes(resultSearchTerm.trim().toLowerCase()))
@@ -543,7 +633,8 @@ export default function LineFollowingScoring() {
         }
       }))
       setRounds((prev) => {
-        const stageConfig = LINE_FOLLOWING_STAGES.find((stage) => stage.value === tournamentStage)
+        const stageConfig = lineStages.find((stage) => stage.value === tournamentStage)
+        const stageLabel = customRoundLabels[tournamentStage] || stageConfig?.label || `${tournamentStage}. szakasz`
         const nextTeam = { id: resultKey, resultKey, team_name: teamName, savedTime: time }
         const existingRound = prev.find((round) => round.id === selectedStageRoundId)
 
@@ -552,7 +643,7 @@ export default function LineFollowingScoring() {
             ...prev,
             {
               id: selectedStageRoundId,
-              label: stageConfig?.label || `${tournamentStage}. szakasz`,
+              label: stageLabel,
               teams: [nextTeam],
               advancingCount: 1
             }
@@ -612,16 +703,34 @@ export default function LineFollowingScoring() {
     }
 
     try {
-      const response = await authFetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(result.teamName)}/${time}/${stage}`, {
+      let response = await authFetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(result.teamName)}/${time}/${stage}`, {
         method: 'DELETE',
         headers: {
           accept: '*/*'
         }
       })
 
+      if (!response.ok && response.status === 400 && !Number.isInteger(time)) {
+        const roundedTime = Math.round(time)
+        const fallbackResponse = await authFetch(`https://brickathlon.runasp.net/api/${competitionConfig.apiPath}/${encodeURIComponent(result.teamName)}/${roundedTime}/${stage}`, {
+          method: 'DELETE',
+          headers: {
+            accept: '*/*'
+          }
+        })
+        if (fallbackResponse.ok) {
+          response = fallbackResponse
+        }
+      }
+
       if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(errorText || 'Az eredmény törlése sikertelen volt.')
+        const errorText = await readApiError(response, 'Az eredmény törlése sikertelen volt.')
+        if (response.status === 400 && !Number.isInteger(time)) {
+          throw new Error(
+            `A szerver a törléshez egész számot vár (int32), de a mentett idő tizedestört (${time} s). A backend fejlesztőnek a DELETE /api/LineFollowing/{teamName}/{time}/{stage} végponton a time paramétert double típusúra kell módosítania! (${errorText})`
+          )
+        }
+        throw new Error(errorText)
       }
 
       const roundId = `round-${stage}`
@@ -759,9 +868,11 @@ export default function LineFollowingScoring() {
       const nextTeamNames = Array.isArray(nextTeamNamesData) && nextTeamNamesData.length > 0
         ? nextTeamNamesData.filter(Boolean)
         : advancingTeamNames
-      const nextStage = Math.min(LINE_FOLLOWING_STAGES.length, getStageValueFromRoundId(round.id) + 1)
-      const nextStageConfig = LINE_FOLLOWING_STAGES.find((stage) => stage.value === nextStage)
+      const nextStage = getStageValueFromRoundId(round.id) + 1
+      const nextStageConfig = lineStages.find((stage) => stage.value === nextStage) || { value: nextStage, label: `${nextStage}. kör` }
+      const nextStageLabel = customRoundLabels[nextStage] || nextStageConfig.label
       setStoredLineFollowingStage(nextStage)
+      setSelectedStage(nextStage)
       setTeamNames(nextTeamNames)
       setResultSearchTerm('')
       setSelectedResultTeam(null)
@@ -773,7 +884,7 @@ export default function LineFollowingScoring() {
       setRounds((prev) => {
         const nextRound = {
           id: `round-${nextStage}`,
-          label: nextStageConfig?.label || `${nextStage}. kör`,
+          label: nextStageLabel,
           teams: [],
           advancingCount: nextTeamNames.length
         }
@@ -783,7 +894,7 @@ export default function LineFollowingScoring() {
           ? prev.map((existingRound) => (existingRound.id === nextRound.id ? nextRound : existingRound))
           : [...prev, nextRound]
       })
-      setActionMessage({ type: 'success', text: 'A továbbjutók feltöltése sikeres volt.' })
+      setActionMessage({ type: 'success', text: `A továbbjutók sikeresen átléptek a következő szakaszba (${nextStageLabel}).` })
     } catch (err) {
       setActionMessage({ type: 'danger', text: err.message })
     }
@@ -807,13 +918,69 @@ export default function LineFollowingScoring() {
 
             <div className="row g-3 align-items-end">
               <div className="col-12 col-lg-3">
-                <label className="form-label" htmlFor="line-stage-select">Szakasz</label>
-                <input
-                  id="line-stage-select"
-                  className="form-control"
-                  value={`${currentResultStage} - ${currentStageConfig.label}`}
-                  readOnly
-                />
+                <div className="d-flex justify-content-between align-items-center mb-1">
+                  <label className="form-label mb-0" htmlFor="line-stage-select">Szakasz</label>
+                  {editingStageId !== `select-${currentResultStage}` ? (
+                    <button
+                      type="button"
+                      className="btn btn-link btn-sm p-0 text-decoration-none"
+                      title="Kiválasztott szakasz átnevezése"
+                      onClick={() => {
+                        setEditingStageId(`select-${currentResultStage}`)
+                        setEditingStageLabel(currentStageConfig.label)
+                      }}
+                    >
+                      <i className="bi bi-pencil me-1" />
+                      Átnevezés
+                    </button>
+                  ) : null}
+                </div>
+                {editingStageId === `select-${currentResultStage}` ? (
+                  <div className="d-flex gap-1">
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editingStageLabel}
+                      onChange={(e) => setEditingStageLabel(e.target.value)}
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-success px-2"
+                      title="Mentés"
+                      onClick={() => handleSaveStageLabel(currentResultStage, editingStageLabel)}
+                    >
+                      <i className="bi bi-check-lg" />
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-secondary px-2"
+                      title="Mégse"
+                      onClick={() => setEditingStageId(null)}
+                    >
+                      <i className="bi bi-x-lg" />
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-warning px-2"
+                      title="Visszaállítás alapértelmezettre"
+                      onClick={() => handleResetStageLabel(currentResultStage)}
+                    >
+                      <i className="bi bi-arrow-counterclockwise" />
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    id="line-stage-select"
+                    className="form-select"
+                    value={currentResultStage}
+                    onChange={(event) => setSelectedStage(Number(event.target.value))}
+                  >
+                    {lineStages.map((st) => (
+                      <option key={st.value} value={st.value}>{st.value} - {st.label}</option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div className="col-12 col-lg-5 position-relative">
@@ -883,7 +1050,7 @@ export default function LineFollowingScoring() {
                 <div className="d-flex flex-wrap gap-2">
                   {teamNames.map((teamName) => <span className="badge rounded-pill bg-light text-dark border border-dark p-2" key={teamName}><AgeGroupBadge category={categoryByTeamName.get(teamName)} className="me-1" />{teamName}</span>)}
                 </div>
-                {teamNames.length <= MIN_FINAL_TEAMS && <div className="alert alert-success mt-3 mb-0">Elérte a legjobb 4 mezőnyét, ezért további kieséses kör már nem generálható.</div>}
+                {teamNames.length <= MIN_FINAL_TEAMS && <div className="alert alert-success mt-3 mb-0">Elérte a döntő mezőnyét ({teamNames.length} csapat), ez a verseny utolsó köre.</div>}
               </div>
             </section>
           )}
@@ -982,8 +1149,68 @@ export default function LineFollowingScoring() {
                 <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
                   <div>
                     <div className="home-kicker">Vonalkövetés</div>
-                    <h4 className="mb-1">{round.label}</h4>
-                    <p className="text-muted mb-0">Két időt adj meg másodpercben, a gyorsabb eredmény számít.</p>
+                    {editingStageId === round.id ? (
+                      <div className="d-flex flex-wrap align-items-center gap-2 my-1" onClick={(event) => event.stopPropagation()}>
+                        <input
+                          type="text"
+                          className="form-control form-control-sm"
+                          style={{ maxWidth: '240px' }}
+                          value={editingStageLabel}
+                          onChange={(event) => setEditingStageLabel(event.target.value)}
+                          placeholder="Szakasz megnevezése"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-success"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            handleSaveStageLabel(getStageValueFromRoundId(round.id), editingStageLabel)
+                          }}
+                        >
+                          Mentés
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setEditingStageId(null)
+                          }}
+                        >
+                          Mégse
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-warning"
+                          title="Visszaállítás az alapértelmezett névre"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            handleResetStageLabel(getStageValueFromRoundId(round.id))
+                          }}
+                        >
+                          Alapértelmezett
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="d-flex align-items-center gap-2">
+                        <h4 className="mb-0">{round.label}</h4>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-secondary py-0 px-2"
+                          title="Szakasz átnevezése"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setEditingStageId(round.id)
+                            setEditingStageLabel(round.label)
+                          }}
+                        >
+                          <i className="bi bi-pencil me-1" />
+                          Átnevezés
+                        </button>
+                      </div>
+                    )}
+                    <p className="text-muted mb-0 small mt-1">Két időt adj meg másodpercben, a gyorsabb eredmény számít.</p>
                   </div>
                   <span className="line-round-toggle-indicator"><span>{isRoundCollapsed ? 'Lenyitás' : 'Összecsukás'}</span><i className={`bi bi-chevron-up ${isRoundCollapsed ? 'collapsed' : ''}`} aria-hidden="true" /></span>
                 </div>

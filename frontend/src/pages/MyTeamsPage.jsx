@@ -11,6 +11,7 @@ import {
   TOMBOLA_STORAGE_EVENT
 } from '../services/tombolaApi'
 import TombolaTicket from '../components/TombolaTicket'
+import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 
 export default function MyTeamsPage({ user }) {
   const [teams, setTeams] = useState([])
@@ -20,7 +21,8 @@ export default function MyTeamsPage({ user }) {
   const [hillResults, setHillResults] = useState([])
   const [basketResults, setBasketResults] = useState([])
   const [tombolaTickets, setTombolaTickets] = useState([])
-    const [loading, setLoading] = useState(true)
+  const [weights, setWeights] = useState([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushLoading, setPushLoading] = useState(false)
@@ -39,7 +41,7 @@ export default function MyTeamsPage({ user }) {
         setLoading(true)
         setError('')
 
-        const [teamsResponse, matchesResponse, lineResponse, hillResponse, basketResponse] = await Promise.allSettled([
+        const [teamsResponse, matchesResponse, lineResponse, hillResponse, basketResponse, weightResponse] = await Promise.allSettled([
           fetch(
             `https://brickathlon.runasp.net/api/Teams/teambyemail/${encodeURIComponent(user.email)}`,
             { headers: { accept: '*/*' }, signal: controller.signal }
@@ -58,6 +60,10 @@ export default function MyTeamsPage({ user }) {
           ),
           fetch(
             'https://brickathlon.runasp.net/api/Basketball/allattempts',
+            { headers: { accept: '*/*' }, signal: controller.signal }
+          ),
+          fetch(
+            'https://brickathlon.runasp.net/api/Weight/getallweight',
             { headers: { accept: '*/*' }, signal: controller.signal }
           )
         ])
@@ -110,6 +116,15 @@ export default function MyTeamsPage({ user }) {
             setBasketResults([])
           }
         }
+
+        if (weightResponse?.status === 'fulfilled' && weightResponse.value.ok) {
+          try {
+            const wData = await weightResponse.value.json()
+            setWeights(Array.isArray(wData) ? wData : [])
+          } catch {
+            setWeights([])
+          }
+        }
       } catch (requestError) {
         if (requestError.name !== 'AbortError') {
           console.warn('Csapatok betöltése figyelmeztetés:', requestError.message)
@@ -121,7 +136,11 @@ export default function MyTeamsPage({ user }) {
     }
 
     loadTeams()
-    return () => controller.abort()
+    window.addEventListener(DATA_REFRESH_EVENT, loadTeams)
+    return () => {
+      controller.abort()
+      window.removeEventListener(DATA_REFRESH_EVENT, loadTeams)
+    }
   }, [user?.email])
 
   useEffect(() => {
@@ -399,7 +418,7 @@ export default function MyTeamsPage({ user }) {
               </span>
               <Link to="/allasok" className="btn btn-sm btn-outline-light">
                 <i className="bi bi-diagram-3 me-1" />
-                Teljes menetrend
+                Összetett tabella
               </Link>
             </div>
           </div>
@@ -410,7 +429,7 @@ export default function MyTeamsPage({ user }) {
                 <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
                   <span className={`badge fw-bold px-2.5 py-1.5 ${userNextMatchAheadCount === 0 ? 'text-bg-danger' : 'text-bg-warning text-dark'}`}>
                     <i className={`bi ${userNextMatchAheadCount === 0 ? 'bi-exclamation-octagon-fill' : 'bi-bell-fill'} me-1`} />
-                    {userNextMatchAheadCount === 0 ? 'MOST TI JÖTTÖK A PÁSTON!' : 'A TE CSAPATOD KÖVETKEZŐ MECCSE A TEREMBEN'}
+                    {userNextMatchAheadCount === 0 ? 'MOST TI JÖTTÖK A SZUMÓBAN!' : 'A TE CSAPATOD KÖVETKEZŐ MECCSE A TEREMBEN'}
                   </span>
                   <span className="badge text-bg-dark fs-6">
                     #{userNextMatch.table}. mérkőzés
@@ -422,7 +441,7 @@ export default function MyTeamsPage({ user }) {
                 <div className="small mt-1 text-muted">
                   {userNextMatchAheadCount === 0 ? (
                     <span className="text-danger fw-semibold">
-                      Ez a mérkőzés az aktuálisan soron lévő a páston! Kérjük, haladéktalanul menjetek a szumó pályához!
+                      Ez a mérkőzés az aktuálisan soron lévő a szumóban! Kérjük, haladéktalanul menjetek a szumó pályához!
                     </span>
                   ) : (
                     <span>
@@ -438,7 +457,7 @@ export default function MyTeamsPage({ user }) {
               </div>
             )}
 
-            {/* Soron lévő legelső mérkőzés a páston (ha nem a miénk) */}
+            {/* Soron lévő legelső mérkőzés a szumóban (ha nem a miénk) */}
             {currentHallActiveMatch && (!userNextMatch || Number(userNextMatch.table) !== Number(currentHallActiveMatch.table)) && (
               <div className="p-3 rounded-3 bg-light border mb-3">
                 <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
@@ -648,9 +667,139 @@ export default function MyTeamsPage({ user }) {
                   )}
                 </div>
 
+                {/* Hivatalos mérlegelés (lemért robotsúlyok) */}
+                {(() => {
+                  const currentTeamName = team.teamName || ''
+                  const teamWeights = weights.filter((w) => {
+                    const tName = (w.teamName || w.team_name || '').trim().toLowerCase()
+                    return tName && tName === currentTeamName.trim().toLowerCase()
+                  })
+                  const sumoWeights = teamWeights
+                    .filter((w) => (w.competitionType || '').toLowerCase() === 'szumó')
+                    .sort((a, b) => Number(a.id) - Number(b.id))
+                  const hillWeights = teamWeights
+                    .filter((w) => (w.competitionType || '').toLowerCase() === 'hegymászás')
+                    .sort((a, b) => Number(a.id) - Number(b.id))
+                  const measuredCount = (sumoWeights.length > 0 ? 1 : 0) + (hillWeights.length > 0 ? 1 : 0)
+
+                  return (
+                    <div className="mt-3">
+                      <section className="team-info-box">
+                        <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                          <h4 className="team-info-title mb-0">
+                            <i className="bi bi-speedometer2 text-primary me-2" aria-hidden="true" />
+                            Mérlegelés (lemért robotsúlyok)
+                          </h4>
+                          <span className={`badge ${measuredCount === 2 ? 'text-bg-success' : measuredCount === 1 ? 'text-bg-warning text-dark' : 'text-bg-secondary'}`}>
+                            <i className={`bi ${measuredCount > 0 ? 'bi-check-circle-fill' : 'bi-hourglass-split'} me-1`} />
+                            {measuredCount === 2 ? 'Mindkét versenyszám lemérve (2/2)' : measuredCount === 1 ? '1 / 2 versenyszám lemérve' : 'Még nincs lemérve (0/2)'}
+                          </span>
+                        </div>
+
+                        <div className="row g-3 mt-1">
+                          {/* Szumó oszlop */}
+                          <div className="col-12 col-md-6">
+                            <div className="p-3 bg-white border rounded shadow-sm h-100 d-flex flex-column">
+                              <div className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                <span
+                                  className="badge"
+                                  style={{
+                                    backgroundColor: 'var(--orange)',
+                                    color: 'var(--white)'
+                                  }}
+                                >
+                                  <i className="bi bi-shield-shaded me-1" />
+                                  Szumó
+                                </span>
+                                <span className="small text-muted fw-semibold">
+                                  {sumoWeights.length > 0 ? `${sumoWeights.length} mérés rögzítve` : '0 mérés'}
+                                </span>
+                              </div>
+
+                              <div className="flex-grow-1">
+                                {sumoWeights.length === 0 ? (
+                                  <div className="p-3 text-center text-muted bg-light rounded border border-dashed small">
+                                    Még nincs lemérve
+                                  </div>
+                                ) : (
+                                  <div className="d-flex flex-column gap-2">
+                                    {sumoWeights.map((w, idx) => (
+                                      <div
+                                        key={w.id || idx}
+                                        className="d-flex justify-content-between align-items-center p-2 px-3 bg-light rounded border"
+                                      >
+                                        <span className="small text-muted fw-semibold">
+                                          {idx + 1}. mérés
+                                        </span>
+                                        <span className="fs-4 fw-bold text-dark font-monospace">
+                                          {w.weight} <span className="fs-6 fw-normal text-muted">g</span>
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Hegymászás oszlop */}
+                          <div className="col-12 col-md-6">
+                            <div className="p-3 bg-white border rounded shadow-sm h-100 d-flex flex-column">
+                              <div className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                <span
+                                  className="badge"
+                                  style={{
+                                    backgroundColor: 'var(--yellow)',
+                                    color: 'var(--black)',
+                                    border: '1px solid var(--black)'
+                                  }}
+                                >
+                                  <i className="bi bi-triangle-half me-1" />
+                                  Hegymászás
+                                </span>
+                                <span className="small text-muted fw-semibold">
+                                  {hillWeights.length > 0 ? `${hillWeights.length} mérés rögzítve` : '0 mérés'}
+                                </span>
+                              </div>
+
+                              <div className="flex-grow-1">
+                                {hillWeights.length === 0 ? (
+                                  <div className="p-3 text-center text-muted bg-light rounded border border-dashed small">
+                                    Még nincs lemérve
+                                  </div>
+                                ) : (
+                                  <div className="d-flex flex-column gap-2">
+                                    {hillWeights.map((w, idx) => (
+                                      <div
+                                        key={w.id || idx}
+                                        className="d-flex justify-content-between align-items-center p-2 px-3 bg-light rounded border"
+                                      >
+                                        <span className="small text-muted fw-semibold">
+                                          {idx + 1}. mérés
+                                        </span>
+                                        <span className="fs-4 fw-bold text-dark font-monospace">
+                                          {w.weight} <span className="fs-6 fw-normal text-muted">g</span>
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </section>
+                    </div>
+                  )
+                })()}
+
                 {/* Szumó mérkőzések és próbálkozások */}
                 {(() => {
                   const currentTeamName = team.teamName || ''
+                  const teamWeights = weights.filter((w) => {
+                    const tName = (w.teamName || w.team_name || '').trim().toLowerCase()
+                    return tName && tName === currentTeamName.trim().toLowerCase()
+                  })
                   const teamMatches = sumoMatches.filter((m) => {
                     const t1 = m.team1Name || m.team1_name || ''
                     const t2 = m.team2Name || m.team2_name || ''
@@ -687,7 +836,7 @@ export default function MyTeamsPage({ user }) {
                               <div>
                                 <span className={`badge fw-bold mb-1 ${isNow ? 'text-bg-danger' : 'text-bg-warning text-dark'}`}>
                                   <i className={`bi ${isNow ? 'bi-exclamation-circle-fill' : 'bi-clock-history'} me-1`} />
-                                  {isNow ? 'MOST TI JÖTTÖK A PÁSTON!' : 'Következő mérkőzésed a teremben:'}
+                                  {isNow ? 'MOST TI JÖTTÖK A SZUMÓBAN!' : 'Következő mérkőzésed a teremben:'}
                                 </span>
                                 <div className="h5 fw-bold mb-1 text-dark">
                                   #{nextMatch.table}. mérkőzés vs. {nextOpponent}
@@ -762,10 +911,25 @@ export default function MyTeamsPage({ user }) {
                             {/* Hegymászás kísérletei */}
                             <div className="col-12 col-lg-6">
                               <div className="bg-white p-3 rounded border h-100">
-                                <h5 className="h6 fw-bold text-success mb-2">
-                                  <i className="bi bi-triangle-half me-1" />
-                                  Hegymászás eredménye
-                                </h5>
+                                <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                  <h5 className="h6 fw-bold text-success mb-0">
+                                    <i className="bi bi-triangle-half me-1" />
+                                    Hegymászás eredménye
+                                  </h5>
+                                  {(() => {
+                                    const hwList = teamWeights
+                                      .filter((w) => (w.competitionType || '').toLowerCase() === 'hegymászás')
+                                      .sort((a, b) => Number(a.id) - Number(b.id))
+                                    if (hwList.length === 0) return null
+                                    return (
+                                      <span className="badge bg-light text-dark border">
+                                        <i className="bi bi-speedometer2 me-1 text-success" />
+                                        {hwList.length > 1 ? 'Lemért súlyok: ' : 'Lemért súly: '}
+                                        <strong>{hwList.map((w) => `${w.weight} g`).join(', ')}</strong>
+                                      </span>
+                                    )
+                                  })()}
+                                </div>
                                 {myHillAttempts.length === 0 ? (
                                   <div className="small text-muted fst-italic">Még nincs rögzített kísérlet.</div>
                                 ) : (
@@ -830,10 +994,25 @@ export default function MyTeamsPage({ user }) {
                             {/* Szumó meccsek összefoglaló */}
                             <div className="col-12 col-lg-6">
                               <div className="bg-white p-3 rounded border h-100">
-                                <h5 className="h6 fw-bold text-danger mb-2">
-                                  <i className="bi bi-shield-shaded me-1" />
-                                  Szumó mérkőzések ({teamMatches.length})
-                                </h5>
+                                <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                  <h5 className="h6 fw-bold text-danger mb-0">
+                                    <i className="bi bi-shield-shaded me-1" />
+                                    Szumó mérkőzések ({teamMatches.length})
+                                  </h5>
+                                  {(() => {
+                                    const swList = teamWeights
+                                      .filter((w) => (w.competitionType || '').toLowerCase() === 'szumó')
+                                      .sort((a, b) => Number(a.id) - Number(b.id))
+                                    if (swList.length === 0) return null
+                                    return (
+                                      <span className="badge bg-light text-dark border">
+                                        <i className="bi bi-speedometer2 me-1 text-danger" />
+                                        {swList.length > 1 ? 'Lemért súlyok: ' : 'Lemért súly: '}
+                                        <strong>{swList.map((w) => `${w.weight} g`).join(', ')}</strong>
+                                      </span>
+                                    )
+                                  })()}
+                                </div>
                                 {teamMatches.length === 0 ? (
                                   <div className="small text-muted fst-italic">Még nincsenek szumó mérkőzések.</div>
                                 ) : (
@@ -914,7 +1093,7 @@ export default function MyTeamsPage({ user }) {
                                     #{m.table || mIdx + 1}. mérkőzés
                                   </span>
                                   <span className={`small ${isCurrentActive ? 'text-danger fw-bold' : isFinished ? 'text-muted' : 'text-dark fw-semibold'}`}>
-                                    {isFinished ? 'Lejátszva' : isCurrentActive ? 'Most a páston!' : 'Következik'}
+                                    {isFinished ? 'Lejátszva' : isCurrentActive ? 'Most a szumóban!' : 'Következik'}
                                   </span>
                                 </div>
                                 <div className="fw-bold text-truncate mt-1">

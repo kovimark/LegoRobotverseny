@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import FloatingFeedback from '../components/FloatingFeedback'
 import ConfirmModal from '../components/ConfirmModal'
 import { authFetch } from '../services/apiClient'
+import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 
 const API_BASE_URL = 'https://brickathlon.runasp.net'
 
@@ -59,6 +60,7 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
   const isAdmin = userRole === 'admin' || Number(userPrivilege) === 1
   const [teamInfo, setTeamInfo] = useState(null)
   const [pointsData, setPointsData] = useState(null)
+  const [teamWeights, setTeamWeights] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [pointSaving, setPointSaving] = useState(false)
@@ -75,9 +77,17 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
       try {
         setLoading(true)
         setError('')
-        const teamResponse = await fetch(`${API_BASE_URL}/api/Teams`, {
-          headers: { accept: '*/*' }
-        })
+        const [teamResponse, pointsResponse, weightsResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/Teams`, {
+            headers: { accept: '*/*' }
+          }),
+          fetch(`${API_BASE_URL}/api/Points/${encodeURIComponent(decodedTeamName)}`, {
+            headers: { accept: '*/*' }
+          }),
+          fetch(`${API_BASE_URL}/api/Weight/getweightbyteam/${encodeURIComponent(decodedTeamName)}`, {
+            headers: { accept: '*/*' }
+          }).catch(() => null)
+        ])
 
         if (!teamResponse.ok) {
           throw new Error('A csapat adatainak betöltése nem sikerült.')
@@ -99,16 +109,23 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
           setTeamId(team.id)
         }
 
-        const pointsResponse = await fetch(`${API_BASE_URL}/api/Points/${encodeURIComponent(decodedTeamName)}`, {
-          headers: { accept: '*/*' }
-        })
-
-        if (!pointsResponse.ok) {
-          throw new Error('A pontadatok betöltése nem sikerült.')
+        if (pointsResponse.ok) {
+          const points = await pointsResponse.json()
+          setPointsData(points)
+        } else {
+          setPointsData(null)
         }
 
-        const points = await pointsResponse.json()
-        setPointsData(points)
+        if (weightsResponse && weightsResponse.ok) {
+          try {
+            const weights = await weightsResponse.json()
+            setTeamWeights(Array.isArray(weights) ? weights : [])
+          } catch {
+            setTeamWeights([])
+          }
+        } else {
+          setTeamWeights([])
+        }
       } catch (err) {
         setError(err.message)
       } finally {
@@ -118,6 +135,8 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
 
     if (decodedTeamName) {
       loadTeamData()
+      window.addEventListener(DATA_REFRESH_EVENT, loadTeamData)
+      return () => window.removeEventListener(DATA_REFRESH_EVENT, loadTeamData)
     }
   }, [decodedTeamName])
 
@@ -399,6 +418,121 @@ export default function TeamDetailsPage({ userRole, userPrivilege }) {
                               <div className="alert alert-secondary mb-0">Nincsenek csapattag adatok.</div>
                             </div>
                           )}
+                          <div className="col-12 mt-3">
+                            <div className="border rounded p-3 detail-stat">
+                              <div className="d-flex justify-content-between align-items-center mb-2">
+                                <div className="detail-label mb-0">
+                                  <i className="bi bi-speedometer2 me-1 text-primary" />
+                                  Mérlegelés (lemért robotsúlyok)
+                                </div>
+                                <span className={`badge ${teamWeights.length > 0 ? 'text-bg-success' : 'text-bg-secondary'}`}>
+                                  {teamWeights.length > 0 ? `${teamWeights.length} mérés rögzítve` : 'Még nincs lemérve'}
+                                </span>
+                              </div>
+                              <div className="row g-2 mt-1">
+                                {(() => {
+                                  const sumoWeights = teamWeights
+                                    .filter((w) => (w.competitionType || '').toLowerCase() === 'szumó')
+                                    .sort((a, b) => Number(a.id) - Number(b.id))
+                                  const hillWeights = teamWeights
+                                    .filter((w) => (w.competitionType || '').toLowerCase() === 'hegymászás')
+                                    .sort((a, b) => Number(a.id) - Number(b.id))
+                                  return (
+                                    <>
+                                      {/* Szumó oszlop */}
+                                      <div className="col-12 col-sm-6">
+                                        <div className="p-3 border rounded bg-white shadow-sm h-100 d-flex flex-column">
+                                          <div className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                            <span
+                                              className="badge"
+                                              style={{
+                                                backgroundColor: 'var(--orange)',
+                                                color: 'var(--white)'
+                                              }}
+                                            >
+                                              <i className="bi bi-shield-shaded me-1" />
+                                              Szumó
+                                            </span>
+                                            <span className="small text-muted fw-semibold">
+                                              {sumoWeights.length > 0 ? `${sumoWeights.length} mérés rögzítve` : '0 mérés'}
+                                            </span>
+                                          </div>
+                                          <div className="flex-grow-1">
+                                            {sumoWeights.length === 0 ? (
+                                              <div className="p-2 text-center text-muted bg-light rounded border border-dashed small">
+                                                Nincs adat
+                                              </div>
+                                            ) : (
+                                              <div className="d-flex flex-column gap-2">
+                                                {sumoWeights.map((w, idx) => (
+                                                  <div
+                                                    key={w.id || idx}
+                                                    className="d-flex justify-content-between align-items-center p-2 px-3 bg-light rounded border"
+                                                  >
+                                                    <span className="small text-muted fw-semibold">
+                                                      {idx + 1}. mérés
+                                                    </span>
+                                                    <span className="fs-5 fw-bold text-dark font-monospace">
+                                                      {w.weight} <span className="fs-6 fw-normal text-muted">g</span>
+                                                    </span>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Hegymászás oszlop */}
+                                      <div className="col-12 col-sm-6">
+                                        <div className="p-3 border rounded bg-white shadow-sm h-100 d-flex flex-column">
+                                          <div className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                            <span
+                                              className="badge"
+                                              style={{
+                                                backgroundColor: 'var(--yellow)',
+                                                color: 'var(--black)',
+                                                border: '1px solid var(--black)'
+                                              }}
+                                            >
+                                              <i className="bi bi-triangle-half me-1" />
+                                              Hegymászás
+                                            </span>
+                                            <span className="small text-muted fw-semibold">
+                                              {hillWeights.length > 0 ? `${hillWeights.length} mérés rögzítve` : '0 mérés'}
+                                            </span>
+                                          </div>
+                                          <div className="flex-grow-1">
+                                            {hillWeights.length === 0 ? (
+                                              <div className="p-2 text-center text-muted bg-light rounded border border-dashed small">
+                                                Nincs adat
+                                              </div>
+                                            ) : (
+                                              <div className="d-flex flex-column gap-2">
+                                                {hillWeights.map((w, idx) => (
+                                                  <div
+                                                    key={w.id || idx}
+                                                    className="d-flex justify-content-between align-items-center p-2 px-3 bg-light rounded border"
+                                                  >
+                                                    <span className="small text-muted fw-semibold">
+                                                      {idx + 1}. mérés
+                                                    </span>
+                                                    <span className="fs-5 fw-bold text-dark font-monospace">
+                                                      {w.weight} <span className="fs-6 fw-normal text-muted">g</span>
+                                                    </span>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </>
+                                  )
+                                })()}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       ) : (
                         <div className="alert alert-secondary mb-0">A csapat adatai nem találhatók.</div>

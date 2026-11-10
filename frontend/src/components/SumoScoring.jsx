@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import FloatingFeedback from './FloatingFeedback'
 import AgeGroupBadge from './AgeGroupBadge'
 import { authFetch } from '../services/apiClient'
@@ -242,7 +242,7 @@ const getKnockoutStage = (teamCount) => {
 
 //const getKnockoutStageIndex = (stage) => KNOCKOUT_STAGES.indexOf(stage)
 
-const getPairingSearchResult = (availableTeams, usedPairKeys) => {
+const getPairingSearchResult = (availableTeams, pairEncounterCounts, currentRoundKeys, maxAllowedEncounters) => {
   if (availableTeams.length === 0) {
     return { pairings: [], byeTeam: null }
   }
@@ -250,19 +250,30 @@ const getPairingSearchResult = (availableTeams, usedPairKeys) => {
   if (availableTeams.length === 1) {
     return { pairings: [], byeTeam: availableTeams[0] }
   }
- 
+
   const firstTeam = availableTeams[0]
 
+  const candidates = []
   for (let index = 1; index < availableTeams.length; index += 1) {
     const candidateTeam = availableTeams[index]
     const pairKey = buildPairKey(firstTeam.name, candidateTeam.name)
 
-    if (usedPairKeys.has(pairKey)) {
+    if (currentRoundKeys.has(pairKey)) {
       continue
     }
 
+    const previousCount = pairEncounterCounts.get(pairKey) || 0
+    if (previousCount <= maxAllowedEncounters) {
+      candidates.push({ candidateTeam, index, pairKey, previousCount })
+    }
+  }
+
+  candidates.sort((a, b) => (a.previousCount - b.previousCount) || (a.index - b.index))
+
+  for (const { candidateTeam, index, pairKey } of candidates) {
     const remainingTeams = availableTeams.filter((_, teamIndex) => teamIndex !== 0 && teamIndex !== index)
-    const nextResult = getPairingSearchResult(remainingTeams, new Set([...usedPairKeys, pairKey]))
+    const nextRoundKeys = new Set([...currentRoundKeys, pairKey])
+    const nextResult = getPairingSearchResult(remainingTeams, pairEncounterCounts, nextRoundKeys, maxAllowedEncounters)
 
     if (nextResult) {
       return {
@@ -278,24 +289,40 @@ const getPairingSearchResult = (availableTeams, usedPairKeys) => {
   return null
 }
 
-const getRoundPairings = (teamsToPair, usedPairKeys) => {
-  if (teamsToPair.length === 0) {
+const getRoundPairings = (teamsToPair, pairEncounterCounts, allowRematch) => {
+  if (!teamsToPair || teamsToPair.length === 0) {
     return { pairings: [], byeTeam: null }
   }
 
-  if (teamsToPair.length % 2 === 0) {
-    return getPairingSearchResult(teamsToPair, usedPairKeys)
+  if (teamsToPair.length < 2) {
+    return null
   }
 
-  for (let byeIndex = 0; byeIndex < teamsToPair.length; byeIndex += 1) {
-    const byeCandidate = teamsToPair[byeIndex]
-    const remainingTeams = teamsToPair.filter((_, teamIndex) => teamIndex !== byeIndex)
-    const result = getPairingSearchResult(remainingTeams, usedPairKeys)
+  let maxExisting = 0
+  for (const count of pairEncounterCounts.values()) {
+    if (count > maxExisting) maxExisting = count
+  }
 
-    if (result) {
-      return {
-        pairings: result.pairings,
-        byeTeam: byeCandidate
+  const upperLimit = allowRematch ? Math.max(1, maxExisting + 2) : 0
+
+  for (let maxAllowed = 0; maxAllowed <= upperLimit; maxAllowed += 1) {
+    if (teamsToPair.length % 2 === 0) {
+      const result = getPairingSearchResult(teamsToPair, pairEncounterCounts, new Set(), maxAllowed)
+      if (result && result.pairings.length > 0) {
+        return result
+      }
+    } else {
+      for (let byeIndex = teamsToPair.length - 1; byeIndex >= 0; byeIndex -= 1) {
+        const byeCandidate = teamsToPair[byeIndex]
+        const remainingTeams = teamsToPair.filter((_, teamIndex) => teamIndex !== byeIndex)
+        const result = getPairingSearchResult(remainingTeams, pairEncounterCounts, new Set(), maxAllowed)
+
+        if (result && result.pairings.length > 0) {
+          return {
+            pairings: result.pairings,
+            byeTeam: byeCandidate
+          }
+        }
       }
     }
   }
@@ -415,6 +442,7 @@ export default function SumoScoring({ userPrivilege }) {
   const [selectedStage, setSelectedStage] = useState(ALL_STAGE_VALUE)
   const [minimumRounds, setMinimumRounds] = useState(4)
   const [ageGroupBreakdown, setAgeGroupBreakdown] = useState(false)
+  const [sumoRematch, setSumoRematch] = useState(false)
   const [competitionPhase, setCompetitionPhase] = useState('')
   const [showCategoryStandings, setShowCategoryStandings] = useState(false)
   const [groupAdvance, setGroupAdvance] = useState({ psGroupAdvance: 0, hsGroupAdvance: 0, allGroupAdvance: 0 })
@@ -435,33 +463,34 @@ export default function SumoScoring({ userPrivilege }) {
   const [manualSaving, setManualSaving] = useState(false)
   const eligibleTeams = useMemo(() => teams.filter((team) => !team.isDisqualified), [teams])
 
-  useEffect(() => {
-    const applyConfiguration = (configuration) => {
-      const value = Number(configuration?.minimumRounds)
-      setMinimumRounds(Number.isInteger(value) && value > 0 ? value : 4)
-      setAgeGroupBreakdown(Number(configuration?.ageGroupBreakdown) === 1)
-      setGroupAdvance({
-        psGroupAdvance: Number(configuration?.psGroupAdvance) || 0,
-        hsGroupAdvance: Number(configuration?.hsGroupAdvance) || 0,
-        allGroupAdvance: Number(configuration?.allGroupAdvance) || 0
-      })
-      const phase = configuration?.competitionPhase || ''
-      setCompetitionPhase(phase)
-      const normalizedPhase = phase.toLocaleLowerCase('hu-HU')
-      if (normalizedPhase.includes('kies')) {
-        setStageMode('knockout')
-        setSelectedStage(KNOCKOUT_STAGES[0])
-      } else if (normalizedPhase.includes('csoport') || normalizedPhase.includes('alap') || normalizedPhase.includes('teszt')) {
-        setStageMode('group')
-        setSelectedStage(GROUP_STAGE)
-      }
+  const applyConfiguration = useCallback((configuration) => {
+    const value = Number(configuration?.minimumRounds)
+    setMinimumRounds(Number.isInteger(value) && value > 0 ? value : 4)
+    setAgeGroupBreakdown(Number(configuration?.ageGroupBreakdown) === 1)
+    setSumoRematch(Number(configuration?.sumoRematch) === 1)
+    setGroupAdvance({
+      psGroupAdvance: Number(configuration?.psGroupAdvance) || 0,
+      hsGroupAdvance: Number(configuration?.hsGroupAdvance) || 0,
+      allGroupAdvance: Number(configuration?.allGroupAdvance) || 0
+    })
+    const phase = configuration?.competitionPhase || ''
+    setCompetitionPhase(phase)
+    const normalizedPhase = phase.toLocaleLowerCase('hu-HU')
+    if (normalizedPhase.includes('kies')) {
+      setStageMode('knockout')
+      setSelectedStage(KNOCKOUT_STAGES[0])
+    } else if (normalizedPhase.includes('csoport') || normalizedPhase.includes('alap') || normalizedPhase.includes('teszt')) {
+      setStageMode('group')
+      setSelectedStage(GROUP_STAGE)
     }
+  }, [])
 
+  useEffect(() => {
     loadSumoScheduleConfig().then(applyConfiguration).catch(() => applyConfiguration(null))
     const handleConfigurationChange = (event) => applyConfiguration(event.detail)
     window.addEventListener(SUMO_CONFIG_CHANGED_EVENT, handleConfigurationChange)
     return () => window.removeEventListener(SUMO_CONFIG_CHANGED_EVENT, handleConfigurationChange)
-  }, [])
+  }, [applyConfiguration])
 
   useEffect(() => {
     const loadData = async () => {
@@ -469,6 +498,7 @@ export default function SumoScoring({ userPrivilege }) {
       setError('')
 
       try {
+        loadSumoScheduleConfig().then(applyConfiguration).catch(() => {})
         const [teamsResponse, matchesResponse, groupStandingsResponse] = await Promise.all([
           fetch('https://brickathlon.runasp.net/api/Teams'),
           fetch('https://brickathlon.runasp.net/api/Sumo/matches'),
@@ -506,7 +536,7 @@ export default function SumoScoring({ userPrivilege }) {
     loadData()
     window.addEventListener(DATA_REFRESH_EVENT, loadData)
     return () => window.removeEventListener(DATA_REFRESH_EVENT, loadData)
-  }, [])
+  }, [applyConfiguration])
 
   useEffect(() => {
     if (!actionMessage) {
@@ -826,7 +856,13 @@ export default function SumoScoring({ userPrivilege }) {
 
   const generateRoundMatches = () => {
     const sortedTeams = getCurrentRoundTeams()
-    const usedPairKeys = new Set(matches.map((match) => buildPairKey(match.team1Name, match.team2Name)))
+    const groupMatches = matches.filter((match) => !isKnockoutStage(getMatchStage(match)))
+    const pairEncounterCounts = new Map()
+    groupMatches.forEach((match) => {
+      const key = buildPairKey(match.team1Name, match.team2Name)
+      pairEncounterCounts.set(key, (pairEncounterCounts.get(key) || 0) + 1)
+    })
+
     const pairings = []
     const byeTeams = []
 
@@ -840,11 +876,12 @@ export default function SumoScoring({ userPrivilege }) {
     for (const categoryTeams of teamPools) {
       if (categoryTeams.length < 2) continue
 
-      const result = getRoundPairings(categoryTeams, usedPairKeys)
+      const result = getRoundPairings(categoryTeams, pairEncounterCounts, sumoRematch)
       if (!result) return null
 
       for (const pairing of result.pairings) {
-        usedPairKeys.add(buildPairKey(pairing.team1.name, pairing.team2.name))
+        const key = buildPairKey(pairing.team1.name, pairing.team2.name)
+        pairEncounterCounts.set(key, (pairEncounterCounts.get(key) || 0) + 1)
         pairings.push({ ...pairing, table: nextMatchNumber++ })
       }
       if (result.byeTeam) byeTeams.push(result.byeTeam.name)
@@ -862,7 +899,13 @@ export default function SumoScoring({ userPrivilege }) {
 
   const generateBonusRoundMatches = () => {
     if (bonusRoundTeams.length < 2) return []
-    const usedPairKeys = new Set(matches.map((match) => buildPairKey(match.team1Name, match.team2Name)))
+    const groupMatches = matches.filter((match) => !isKnockoutStage(getMatchStage(match)))
+    const pairEncounterCounts = new Map()
+    groupMatches.forEach((match) => {
+      const key = buildPairKey(match.team1Name, match.team2Name)
+      pairEncounterCounts.set(key, (pairEncounterCounts.get(key) || 0) + 1)
+    })
+
     const pairings = []
     const pools = ageGroupBreakdown
       ? [0, 1].map((category) => bonusRoundTeams.filter((team) => team.category === category))
@@ -874,7 +917,7 @@ export default function SumoScoring({ userPrivilege }) {
     for (const pool of pools) {
       if (pool.length < 2) continue
       const sortedPool = [...pool].sort((left, right) => left.name.localeCompare(right.name, 'hu'))
-      const result = getRoundPairings(sortedPool, usedPairKeys)
+      const result = getRoundPairings(sortedPool, pairEncounterCounts, sumoRematch)
       const poolPairings = result?.pairings?.length > 0
         ? result.pairings
         : Array.from({ length: Math.floor(sortedPool.length / 2) }, (_, index) => ({
@@ -883,7 +926,8 @@ export default function SumoScoring({ userPrivilege }) {
         }))
       for (const pairing of poolPairings) {
         if (!pairing.team1 || !pairing.team2) continue
-        usedPairKeys.add(buildPairKey(pairing.team1.name, pairing.team2.name))
+        const key = buildPairKey(pairing.team1.name, pairing.team2.name)
+        pairEncounterCounts.set(key, (pairEncounterCounts.get(key) || 0) + 1)
         pairings.push({ ...pairing, table: nextMatchNumber++ })
       }
     }
@@ -958,7 +1002,14 @@ export default function SumoScoring({ userPrivilege }) {
       if (shouldGenerateKnockout) {
         setActionMessage({ type: 'danger', text: 'Nem sikerült egyenes kieséses párosítást generálni a jelenlegi csapatszámmal.' })
       } else {
-        setActionMessage({ type: 'danger', text: bonusRound ? 'Nincs legalább két olyan csapat, amely kevesebb csoportmeccset játszott.' : 'Nem sikerült új fordulót generálni visszavágó nélkül.' })
+        setActionMessage({
+          type: 'danger',
+          text: bonusRound
+            ? 'Nincs legalább két olyan csapat, amely kevesebb csoportmeccset játszott.'
+            : sumoRematch
+              ? 'Nem sikerült új fordulót generálni a jelenlegi csapatokkal.'
+              : 'Nem sikerült új fordulót generálni visszavágó nélkül. Minden lehetséges páros mérkőzött már egymással. A beállításokban engedélyezheted a visszavágókat.'
+        })
       }
       return
     }
@@ -1527,7 +1578,7 @@ export default function SumoScoring({ userPrivilege }) {
                   <div className="home-kicker">Szumó {getStageLabel(selectedStage)}</div>
                   <h3 className="mb-2">Meccsek, fordulók és eredmények</h3>
                   <p className="text-muted mb-0">
-                    A generálás a jelenlegi állás alapján történik, visszavágó nélkül. {ageGroupBreakdown ? 'A két korosztály külön ágon játszik. Az általános és a középiskolás ág döntőinek győztesei mérkőznek meg az abszolút döntőben.' : 'A két korosztály közös mezőnyben szerepel.'}
+                    A generálás a jelenlegi állás alapján történik, {sumoRematch ? 'visszavágó engedélyezésével' : 'visszavágó nélkül'}. {ageGroupBreakdown ? 'A két korosztály külön ágon játszik. Az általános és a középiskolás ág döntőinek győztesei mérkőznek meg az abszolút döntőben.' : 'A két korosztály közös mezőnyben szerepel.'}
                   </p>
                 </div>
                 <div className="d-flex flex-wrap gap-2">

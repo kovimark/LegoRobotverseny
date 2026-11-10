@@ -3,6 +3,7 @@ import FloatingFeedback from '../components/FloatingFeedback'
 import AgeGroupBadge from '../components/AgeGroupBadge'
 import ConfirmModal from '../components/ConfirmModal'
 import { getAllWeights, postWeight, deleteWeight } from '../services/weightApi'
+import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 
 const API_BASE_URL = 'https://brickathlon.runasp.net'
 const ALLOWED_COMPETITIONS = ['Hegymászás', 'Szumó']
@@ -54,6 +55,8 @@ export default function WeightManagementPage() {
 
   useEffect(() => {
     fetchData()
+    window.addEventListener(DATA_REFRESH_EVENT, fetchData)
+    return () => window.removeEventListener(DATA_REFRESH_EVENT, fetchData)
   }, [])
 
   useEffect(() => {
@@ -236,22 +239,11 @@ export default function WeightManagementPage() {
     <main className="container py-4">
       <FloatingFeedback message={actionMessage} onDismiss={() => setActionMessage(null)} />
 
-      <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-        <div>
-          <h2 className="h3 mb-1">Mérlegelés</h2>
-          <div className="text-muted">
-            Csapatok robotjainak versenyszámonkénti súlymérése és rögzítése
-          </div>
+      <div className="mb-4">
+        <h2 className="h3 mb-1">Mérlegelés</h2>
+        <div className="text-muted">
+          Csapatok robotjainak versenyszámonkénti súlymérése és rögzítése
         </div>
-        <button
-          type="button"
-          className="btn btn-outline-primary btn-sm"
-          onClick={fetchData}
-          disabled={loading}
-        >
-          <i className="bi bi-arrow-repeat me-1" />
-          {loading ? 'Frissítés...' : 'Adatok frissítése'}
-        </button>
       </div>
 
       {error && (

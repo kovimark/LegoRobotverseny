@@ -7,18 +7,18 @@ import { competitionTypes } from '../config/adminScoringConfig'
 import { judgeCompetitionByPrivilege } from '../config/privilegeConfig'
 import { authFetch } from '../services/apiClient'
 import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
+import {
+  LINE_STAGE_CONFIG_CHANGED_EVENT,
+  getCustomLineStageLabels,
+  setCustomLineStageLabel,
+  buildLineFollowingStages
+} from '../services/lineFollowingStageConfig'
 import './GameScoringPage.css'
 
 const API_BASE = 'https://brickathlon.runasp.net/api'
 const MAX_TIME_SECONDS = 120
 const MAX_BASKET_ATTEMPTS = 10
 const MAX_BASKET_HITS = 5
-const LINE_STAGES = [
-  { value: 1, label: 'Csoportkör' },
-  { value: 2, label: 'Legjobb 16' },
-  { value: 3, label: 'Negyeddöntő' },
-  { value: 4, label: 'Legjobb 4' }
-]
 
 const STAGE_API_VALUES = {
   GS: 1,
@@ -36,6 +36,20 @@ const STAGE_LABELS = {
   SF: 'Elődöntő',
   BM: 'Bronzmeccs',
   F: 'Döntő'
+}
+
+const readApiError = async (response, fallbackMessage) => {
+  try {
+    const errorText = await response.text()
+    try {
+      const errorData = JSON.parse(errorText)
+      return Object.values(errorData.errors || {}).flat().join(' ') || errorData.title || errorText || fallbackMessage
+    } catch {
+      return errorText || fallbackMessage
+    }
+  } catch {
+    return fallbackMessage
+  }
 }
 
 const SUMO_TIMER_PRESETS = {
@@ -489,45 +503,72 @@ function JudgeScenarioHelper({ competitionId }) {
 function GameBasketScoring() {
   const [teamNames, setTeamNames] = useState([])
   const [allTeams, setAllTeams] = useState([])
+  const [basketAttempts, setBasketAttempts] = useState([])
+  const [settings, setSettings] = useState(null)
   const [selectedTeamName, setSelectedTeamName] = useState('')
   const [draft, setDraft] = useState(createBasketDraft)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [actionMessage, setActionMessage] = useState(null)
   const [teamSearch, setTeamSearch] = useState('')
+  const [resultToDelete, setResultToDelete] = useState(null)
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [attemptsRes, namesResponse, teamsResponse, settingsResponse] = await Promise.all([
+        fetch(`${API_BASE}/Basketball/allattempts`).catch(() => null),
+        fetch(`${API_BASE}/Teams/teamnames`),
+        fetch(`${API_BASE}/Teams`),
+        fetch(`${API_BASE}/Settings/getAllSettings`).catch(() => null)
+      ])
+
+      let attemptsData = []
+      if (attemptsRes && attemptsRes.ok) {
+        attemptsData = await attemptsRes.json()
+      } else {
+        const bestRes = await fetch(`${API_BASE}/Basketball/bestattempts`).catch(() => null)
+        if (bestRes && bestRes.ok) {
+          attemptsData = await bestRes.json()
+        }
+      }
+
+      if (!namesResponse.ok) {
+        throw new Error('Nem sikerült betölteni a csapatneveket.')
+      }
+
+      const namesData = await namesResponse.json()
+      const teamsData = teamsResponse.ok ? await teamsResponse.json() : []
+      let settingsData = null
+      if (settingsResponse && settingsResponse.ok) {
+        const s = await settingsResponse.json()
+        settingsData = Array.isArray(s) ? s[0] : s
+      }
+
+      const normalizedNames = Array.isArray(namesData)
+        ? namesData.map((item) => (typeof item === 'string' ? item : item?.teamName || item?.team_name || '')).filter(Boolean)
+        : []
+
+      const allTeamNames = Array.isArray(teamsData)
+        ? teamsData.map((item) => (typeof item === 'string' ? item : item?.teamName || item?.team_name || '')).filter(Boolean)
+        : []
+
+      setTeamNames(Array.from(new Set([...normalizedNames, ...allTeamNames])))
+      setAllTeams(Array.isArray(teamsData) ? teamsData : [])
+      setBasketAttempts(Array.isArray(attemptsData) ? attemptsData : [])
+      if (settingsData) setSettings(settingsData)
+    } catch (error) {
+      setActionMessage({ type: 'danger', text: error.message })
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true)
-      try {
-        const [namesResponse, teamsResponse] = await Promise.all([
-          fetch(`${API_BASE}/Teams/teamnames`),
-          fetch(`${API_BASE}/Teams`)
-        ])
-
-        if (!namesResponse.ok) {
-          throw new Error('Nem sikerült betölteni a csapatneveket.')
-        }
-
-        const namesData = await namesResponse.json()
-        const teamsData = teamsResponse.ok ? await teamsResponse.json() : []
-        const normalizedNames = Array.isArray(namesData)
-          ? namesData.map((item) => (typeof item === 'string' ? item : item?.teamName || item?.team_name || '')).filter(Boolean)
-          : []
-
-        setTeamNames(Array.from(new Set(normalizedNames)))
-        setAllTeams(Array.isArray(teamsData) ? teamsData : [])
-      } catch (error) {
-        setActionMessage({ type: 'danger', text: error.message })
-      } finally {
-        setLoading(false)
-      }
-    }
-
     loadData()
     window.addEventListener(DATA_REFRESH_EVENT, loadData)
     return () => window.removeEventListener(DATA_REFRESH_EVENT, loadData)
-  }, [])
+  }, [loadData])
 
   useEffect(() => {
     if (!actionMessage) return undefined
@@ -541,6 +582,29 @@ function GameBasketScoring() {
     setDraft(createBasketDraft())
   }
 
+  // Selected team attempts
+  const teamAttempts = useMemo(() => {
+    if (!selectedTeamName) return []
+    return basketAttempts.filter((a) => (a.team_name || a.teamName || '').toLowerCase() === selectedTeamName.toLowerCase())
+  }, [basketAttempts, selectedTeamName])
+
+  const maxTries = Number(settings?.maxTryBasketball) || 2
+  const attemptCount = teamAttempts.length
+  const isMaxReached = attemptCount >= maxTries
+  const currentAttemptNumber = Math.min(attemptCount + 1, maxTries)
+
+  const bestAttempt = useMemo(() => {
+    if (teamAttempts.length === 0) return null
+    return [...teamAttempts].sort((a, b) => {
+      const pA = Number(a.points ?? (Number(a.hoop1 || 0) * 1 + Number(a.hoop2 || 0) * 2 + Number(a.hoop3 || 0) * 3 + Number(a.hoop4 || 0) * 4 + Number(a.hoop5 || 0) * 5))
+      const pB = Number(b.points ?? (Number(b.hoop1 || 0) * 1 + Number(b.hoop2 || 0) * 2 + Number(b.hoop3 || 0) * 3 + Number(b.hoop4 || 0) * 4 + Number(b.hoop5 || 0) * 5))
+      if (pB !== pA) return pB - pA
+      const tA = Number(a.time || 0)
+      const tB = Number(b.time || 0)
+      return tA - tB
+    })[0]
+  }, [teamAttempts])
+
   const totalHits = Number(draft.hoop1) + Number(draft.hoop2) + Number(draft.hoop3) + Number(draft.hoop4) + Number(draft.hoop5)
 
   const handleSave = async () => {
@@ -549,6 +613,14 @@ function GameBasketScoring() {
 
     if (!selectedTeamName) {
       setActionMessage({ type: 'danger', text: 'Válassz csapatot.' })
+      return
+    }
+
+    if (isMaxReached) {
+      setActionMessage({
+        type: 'danger',
+        text: `Ez a csapat (${selectedTeamName}) már elérte a maximális (${maxTries}) próbálkozási számot!`
+      })
       return
     }
 
@@ -606,14 +678,61 @@ function GameBasketScoring() {
       }
 
       if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(errorText || 'A mentés sikertelen volt.')
+        const errorText = await readApiError(response, 'A mentés sikertelen volt.')
+        throw new Error(errorText)
       }
 
-      handleResetForm()
+      setDraft(createBasketDraft())
       setActionMessage({ type: 'success', text: `"${selectedTeamName}" kosárra dobás eredménye sikeresen rögzítve!` })
+
+      // Reload attempts
+      const attemptsRes = await fetch(`${API_BASE}/Basketball/allattempts`).catch(() => null)
+      if (attemptsRes && attemptsRes.ok) {
+        const d = await attemptsRes.json()
+        setBasketAttempts(Array.isArray(d) ? d : [])
+      }
     } catch (error) {
       setActionMessage({ type: 'danger', text: error.message })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeleteResult = async () => {
+    if (!resultToDelete) return
+    const teamName = resultToDelete.team_name || resultToDelete.teamName
+    const h1 = Number(resultToDelete.hoop1 ?? 0)
+    const h2 = Number(resultToDelete.hoop2 ?? 0)
+    const h3 = Number(resultToDelete.hoop3 ?? 0)
+    const h4 = Number(resultToDelete.hoop4 ?? 0)
+    const h5 = Number(resultToDelete.hoop5 ?? 0)
+
+    setSaving(true)
+    try {
+      const response = await authFetch(
+        `${API_BASE}/Basketball/${encodeURIComponent(teamName)}/${h1}/${h2}/${h3}/${h4}/${h5}`,
+        {
+          method: 'DELETE',
+          headers: { accept: '*/*' }
+        }
+      )
+
+      if (!response.ok) {
+        const errorText = await readApiError(response, 'Az eredmény törlése sikertelen volt.')
+        throw new Error(errorText)
+      }
+
+      setActionMessage({ type: 'success', text: `A(z) "${teamName}" próbája sikeresen törölve.` })
+      setResultToDelete(null)
+
+      const attemptsRes = await fetch(`${API_BASE}/Basketball/allattempts`).catch(() => null)
+      if (attemptsRes && attemptsRes.ok) {
+        const d = await attemptsRes.json()
+        setBasketAttempts(Array.isArray(d) ? d : [])
+      }
+    } catch (error) {
+      setActionMessage({ type: 'danger', text: error.message })
+      setResultToDelete(null)
     } finally {
       setSaving(false)
     }
@@ -640,8 +759,52 @@ function GameBasketScoring() {
         </div>
       </header>
 
-      {loading ? <div className="alert alert-secondary">Csapatok betöltése...</div> : (
+      {loading ? <div className="alert alert-secondary">Csapatok és beállítások betöltése...</div> : (
         <>
+          {/* Próbálkozás státusz doboz */}
+          {selectedTeamName && (
+            <div
+              className={`p-3 rounded-3 mb-3 border ${isMaxReached ? 'border-secondary' : 'border-warning'}`}
+              style={{ backgroundColor: isMaxReached ? '#f8f9fa' : '#fff9e6' }}
+            >
+              <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                  <span
+                    className="badge fw-bold mb-1"
+                    style={{
+                      backgroundColor: isMaxReached ? '#6c757d' : 'var(--yellow)',
+                      color: isMaxReached ? 'var(--white)' : 'var(--black)',
+                      border: isMaxReached ? 'none' : '1px solid var(--black)'
+                    }}
+                  >
+                    {isMaxReached ? 'Maximális próbálkozás elérve' : `${currentAttemptNumber}. próbálkozás / ${maxTries}`}
+                  </span>
+                  <div className="fw-semibold text-dark fs-6">
+                    {selectedTeamName} – {isMaxReached ? `Elérte a maximális (${maxTries}) próbát.` : `A(z) ${currentAttemptNumber}. próba rögzítése zajlik.`}
+                  </div>
+                  <div className="small text-muted">
+                    {isMaxReached
+                      ? `Ez a csapat már rögzítette mind a ${maxTries} próbáját. Új próba rögzítéséhez törölj egy korábbit a lenti listából.`
+                      : bestAttempt
+                        ? `Eddigi legjobb: ${bestAttempt.points ?? (Number(bestAttempt.hoop1 || 0) * 1 + Number(bestAttempt.hoop2 || 0) * 2 + Number(bestAttempt.hoop3 || 0) * 3 + Number(bestAttempt.hoop4 || 0) * 4 + Number(bestAttempt.hoop5 || 0) * 5)} pont (${bestAttempt.time} s)`
+                        : 'Még nincs rögzített próbálkozása a csapatnak.'}
+                  </div>
+                </div>
+                <div className="text-end">
+                  <span
+                    className="badge fs-6"
+                    style={{
+                      backgroundColor: isMaxReached ? 'var(--red)' : 'var(--orange)',
+                      color: 'var(--white)'
+                    }}
+                  >
+                    {attemptCount} / {maxTries} próba kész
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="row g-3">
             <div className="col-12 col-lg-6">
               <SearchPicker
@@ -677,13 +840,14 @@ function GameBasketScoring() {
                 max={MAX_BASKET_ATTEMPTS}
                 step={1}
                 integer
+                disabled={isMaxReached || !selectedTeamName}
                 onChange={(value) => setDraft((prev) => ({ ...prev, throwNumber: value }))}
               />
             </div>
             <div className="col-12 col-lg-3">
               <label className="form-label">Érvényes találatok</label>
               <div className={`game-scoring-counter ${totalHits === 5 ? 'text-success fw-bold' : ''}`}>
-                {totalHits} / {MAX_BASKET_HITS} {totalHits === 5 ? '✓ (Kész)' : ''}
+                {totalHits} / {MAX_BASKET_HITS} {totalHits === 5 ? '(Kész)' : ''}
               </div>
             </div>
           </div>
@@ -698,6 +862,7 @@ function GameBasketScoring() {
                   max={MAX_BASKET_HITS}
                   step={1}
                   integer
+                  disabled={isMaxReached || !selectedTeamName}
                   onChange={(value) => {
                     const nextDraft = { ...draft, [`hoop${hoop}`]: value }
                     const nextTotal = Number(nextDraft.hoop1) + Number(nextDraft.hoop2) + Number(nextDraft.hoop3) + Number(nextDraft.hoop4) + Number(nextDraft.hoop5)
@@ -724,12 +889,16 @@ function GameBasketScoring() {
                 max={MAX_TIME_SECONDS}
                 step={0.001}
                 inputMode="decimal"
+                disabled={isMaxReached || !selectedTeamName}
                 onChange={(value) => setDraft((prev) => ({ ...prev, time: value }))}
               />
               <div className="form-text">Kézzel bármikor felülírható.</div>
             </div>
             <div className="col-12 col-lg-8">
-              <PrecisionStopwatch onCapture={(value) => setDraft((prev) => ({ ...prev, time: value }))} />
+              <PrecisionStopwatch
+                onCapture={(value) => setDraft((prev) => ({ ...prev, time: value }))}
+                disabled={isMaxReached || !selectedTeamName}
+              />
             </div>
           </div>
 
@@ -737,13 +906,119 @@ function GameBasketScoring() {
             <button type="button" className="btn btn-outline-secondary" onClick={handleResetForm} disabled={saving}>
               Mégse
             </button>
-            <button type="button" className="btn btn-lg btn-warning game-scoring-save-btn" onClick={handleSave} disabled={saving || !selectedTeamName}>
-              {saving ? 'Mentés...' : 'Eredmény rögzítése'}
+            <button
+              type="button"
+              className="btn btn-lg game-scoring-save-btn fw-bold px-4"
+              style={{
+                backgroundColor: (isMaxReached || !selectedTeamName) ? '#6c757d' : 'var(--yellow)',
+                borderColor: (isMaxReached || !selectedTeamName) ? '#6c757d' : 'var(--black)',
+                color: (isMaxReached || !selectedTeamName) ? 'var(--white)' : 'var(--black)'
+              }}
+              onClick={handleSave}
+              disabled={saving || isMaxReached || !selectedTeamName}
+            >
+              <i className="bi bi-check2-circle me-1" />
+              {saving ? 'Mentés...' : isMaxReached ? 'Max. próba elérve' : 'Eredmény rögzítése'}
             </button>
           </div>
+
+          {/* Kiválasztott csapat próbálkozásainak története */}
+          {selectedTeamName && (
+            <div className="card border-0 bg-light mt-4 p-3 rounded-3 shadow-sm">
+              <h5 className="h6 fw-bold mb-2 text-dark d-flex align-items-center justify-content-between">
+                <span>
+                  <i className="bi bi-clock-history me-2" style={{ color: 'var(--orange)' }} />
+                  {selectedTeamName} – Próbálkozások története ({teamAttempts.length} / {maxTries})
+                </span>
+                {bestAttempt && (
+                  <span className="badge" style={{ backgroundColor: 'var(--green)', color: 'var(--white)' }}>
+                    Legjobb: {bestAttempt.points ?? (Number(bestAttempt.hoop1 || 0) * 1 + Number(bestAttempt.hoop2 || 0) * 2 + Number(bestAttempt.hoop3 || 0) * 3 + Number(bestAttempt.hoop4 || 0) * 4 + Number(bestAttempt.hoop5 || 0) * 5)} pont ({bestAttempt.time} s)
+                  </span>
+                )}
+              </h5>
+              {teamAttempts.length === 0 ? (
+                <div className="small text-muted fst-italic">Még nincs rögzített próbálkozása a csapatnak.</div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table table-sm table-bordered bg-white mb-0 small">
+                    <thead className="table-light">
+                      <tr>
+                        <th>#</th>
+                        <th>Pontszám</th>
+                        <th>Dobások</th>
+                        <th>Találatok (1-5. kosár)</th>
+                        <th>Idő</th>
+                        <th className="text-end" style={{ width: '80px' }}>Törlés</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {teamAttempts.map((att, idx) => {
+                        const isBest = att === bestAttempt
+                        const points = att.points ?? (Number(att.hoop1 || 0) * 1 + Number(att.hoop2 || 0) * 2 + Number(att.hoop3 || 0) * 3 + Number(att.hoop4 || 0) * 4 + Number(att.hoop5 || 0) * 5)
+                        return (
+                          <tr key={idx} className={isBest ? 'table-warning' : ''}>
+                            <td className="fw-bold">{idx + 1}. próba</td>
+                            <td className="fw-bold">
+                              {points} pont {isBest && <span className="badge ms-1" style={{ backgroundColor: 'var(--green)', color: 'var(--white)' }}>Legjobb</span>}
+                            </td>
+                            <td>{att.throws ?? att.throwNumber ?? '-'} dobás</td>
+                            <td>[{att.hoop1}, {att.hoop2}, {att.hoop3}, {att.hoop4}, {att.hoop5}]</td>
+                            <td className="font-monospace">{att.time} s</td>
+                            <td className="text-end">
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-danger py-0 px-2"
+                                onClick={() => setResultToDelete(att)}
+                                title="Eredmény törlése"
+                              >
+                                <i className="bi bi-trash" />
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
-<br /><br />
+
+      {resultToDelete && (
+        <>
+          <div className="modal show d-block" tabIndex={-1} style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">Eredmény törlésének megerősítése</h5>
+                  <button type="button" className="btn-close" onClick={() => setResultToDelete(null)} />
+                </div>
+                <div className="modal-body">
+                  Biztosan törölni szeretnéd a(z) <strong>{resultToDelete.team_name || resultToDelete.teamName}</strong> csapat próbálkozását?
+                  <ul className="mt-2 mb-0 small text-muted">
+                    <li>Pontszám: {resultToDelete.points ?? (Number(resultToDelete.hoop1 || 0) * 1 + Number(resultToDelete.hoop2 || 0) * 2 + Number(resultToDelete.hoop3 || 0) * 3 + Number(resultToDelete.hoop4 || 0) * 4 + Number(resultToDelete.hoop5 || 0) * 5)} pont</li>
+                    <li>Idő: {resultToDelete.time} s</li>
+                    <li>Találatok: [{resultToDelete.hoop1}, {resultToDelete.hoop2}, {resultToDelete.hoop3}, {resultToDelete.hoop4}, {resultToDelete.hoop5}]</li>
+                  </ul>
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-outline-secondary" onClick={() => setResultToDelete(null)}>
+                    Mégse
+                  </button>
+                  <button type="button" className="btn btn-danger" onClick={handleDeleteResult} disabled={saving}>
+                    {saving ? 'Törlés...' : 'Törlés megerősítése'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop show" />
+        </>
+      )}
+
+      <br /><br />
       <JudgeScenarioHelper competitionId="basket" />
     </section>
   )
@@ -753,6 +1028,7 @@ function GameLineFollowingScoring() {
   const [teamNames, setTeamNames] = useState([])
   const [allTeams, setAllTeams] = useState([])
   const [lineResults, setLineResults] = useState([])
+  const [settings, setSettings] = useState(null)
   const [selectedTeamName, setSelectedTeamName] = useState('')
   const [selectedTeamCategory, setSelectedTeamCategory] = useState(null)
   const [time, setTime] = useState('')
@@ -765,21 +1041,65 @@ function GameLineFollowingScoring() {
   const [sortDirection, setSortDirection] = useState('asc')
   const [resultsSearch, setResultsSearch] = useState('')
   const [resultToDelete, setResultToDelete] = useState(null)
+  const [customRoundLabels, setCustomRoundLabels] = useState(() => getCustomLineStageLabels())
+  const [editingStage, setEditingStage] = useState(false)
+  const [editingLabel, setEditingLabel] = useState('')
+
+  useEffect(() => {
+    const handleLabelsChanged = (event) => {
+      setCustomRoundLabels(event.detail || getCustomLineStageLabels())
+    }
+    window.addEventListener(LINE_STAGE_CONFIG_CHANGED_EVENT, handleLabelsChanged)
+    window.addEventListener('storage', handleLabelsChanged)
+    return () => {
+      window.removeEventListener(LINE_STAGE_CONFIG_CHANGED_EVENT, handleLabelsChanged)
+      window.removeEventListener('storage', handleLabelsChanged)
+    }
+  }, [])
+
+  const lineStages = useMemo(() => {
+    return buildLineFollowingStages(settings, customRoundLabels, lineResults)
+  }, [settings, customRoundLabels, lineResults])
+
+  const currentStageConfig = lineStages.find((s) => s.value === stage) || {
+    value: stage,
+    label: customRoundLabels[stage] || `${stage}. szakasz`
+  }
+
+  const handleSaveStageLabel = (stageValue, newLabel) => {
+    const updated = setCustomLineStageLabel(stageValue, newLabel)
+    setCustomRoundLabels(updated)
+    setEditingStage(false)
+    setActionMessage({ type: 'success', text: `A(z) ${stageValue}. szakasz neve mentve: "${newLabel}"` })
+  }
+
+  const handleResetStageLabel = (stageValue) => {
+    const updated = setCustomLineStageLabel(stageValue, '')
+    setCustomRoundLabels(updated)
+    setEditingStage(false)
+    setActionMessage({ type: 'success', text: `A(z) ${stageValue}. szakasz neve visszaállítva az alapértelmezettre.` })
+  }
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [lineResultsResponse, lineTeamNamesResponse, teamNamesResponse, allTeamsResponse] = await Promise.all([
+      const [lineResultsResponse, lineTeamNamesResponse, teamNamesResponse, allTeamsResponse, settingsResponse] = await Promise.all([
         fetch(`${API_BASE}/LineFollowing/allattempts`),
         fetch(`${API_BASE}/LineFollowing/teamnames`),
         fetch(`${API_BASE}/Teams/teamnames`),
-        fetch(`${API_BASE}/Teams`)
+        fetch(`${API_BASE}/Teams`),
+        fetch(`${API_BASE}/Settings/getAllSettings`).catch(() => null)
       ])
 
       const lineResultsData = lineResultsResponse.ok ? await lineResultsResponse.json() : []
       const lineTeamNamesData = lineTeamNamesResponse.ok ? await lineTeamNamesResponse.json() : []
       const teamNamesData = teamNamesResponse.ok ? await teamNamesResponse.json() : []
       const allTeamsData = allTeamsResponse.ok ? await allTeamsResponse.json() : []
+      let settingsData = null
+      if (settingsResponse && settingsResponse.ok) {
+        const s = await settingsResponse.json()
+        settingsData = Array.isArray(s) ? s[0] : s
+      }
 
       const namesFromResults = Array.isArray(lineResultsData)
         ? Array.from(new Set(lineResultsData
@@ -795,15 +1115,25 @@ function GameLineFollowingScoring() {
         ? teamNamesData.map((item) => (typeof item === 'string' ? item : item?.teamName || item?.team_name || '')).filter(Boolean)
         : []
 
+      const allTeamNames = Array.isArray(allTeamsData)
+        ? allTeamsData.map((item) => (typeof item === 'string' ? item : item?.teamName || item?.team_name || '')).filter(Boolean)
+        : []
+
       const finalTeamNames = activeLineFollowingTeamNames.length > 0
         ? activeLineFollowingTeamNames
         : fallbackTeamNames.length > 0
           ? fallbackTeamNames
           : namesFromResults
 
-      setTeamNames(Array.from(new Set(finalTeamNames)))
+      const combinedTeamNames = Array.from(new Set([
+        ...finalTeamNames,
+        ...allTeamNames
+      ]))
+
+      setTeamNames(combinedTeamNames)
       setAllTeams(Array.isArray(allTeamsData) ? allTeamsData : [])
       setLineResults(Array.isArray(lineResultsData) ? lineResultsData : [])
+      if (settingsData) setSettings(settingsData)
     } catch (error) {
       setActionMessage({ type: 'danger', text: error.message })
     } finally {
@@ -833,6 +1163,30 @@ function GameLineFollowingScoring() {
     return () => window.clearTimeout(timeoutId)
   }, [actionMessage])
 
+  // Attempts count and limit for selected team in the active stage
+  const maxTries = Number(settings?.maxTryLinefollowing ?? settings?.maxTryLineFollow) || 2
+
+  const teamAttemptsForStage = useMemo(() => {
+    if (!selectedTeamName) return []
+    return lineResults.filter((item) => {
+      const itemTeam = (item.team_name || item.teamName || '').toLowerCase()
+      const itemStage = Number(item.tournamentStage || item.tournament_stage || item.stage || 1)
+      return itemTeam === selectedTeamName.toLowerCase() && itemStage === stage
+    })
+  }, [lineResults, selectedTeamName, stage])
+
+  const attemptCount = teamAttemptsForStage.length
+  const isMaxReached = attemptCount >= maxTries
+  const currentAttemptNumber = Math.min(attemptCount + 1, maxTries)
+
+  const bestTimeInStage = useMemo(() => {
+    if (teamAttemptsForStage.length === 0) return null
+    const validTimes = teamAttemptsForStage
+      .map((item) => Number(item.time))
+      .filter((t) => Number.isFinite(t) && t > 0)
+    return validTimes.length > 0 ? Math.min(...validTimes) : null
+  }, [teamAttemptsForStage])
+
   const handleSave = async () => {
     const parsedTime = Number(time)
 
@@ -846,8 +1200,16 @@ function GameLineFollowingScoring() {
       return
     }
 
+    if (isMaxReached) {
+      setActionMessage({
+        type: 'danger',
+        text: `Ez a csapat (${selectedTeamName}) a(z) ${lineStages.find((s) => s.value === stage)?.label || `${stage}. szakasz`}ban már elérte a maximális (${maxTries}) próbálkozási számot!`
+      })
+      return
+    }
+
     if (!Number.isFinite(parsedTime) || parsedTime <= 0 || parsedTime > MAX_TIME_SECONDS) {
-      setActionMessage({ type: 'danger', text: 'Adj meg érvényes időt (0-120 mp).' })
+      setActionMessage({ type: 'danger', text: `Adj meg érvényes időt (0-${MAX_TIME_SECONDS} mp).` })
       return
     }
 
@@ -861,14 +1223,15 @@ function GameLineFollowingScoring() {
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(errorText || 'A mentés sikertelen volt.')
+        const errorText = await readApiError(response, 'A mentés sikertelen volt.')
+        throw new Error(errorText)
       }
 
       setTime('')
-      setSelectedTeamName('')
-      setTeamSearch('')
-      setActionMessage({ type: 'success', text: 'Vonalkövetés eredmény rögzítve.' })
+      setActionMessage({
+        type: 'success',
+        text: `"${selectedTeamName}" vonalkövetés eredménye (${parsedTime} s) sikeresen rögzítve!`
+      })
 
       // Reload results
       const res = await fetch(`${API_BASE}/LineFollowing/allattempts`)
@@ -891,17 +1254,44 @@ function GameLineFollowingScoring() {
 
     setSaving(true)
     try {
-      const response = await authFetch(`${API_BASE}/LineFollowing/${encodeURIComponent(teamName)}/${rTime}/${rStage}`, {
+      // 1. Direct delete call
+      let response = await authFetch(`${API_BASE}/LineFollowing/${encodeURIComponent(teamName)}/${rTime}/${rStage}`, {
         method: 'DELETE',
         headers: { accept: '*/*' }
       })
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(errorText || 'Az eredmény törlése sikertelen volt.')
+
+      // 2. Fallback: if server responds with 400 because route parameter is int32 on the C# controller
+      if (!response.ok && response.status === 400 && !Number.isInteger(rTime)) {
+        const roundedTime = Math.round(rTime)
+        const fallbackResponse = await authFetch(`${API_BASE}/LineFollowing/${encodeURIComponent(teamName)}/${roundedTime}/${rStage}`, {
+          method: 'DELETE',
+          headers: { accept: '*/*' }
+        })
+        if (fallbackResponse.ok) {
+          response = fallbackResponse
+        }
       }
+
+      if (!response.ok) {
+        const errorText = await readApiError(response, 'Az eredmény törlése sikertelen volt.')
+        if (response.status === 400 && !Number.isInteger(rTime)) {
+          throw new Error(
+            `A szerver a törléshez egész számot vár (int32), de a mentett idő tizedestört (${rTime} s). A backend fejlesztőnek a DELETE /api/LineFollowing/{teamName}/{time}/{stage} végponton a time paramétert double típusúra kell módosítania! (${errorText})`
+          )
+        }
+        throw new Error(errorText)
+      }
+
       setLineResults((prev) => prev.filter((item) => item !== resultToDelete))
       setActionMessage({ type: 'success', text: 'Az eredmény sikeresen törölve.' })
       setResultToDelete(null)
+
+      // Reload results
+      const res = await fetch(`${API_BASE}/LineFollowing/allattempts`)
+      if (res.ok) {
+        const data = await res.json()
+        setLineResults(Array.isArray(data) ? data : [])
+      }
     } catch (error) {
       setActionMessage({ type: 'danger', text: error.message })
       setResultToDelete(null)
@@ -952,17 +1342,78 @@ function GameLineFollowingScoring() {
     <section className="game-scoring-panel">
       <FloatingFeedback message={actionMessage} onClose={() => setActionMessage(null)} />
       <header className="game-scoring-panel__header">
-        <h3>Vonalkövetés</h3>
-        <p>Stopperrel mérd az időt, majd azonnal mentsd az adott szakaszba.</p>
+        <div className="d-flex justify-content-between align-items-center">
+          <div>
+            <h3>Vonalkövetés</h3>
+            <p>Stopperrel mérd az időt, majd azonnal mentsd az adott szakaszba.</p>
+          </div>
+          {selectedTeamName && (
+            <button
+              type="button"
+              className="btn btn-outline-secondary btn-sm"
+              onClick={() => {
+                setSelectedTeamName('')
+                setTeamSearch('')
+                setTime('')
+              }}
+            >
+              Új csapat
+            </button>
+          )}
+        </div>
       </header>
 
-      {loading ? <div className="alert alert-secondary">Csapatok betöltése...</div> : (
+      {loading ? <div className="alert alert-secondary">Csapatok és beállítások betöltése...</div> : (
         <>
+          {/* Próbálkozás státusz doboz */}
+          {selectedTeamName && (
+            <div
+              className={`p-3 rounded-3 mb-3 border ${isMaxReached ? 'border-secondary' : 'border-warning'}`}
+              style={{ backgroundColor: isMaxReached ? '#f8f9fa' : '#fff9e6' }}
+            >
+              <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                  <span
+                    className="badge fw-bold mb-1"
+                    style={{
+                      backgroundColor: isMaxReached ? '#6c757d' : 'var(--yellow)',
+                      color: isMaxReached ? 'var(--white)' : 'var(--black)',
+                      border: isMaxReached ? 'none' : '1px solid var(--black)'
+                    }}
+                  >
+                    {isMaxReached ? 'Maximális próbálkozás elérve' : `${currentAttemptNumber}. próbálkozás / ${maxTries}`}
+                  </span>
+                  <div className="fw-semibold text-dark fs-6">
+                    {selectedTeamName} – {isMaxReached ? `Ebben a szakaszban elérte a maximális (${maxTries}) próbát.` : `A(z) ${currentAttemptNumber}. próba rögzítése zajlik.`}
+                  </div>
+                  <div className="small text-muted">
+                    {isMaxReached
+                      ? `Ez a csapat a(z) ${lineStages.find((s) => s.value === stage)?.label || `${stage}. szakasz`}ban már rögzítette mind a ${maxTries} próbáját. Új próba rögzítéséhez törölj egy korábbit a lenti listából.`
+                      : bestTimeInStage !== null
+                        ? `Eddigi legjobb idő ebben a szakaszban: ${bestTimeInStage} s`
+                        : `Még nincs rögzített próbálkozása ebben a szakaszban.`}
+                  </div>
+                </div>
+                <div className="text-end">
+                  <span
+                    className="badge fs-6"
+                    style={{
+                      backgroundColor: isMaxReached ? 'var(--red)' : 'var(--orange)',
+                      color: 'var(--white)'
+                    }}
+                  >
+                    {attemptCount} / {maxTries} próba kész
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="row g-3">
             <div className="col-12 col-lg-6">
               <SearchPicker
                 id="line-team-search"
-                label="Csapat keresése"
+                label="Csapat kiválasztása"
                 value={teamSearch}
                 onChange={(nextValue) => {
                   setTeamSearch(nextValue)
@@ -978,22 +1429,77 @@ function GameLineFollowingScoring() {
                 }}
               />
               {selectedTeamName && (
-                <div className="small mt-2 text-muted"><AgeGroupBadge category={selectedTeamCategory} className="me-2" />Aktív csapat: {selectedTeamName}</div>
+                <div className="small mt-2 text-muted">
+                  <AgeGroupBadge category={selectedTeamCategory} className="me-2" />
+                  Aktív csapat: <strong>{selectedTeamName}</strong>
+                </div>
               )}
             </div>
             <div className="col-12 col-lg-6">
-              <label className="form-label">Szakasz</label>
-              <select className="form-select" value={stage} onChange={(event) => setStage(Number(event.target.value))}>
-                {LINE_STAGES.map((item) => (
-                  <option value={item.value} key={item.value}>{item.value}. {item.label}</option>
-                ))}
-              </select>
+              <div className="d-flex justify-content-between align-items-center mb-1">
+                <label className="form-label fw-bold mb-0">Szakasz</label>
+                {!editingStage ? (
+                  <button
+                    type="button"
+                    className="btn btn-link btn-sm p-0 text-decoration-none"
+                    title="Kiválasztott szakasz átnevezése"
+                    onClick={() => {
+                      setEditingStage(true)
+                      setEditingLabel(currentStageConfig.label)
+                    }}
+                  >
+                    <i className="bi bi-pencil me-1" />
+                    Átnevezés
+                  </button>
+                ) : null}
+              </div>
+              {editingStage ? (
+                <div className="d-flex gap-1">
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={editingLabel}
+                    onChange={(e) => setEditingLabel(e.target.value)}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-success px-2"
+                    title="Mentés"
+                    onClick={() => handleSaveStageLabel(stage, editingLabel)}
+                  >
+                    <i className="bi bi-check-lg" />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary px-2"
+                    title="Mégse"
+                    onClick={() => setEditingStage(false)}
+                  >
+                    <i className="bi bi-x-lg" />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-warning px-2"
+                    title="Visszaállítás alapértelmezettre"
+                    onClick={() => handleResetStageLabel(stage)}
+                  >
+                    <i className="bi bi-arrow-counterclockwise" />
+                  </button>
+                </div>
+              ) : (
+                <select className="form-select" value={stage} onChange={(event) => setStage(Number(event.target.value))}>
+                  {lineStages.map((item) => (
+                    <option value={item.value} key={item.value}>{item.value}. {item.label}</option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 
           <div className="row g-3 mt-1 align-items-end">
             <div className="col-12 col-lg-4">
-              <label className="form-label">Idő (mp)</label>
+              <label className="form-label fw-bold">Idő (mp)</label>
               <StepperInput
                 value={time}
                 min={0}
@@ -1001,30 +1507,104 @@ function GameLineFollowingScoring() {
                 step={0.001}
                 inputMode="decimal"
                 onChange={(value) => setTime(value)}
+                disabled={isMaxReached || !selectedTeamName}
               />
-              <div className="form-text">Kézzel is szerkeszthető.</div>
+              <div className="form-text">Stopperből átemelhető vagy kézzel szerkeszthető.</div>
             </div>
             <div className="col-12 col-lg-8">
-              <PrecisionStopwatch onCapture={(value) => setTime(value)} />
+              <PrecisionStopwatch onCapture={(value) => setTime(value)} disabled={isMaxReached || !selectedTeamName} />
             </div>
           </div>
 
           <div className="d-flex justify-content-end mt-4">
-            <button type="button" className="btn btn-lg btn-warning game-scoring-save-btn" onClick={handleSave} disabled={saving}>
-              {saving ? 'Mentés...' : 'Eredmény rögzítése'}
+            <button
+              type="button"
+              className="btn btn-lg game-scoring-save-btn fw-bold px-4"
+              style={{
+                backgroundColor: (isMaxReached || !selectedTeamName) ? '#6c757d' : 'var(--yellow)',
+                borderColor: (isMaxReached || !selectedTeamName) ? '#6c757d' : 'var(--black)',
+                color: (isMaxReached || !selectedTeamName) ? 'var(--white)' : 'var(--black)'
+              }}
+              onClick={handleSave}
+              disabled={saving || isMaxReached || !selectedTeamName}
+            >
+              <i className="bi bi-check2-circle me-1" />
+              {saving ? 'Mentés...' : isMaxReached ? 'Max. próba elérve' : 'Eredmény rögzítése'}
             </button>
           </div>
+
+          {/* Kiválasztott csapat próbálkozásainak története */}
+          {selectedTeamName && (
+            <div className="card border-0 bg-light mt-4 p-3 rounded-3 shadow-sm">
+              <h5 className="h6 fw-bold mb-2 text-dark d-flex align-items-center justify-content-between">
+                <span>
+                  <i className="bi bi-clock-history me-2" style={{ color: 'var(--orange)' }} />
+                  {selectedTeamName} – Próbálkozások a(z) {lineStages.find((s) => s.value === stage)?.label || `${stage}. szakasz`}ban ({teamAttemptsForStage.length} / {maxTries})
+                </span>
+                {bestTimeInStage !== null && (
+                  <span className="badge" style={{ backgroundColor: 'var(--green)', color: 'var(--white)' }}>
+                    Legjobb: {bestTimeInStage} s
+                  </span>
+                )}
+              </h5>
+              {teamAttemptsForStage.length === 0 ? (
+                <div className="small text-muted fst-italic">Ebben a szakaszban még nincs rögzített próbálkozása a csapatnak.</div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table table-sm table-bordered bg-white mb-0 small">
+                    <thead className="table-light">
+                      <tr>
+                        <th>#</th>
+                        <th>Időeredmény</th>
+                        <th>Szakasz</th>
+                        <th className="text-end" style={{ width: '80px' }}>Törlés</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {teamAttemptsForStage.map((att, idx) => {
+                        const isBest = Number(att.time) === bestTimeInStage
+                        return (
+                          <tr key={idx} className={isBest ? 'table-warning' : ''}>
+                            <td className="fw-bold">{idx + 1}. próba</td>
+                            <td className="font-monospace fw-bold">
+                              {att.time} s {isBest && <span className="badge ms-1" style={{ backgroundColor: 'var(--green)', color: 'var(--white)' }}>Legjobb</span>}
+                            </td>
+                            <td>{lineStages.find((s) => s.value === Number(att.tournamentStage || att.tournament_stage || att.stage || 1))?.label || `${stage}. szakasz`}</td>
+                            <td className="text-end">
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-danger py-0 px-2"
+                                onClick={() => setResultToDelete(att)}
+                                title="Eredmény törlése"
+                              >
+                                <i className="bi bi-trash" />
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="card shadow-sm border mt-4 p-3 bg-light">
             <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
               <div>
-                <h4 className="h5 mb-0">Rögzített próbálkozások ({LINE_STAGES.find((s) => s.value === stage)?.label || `${stage}. szakasz`})</h4>
+                <h4 className="h5 mb-0">Rögzített próbálkozások ({lineStages.find((s) => s.value === stage)?.label || `${stage}. szakasz`})</h4>
                 <span className="text-muted small">{displayResults.length} eredmény találva</span>
               </div>
               <div className="btn-group" role="group" aria-label="Rendezés">
                 <button
                   type="button"
-                  className={`btn btn-sm ${sortField === 'name' ? 'btn-primary' : 'btn-outline-primary'}`}
+                  className="btn btn-sm"
+                  style={{
+                    backgroundColor: sortField === 'name' ? 'var(--orange)' : 'transparent',
+                    borderColor: 'var(--orange)',
+                    color: sortField === 'name' ? 'var(--white)' : 'var(--black)'
+                  }}
                   onClick={() => {
                     if (sortField === 'name') {
                       setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))
@@ -1039,7 +1619,12 @@ function GameLineFollowingScoring() {
                 </button>
                 <button
                   type="button"
-                  className={`btn btn-sm ${sortField === 'time' ? 'btn-primary' : 'btn-outline-primary'}`}
+                  className="btn btn-sm"
+                  style={{
+                    backgroundColor: sortField === 'time' ? 'var(--orange)' : 'transparent',
+                    borderColor: 'var(--orange)',
+                    color: sortField === 'time' ? 'var(--white)' : 'var(--black)'
+                  }}
                   onClick={() => {
                     if (sortField === 'time') {
                       setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))
@@ -1085,7 +1670,7 @@ function GameLineFollowingScoring() {
                       const teamObj = allTeams.find((t) => (t.teamName || t.team_name) === teamName)
                       const category = teamObj ? (Number(teamObj.category) === 1 ? 1 : 0) : null
                       const itemStage = Number(item.tournamentStage || item.tournament_stage || item.stage || 1)
-                      const stageLabel = LINE_STAGES.find((s) => s.value === itemStage)?.label || `${itemStage}. szakasz`
+                      const stageLabel = lineStages.find((s) => s.value === itemStage)?.label || `${itemStage}. szakasz`
 
                       return (
                         <tr key={`${teamName}-${item.time}-${itemStage}-${idx}`}>
@@ -1134,14 +1719,20 @@ function GameLineFollowingScoring() {
               <div className="modal-body">
                 <p className="mb-2 text-dark">Biztosan törlöd ezt az eredményt?</p>
                 <p className="fw-semibold mb-1 text-dark">{resultToDelete.team_name || resultToDelete.teamName}</p>
-                <p className="small mb-0 text-dark">Idő: {resultToDelete.time} s</p>
-                <p className="small mb-0 text-dark">Szakasz: {LINE_STAGES.find((s) => s.value === Number(resultToDelete.tournamentStage || resultToDelete.tournament_stage || resultToDelete.stage || 1))?.label || `${resultToDelete.tournamentStage || 1}. szakasz`}</p>
+                <p className="small mb-0 text-dark">Idő: <strong>{resultToDelete.time} s</strong></p>
+                <p className="small mb-0 text-dark">Szakasz: {lineStages.find((s) => s.value === Number(resultToDelete.tournamentStage || resultToDelete.tournament_stage || resultToDelete.stage || 1))?.label || `${resultToDelete.tournamentStage || 1}. szakasz`}</p>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-outline-secondary" onClick={() => setResultToDelete(null)} disabled={saving}>
                   Mégse
                 </button>
-                <button type="button" className="btn btn-danger" onClick={handleDeleteResult} disabled={saving}>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  style={{ backgroundColor: 'var(--red)', borderColor: 'var(--red)' }}
+                  onClick={handleDeleteResult}
+                  disabled={saving}
+                >
                   {saving ? 'Törlés...' : 'Törlés megerősítése'}
                 </button>
               </div>
@@ -1356,10 +1947,10 @@ function GameHillClimbingScoring() {
         <>
           {/* Próbálkozás státusz doboz */}
           {selectedTeamName && (
-            <div className={`p-3 rounded-3 mb-3 border ${isMaxReached ? 'bg-secondary-subtle border-secondary' : 'bg-primary-subtle border-primary'}`}>
+            <div className={`p-3 rounded-3 mb-3 border ${isMaxReached ? 'border-secondary' : 'border-warning'}`} style={{ backgroundColor: isMaxReached ? '#f8f9fa' : '#fff9e6' }}>
               <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <div>
-                  <span className={`badge ${isMaxReached ? 'text-bg-secondary' : 'text-bg-primary'} fw-bold mb-1`}>
+                  <span className="badge fw-bold mb-1" style={{ backgroundColor: isMaxReached ? '#6c757d' : 'var(--yellow)', color: isMaxReached ? 'var(--white)' : 'var(--black)', border: isMaxReached ? 'none' : '1px solid var(--black)' }}>
                     {isMaxReached ? 'Minden próbálkozás befejezve' : `${currentAttemptNumber}. próbálkozás / ${maxTries}`}
                   </span>
                   <div className="fw-semibold text-dark fs-6">
@@ -1372,7 +1963,7 @@ function GameHillClimbingScoring() {
                   </div>
                 </div>
                 <div className="text-end">
-                  <span className="badge text-bg-dark fs-6">
+                  <span className="badge fs-6" style={{ backgroundColor: isMaxReached ? 'var(--red)' : 'var(--orange)', color: 'var(--white)' }}>
                     {closedCount} / {maxTries} próba kész
                   </span>
                 </div>
@@ -1444,7 +2035,8 @@ function GameHillClimbingScoring() {
           <div className="d-flex flex-wrap justify-content-end gap-2 mt-4">
             <button
               type="button"
-              className="btn btn-outline-primary"
+              className="btn btn-outline-dark"
+              style={{ borderColor: 'var(--orange)', color: 'var(--orange)' }}
               onClick={handleSaveProgress}
               disabled={saving || !selectedTeamName}
               title="Szint és idő elmentése a próba lezárása nélkül (amíg a robot mászik)"
@@ -1454,7 +2046,12 @@ function GameHillClimbingScoring() {
             </button>
             <button
               type="button"
-              className="btn btn-primary game-scoring-save-btn fw-bold px-4"
+              className="btn btn-lg game-scoring-save-btn fw-bold px-4"
+              style={{
+                backgroundColor: (isMaxReached || !selectedTeamName) ? '#6c757d' : 'var(--yellow)',
+                borderColor: (isMaxReached || !selectedTeamName) ? '#6c757d' : 'var(--black)',
+                color: (isMaxReached || !selectedTeamName) ? 'var(--white)' : 'var(--black)'
+              }}
               onClick={handleFinishAttempt}
               disabled={saving || !selectedTeamName}
               title="A próba véget ért (kiesett a hegyről vagy elérte a 4. szintet)"
@@ -2139,7 +2736,8 @@ function GameSumoScoring() {
         </div>
         <button
           type="button"
-          className="btn btn-primary fw-bold shadow-sm"
+          className="btn fw-bold shadow-sm"
+          style={{ backgroundColor: 'var(--yellow)', color: 'var(--black)', border: '1px solid var(--black)' }}
           onClick={() => {
             const nextTable = matches.length > 0 ? Math.max(...matches.map((m) => Number(m.table) || 0)) + 1 : 1
             setManualTable(nextTable)
@@ -2162,21 +2760,21 @@ function GameSumoScoring() {
             <div className="sumo-timer-modes">
               <button
                 type="button"
-                className={`btn ${timerMode === 'match' ? 'btn-primary' : 'btn-outline-primary'}`}
+                className="btn fw-bold" style={timerMode === 'match' ? { backgroundColor: 'var(--orange)', color: 'var(--white)', border: '1px solid var(--orange)' } : { borderColor: 'var(--orange)', color: 'var(--orange)' }}
                 onClick={() => setTimerMode('match')}
               >
                 Meccs 45 mp
               </button>
               <button
                 type="button"
-                className={`btn ${timerMode === 'timeout' ? 'btn-primary' : 'btn-outline-primary'}`}
+                className="btn fw-bold" style={timerMode === 'timeout' ? { backgroundColor: 'var(--orange)', color: 'var(--white)', border: '1px solid var(--orange)' } : { borderColor: 'var(--orange)', color: 'var(--orange)' }}
                 onClick={() => setTimerMode('timeout')}
               >
                 Időkérés 30 mp
               </button>
               <button
                 type="button"
-                className={`btn ${timerMode === 'break' ? 'btn-primary' : 'btn-outline-primary'}`}
+                className="btn fw-bold" style={timerMode === 'break' ? { backgroundColor: 'var(--orange)', color: 'var(--white)', border: '1px solid var(--orange)' } : { borderColor: 'var(--orange)', color: 'var(--orange)' }}
                 onClick={() => setTimerMode('break')}
               >
                 Szünet 30 mp
@@ -2199,7 +2797,8 @@ function GameSumoScoring() {
               <label className="form-label fw-bold mb-0">Aktív mérkőzés kiválasztása</label>
               <button
                 type="button"
-                className="btn btn-sm btn-outline-primary fw-bold"
+                className="btn btn-sm fw-bold"
+                style={{ borderColor: 'var(--orange)', color: 'var(--orange)' }}
                 onClick={() => {
                   const nextTable = matches.length > 0 ? Math.max(...matches.map((m) => Number(m.table) || 0)) + 1 : 1
                   setManualTable(nextTable)
@@ -2386,7 +2985,7 @@ function GameSumoScoring() {
               <form onSubmit={handleCreateManualMatch}>
                 <div className="modal-header">
                   <h5 className="modal-title">
-                    <i className="bi bi-plus-circle text-primary me-2" />
+                    <i className="bi bi-plus-circle me-2" style={{ color: 'var(--orange)' }} />
                     Kézi mérkőzés létrehozása
                   </h5>
                   <button

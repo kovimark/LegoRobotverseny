@@ -4,6 +4,7 @@ import AgeGroupBadge from '../components/AgeGroupBadge'
 import ConfirmModal from '../components/ConfirmModal'
 import { authFetch } from '../services/apiClient'
 import { cleanTestData } from '../services/sumoScheduleConfigApi'
+import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 
 const API_BASE_URL = 'https://brickathlon.runasp.net'
 
@@ -141,6 +142,8 @@ export default function AdminPage() {
 
   useEffect(() => {
     fetchTeams()
+    window.addEventListener(DATA_REFRESH_EVENT, fetchTeams)
+    return () => window.removeEventListener(DATA_REFRESH_EVENT, fetchTeams)
   }, [])
 
   useEffect(() => {

@@ -4,7 +4,12 @@ import FloatingFeedback from '../components/FloatingFeedback'
 import TeamGroupManager from '../components/TeamGroupManager'
 import BackupManager from '../components/BackupManager'
 import CompetitionStatistics from '../components/CompetitionStatistics'
+import { DATA_REFRESH_EVENT } from '../config/dataRefresh'
 import { getNotificationTeams as getTeams } from '../services/notificationApi'
+import {
+  getCustomLineStageLabels,
+  buildLineFollowingStages
+} from '../services/lineFollowingStageConfig'
 import {
   addCompetitionPhase,
   cleanTestData,
@@ -89,7 +94,11 @@ export default function SettingsManagementPage({ groupOnly = false }) {
     if (groupOnly) return undefined
     const handleSettingsChange = () => loadData()
     window.addEventListener(SUMO_CONFIG_CHANGED_EVENT, handleSettingsChange)
-    return () => window.removeEventListener(SUMO_CONFIG_CHANGED_EVENT, handleSettingsChange)
+    window.addEventListener(DATA_REFRESH_EVENT, handleSettingsChange)
+    return () => {
+      window.removeEventListener(SUMO_CONFIG_CHANGED_EVENT, handleSettingsChange)
+      window.removeEventListener(DATA_REFRESH_EVENT, handleSettingsChange)
+    }
   }, [groupOnly])
   const updateSettings = (name, value) => setSettings((current) => ({ ...current, [name]: value }))
   const updatePhase = (name, value) => setPhaseDraft((current) => ({ ...current, [name]: value }))
@@ -509,6 +518,22 @@ export default function SettingsManagementPage({ groupOnly = false }) {
               <div className="col-md-4"><label className="form-label" htmlFor="advance-primary">Továbbjutók – általános iskolás</label><input id="advance-primary" type="number" min="0" max={teamCounts.primary} step="1" className="form-control" disabled={Number(settings.ageGroupBreakdown) !== 1} value={settings.psGroupAdvance ?? ''} onChange={(event) => { const v = event.target.value; updateSettings('psGroupAdvance', v === '' ? '' : Math.min(teamCounts.primary, Math.max(0, Number(v)))) }} onBlur={() => { if (settings.psGroupAdvance === '') updateSettings('psGroupAdvance', 0) }} /><div className="form-text">Maximum {teamCounts.primary} csapat.</div></div>
               <div className="col-md-4"><label className="form-label" htmlFor="advance-secondary">Továbbjutók – középiskolás</label><input id="advance-secondary" type="number" min="0" max={teamCounts.secondary} step="1" className="form-control" disabled={Number(settings.ageGroupBreakdown) !== 1} value={settings.hsGroupAdvance ?? ''} onChange={(event) => { const v = event.target.value; updateSettings('hsGroupAdvance', v === '' ? '' : Math.min(teamCounts.secondary, Math.max(0, Number(v)))) }} onBlur={() => { if (settings.hsGroupAdvance === '') updateSettings('hsGroupAdvance', 0) }} /><div className="form-text">Maximum {teamCounts.secondary} csapat.</div></div>
               <div className="col-12"><div className="form-text">Ugyanezeket a létszámokat használja a vonalkövetés és a szumó csoportköre.</div></div>
+              <div className="col-12">
+                <div className="p-3 bg-light rounded border">
+                  <div className="fw-semibold mb-1 text-dark">Vonalkövetés kieséses szakaszai a továbbjutók száma alapján:</div>
+                  <div className="d-flex flex-wrap gap-2 align-items-center">
+                    {buildLineFollowingStages(settings, getCustomLineStageLabels()).map((s, idx) => (
+                      <span key={s.value} className="badge bg-white text-dark border p-2">
+                        {idx > 0 && <i className="bi bi-arrow-right me-1 text-muted" />}
+                        {s.value}. {s.label}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="small text-muted mt-2">
+                    A szakaszok megnevezése a fenti továbbjutási létszámokból számolódik (pl. 4 továbbjutónál: 2. Legjobb 4, 3. Döntő). A pontozási oldalon az Átnevezés gombbal bármelyik szakasz egyedi nevet is kaphat.
+                  </div>
+                </div>
+              </div>
               <div className="col-12 text-end"><button type="button" className="btn btn-primary" disabled={saving} onClick={async () => { try { setSaving(true); await modifySettings({ ...settings, competitionPhase: getCleanPhaseValue(settings.competitionPhase) }); setStatus({ type: 'success', text: 'A továbbjutási beállítások mentve.' }); await loadData() } catch (error) { setStatus({ type: 'danger', text: error.message }) } finally { setSaving(false) } }}>Továbbjutási beállítások mentése</button></div>
             </div>
           </div>
