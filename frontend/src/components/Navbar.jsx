@@ -77,11 +77,6 @@ export default function Navbar({ user, userRole, userPrivilege, userTeamId, auth
                                 Hírek
                             </Link>
                         </div>
-                        <div className="navbar-nav">
-                            <Link className="nav-link" to="/versenyjelentkezes" onClick={closeMenu}>
-                                Versenyjelentkezés
-                            </Link>
-                        </div>
 
                         <div className="navbar-nav navbar-auth">
                             {user ? (

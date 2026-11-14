@@ -585,21 +585,13 @@ export default function CompetitionRegistration({ user }) {
               </p>
             </div>
 
-            {isBlocked ? (
+            {isBlocked && (
               <div className="alert alert-warning border-warning d-flex align-items-center gap-2 p-3 rounded-3 mb-0" role="alert">
                 <i className="bi bi-exclamation-triangle-fill fs-5 text-warning-emphasis flex-shrink-0" />
                 <div>
                   <strong>A nevezés jelenleg nem elérhető:</strong> Rendszerkarbantartás miatt a verseny regisztráció 10.26-án 10:00 és 16:00 között szünetel. Kérjük, látogass vissza később!
                 </div>
               </div>
-            ) : (
-              <button
-                type="submit"
-                className="btn btn-primary w-100"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Nevezés...' : 'Nevezés'}
-              </button>
             )}
           </form>
         </div>
