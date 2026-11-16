@@ -5,7 +5,7 @@ const FAQ_ITEMS = [
   {
     id: 'faq-1',
     question: 'Mikor kezdődik a helyszíni regisztráció és a tesztelés?',
-    answer: 'A helyszíni regisztráció és a pályatesztelés reggel 7:00-kor indul és 8:50-ig tart. Kérjük a csapatokat, hogy legkésőbb 8:30-ig érkezzenek meg, hogy maradjon elegendő idő a robotok kalibrálására és a tesztelésre a megnyitó előtt.'
+    answer: 'A kapunyitás, a helyszíni regisztráció és a pályatesztelés 9:30-kor indul és 9:50-ig tart. Kérjük a csapatokat, hogy pontosan érkezzenek meg, hogy maradjon elegendő idő a robotok kalibrálására és a tesztelésre a 9:50-es megnyitó előtt.'
   },
   {
     id: 'faq-2',
@@ -20,7 +20,7 @@ const FAQ_ITEMS = [
   {
     id: 'faq-4',
     question: 'Hogyan szerezhet a csapatunk tombolaszelvényt és mikor lesz a húzás?',
-    answer: 'Tombolát többféleképpen gyűjthettek: a helyszíni regisztráció igazolásakor, a segítőknél különböző bemutató állomások kipróbálásakor, a weboldalon elérhető visszajelző kérdőív kitöltésével, illetve rekorddöntéssel. A tombolasorsolás 16:00-kor, az ünnepélyes eredményhirdetéskor zajlik.'
+    answer: 'Tombolát többféleképpen gyűjthettek: a helyszíni regisztráció igazolásakor, a segítőknél különböző bemutató állomások kipróbálásakor, a weboldalon elérhető visszajelző kérdőív kitöltésével, illetve rekorddöntéssel. A tombolasorsolás a 12:10-es ünnepélyes eredményhirdetéskor zajlik.'
   },
   {
     id: 'faq-5',
@@ -30,7 +30,7 @@ const FAQ_ITEMS = [
   {
     id: 'faq-6',
     question: 'Mi a teendő, ha holtverseny alakul ki a továbbjutó helyeken?',
-    answer: 'Amennyiben a csoportkör végén pontegyenlőség alakul ki a továbbjutást érintő pozíciókban, a menetrend szerinti 14:00 - 14:30 idősávban hivatalos szétlövés dönt a kieséses szakaszba jutásról.'
+    answer: 'Amennyiben a csoportkör végén pontegyenlőség alakul ki, a versenyszabályzatban rögzített hivatalos szétlövés dönt a végső sorrendről.'
   }
 ];
 

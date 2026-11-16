@@ -8,11 +8,58 @@ export default function Navbar({ user, userRole, userPrivilege, userTeamId, auth
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [isProfileOpen, setIsProfileOpen] = useState(false)
     const [isMessagesModalOpen, setIsMessagesModalOpen] = useState(false)
+    const [isDocsOpen, setIsDocsOpen] = useState(false)
     const isAdmin = userRole === 'admin' || Number(userPrivilege) === 1
     const isHelper = userRole === 'helper' || Number(userPrivilege) === 6
 
     const closeMenu = () => {
         setIsMenuOpen(false)
+        setIsDocsOpen(false)
+    }
+
+    React.useEffect(() => {
+        if (!isDocsOpen) return
+        const handleClickOutside = (e) => {
+            if (!e.target.closest('.docs-dropdown-container')) {
+                setIsDocsOpen(false)
+            }
+        }
+        document.addEventListener('click', handleClickOutside)
+        return () => document.removeEventListener('click', handleClickOutside)
+    }, [isDocsOpen])
+
+    const handleDownloadBoth = (e) => {
+        if (e) e.preventDefault()
+        const doc1 = {
+            url: `${process.env.PUBLIC_URL}/rulebook/alairando_adatkezelesi_tajekoztato_es_nyilatkozat.pdf`,
+            filename: 'alairando_adatkezelesi_tajekoztato_es_nyilatkozat.pdf'
+        }
+        const doc2 = {
+            url: `${process.env.PUBLIC_URL}/rulebook/ADATKEZELÉSI TÁJÉKOZTATÓ ÉS NYILATKOZAT.pdf`,
+            filename: 'ADATKEZELÉSI TÁJÉKOZTATÓ ÉS NYILATKOZAT.pdf'
+        }
+
+        const link1 = document.createElement('a')
+        link1.href = doc1.url
+        link1.download = doc1.filename
+        link1.target = '_blank'
+        link1.rel = 'noopener noreferrer'
+        document.body.appendChild(link1)
+        link1.click()
+        document.body.removeChild(link1)
+
+        setTimeout(() => {
+            const link2 = document.createElement('a')
+            link2.href = doc2.url
+            link2.download = doc2.filename
+            link2.target = '_blank'
+            link2.rel = 'noopener noreferrer'
+            document.body.appendChild(link2)
+            link2.click()
+            document.body.removeChild(link2)
+        }, 350)
+
+        closeMenu()
     }
 
     const handleProfileToggle = () => {
@@ -76,6 +123,74 @@ export default function Navbar({ user, userRole, userPrivilege, userTeamId, auth
                             <Link className="nav-link" to="/hirek" onClick={closeMenu}>
                                 Hírek
                             </Link>
+                        </div>
+                        <div className="navbar-nav position-relative docs-dropdown-container">
+                            <div className="d-flex align-items-center">
+                                <button
+                                    type="button"
+                                    className="nav-link btn btn-link text-decoration-none border-0 text-start d-inline-flex align-items-center"
+                                    onClick={handleDownloadBoth}
+                                    title="Mindkét nyilatkozat letöltése (Aláírandó nyilatkozat és Adatkezelési tájékoztató)"
+                                >
+                                    <i className="bi bi-file-earmark-arrow-down-fill me-1" aria-hidden="true" />
+                                    Nyilatkozatok letöltése
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-sm btn-link text-dark p-1 text-decoration-none docs-dropdown-arrow"
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        setIsDocsOpen(prev => !prev)
+                                    }}
+                                    aria-label="Választék megnyitása"
+                                    aria-expanded={isDocsOpen}
+                                    title="Külön letöltési lehetőségek"
+                                >
+                                    <i className={`bi ${isDocsOpen ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
+                                </button>
+                            </div>
+
+                            {isDocsOpen && (
+                                <div className="docs-dropdown-menu">
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm btn-light w-100 text-start fw-bold mb-1 d-flex align-items-center gap-2"
+                                        onClick={handleDownloadBoth}
+                                    >
+                                        <i className="bi bi-download text-primary" />
+                                        <span>Mindkét dokumentum letöltése</span>
+                                    </button>
+                                    <hr className="my-1" />
+                                    <a
+                                        href={`${process.env.PUBLIC_URL}/rulebook/alairando_adatkezelesi_tajekoztato_es_nyilatkozat.pdf`}
+                                        download="alairando_adatkezelesi_tajekoztato_es_nyilatkozat.pdf"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="btn btn-sm btn-light w-100 text-start mb-1 d-flex align-items-center gap-2"
+                                        onClick={() => {
+                                            setIsDocsOpen(false)
+                                            closeMenu()
+                                        }}
+                                    >
+                                        <i className="bi bi-file-earmark-check-fill text-success" />
+                                        <span>alairando_adatkezelesi_tajekoztato_es_nyilatkozat.pdf</span>
+                                    </a>
+                                    <a
+                                        href={`${process.env.PUBLIC_URL}/rulebook/ADATKEZELÉSI TÁJÉKOZTATÓ ÉS NYILATKOZAT.pdf`}
+                                        download="ADATKEZELÉSI TÁJÉKOZTATÓ ÉS NYILATKOZAT.pdf"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="btn btn-sm btn-light w-100 text-start d-flex align-items-center gap-2"
+                                        onClick={() => {
+                                            setIsDocsOpen(false)
+                                            closeMenu()
+                                        }}
+                                    >
+                                        <i className="bi bi-file-earmark-text-fill text-secondary" />
+                                        <span>ADATKEZELÉSI TÁJÉKOZTATÓ ÉS NYILATKOZAT.pdf</span>
+                                    </a>
+                                </div>
+                            )}
                         </div>
 
                         <div className="navbar-nav navbar-auth">

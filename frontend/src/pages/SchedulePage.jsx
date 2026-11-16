@@ -4,45 +4,38 @@ import { getAllSettings, getAllCompetitionPhases } from '../services/sumoSchedul
 
 const scheduleItems = [
   {
+    id: 'doors_open',
+    time: '9:30',
+    title: 'Kapunyitás',
+    description: 'A helyszín kapuinak megnyitása és a résztvevők fogadása.',
+    icon: 'bi-door-open-fill'
+  },
+  {
     id: 'test_and_reg',
-    time: '7:00 - 8:50',
-    title: 'Helyszíni tesztelés és regisztráció',
+    time: '9:30 – 9:50',
+    title: 'Tesztelés és regisztráció',
     description: 'A csapatok érkezése, regisztráció és tesztelés a pályákon.',
     icon: 'bi-clipboard-check-fill'
   },
   {
     id: 'opening',
-    time: '8:50 - 9:00',
+    time: '9:50 – 10:00',
     title: 'Megnyitó',
     description: 'Hivatalos megnyitó és a legfontosabb technikai tudnivalók.',
     icon: 'bi-megaphone-fill'
   },
   {
     id: 'group_stage',
-    time: '9:00 - 14:00',
+    time: '10:00 – 12:00',
     title: 'Csoportkör',
     description: 'Csoportmérkőzések és kísérletek lebonyolítása a versenyszámokban.',
     icon: 'bi-grid-3x3-gap-fill'
   },
   {
-    id: 'tie_breaker',
-    time: '14:00 - 14:30',
-    title: 'Holtversenyek eldöntése',
-    description: 'A továbbjutó helyeken kialakult holtversenyek eldöntése.',
-    icon: 'bi-shuffle'
-  },
-  {
-    id: 'knockout_stage',
-    time: '14:30 - 16:00',
-    title: 'Egyenes kieséses szakasz',
-    description: 'A továbbjutott csapatok döntő küzdelmei a helyezésekért.',
-    icon: 'bi-trophy-fill'
-  },
-  {
-    id: 'ceremony_and_tombola',
-    time: '16:00 - 16:30',
-    title: 'Eredményhirdetés és Tombola',
-    description: 'Ünnepélyes díjátadó, eredményhirdetés és tombola sorsolás.',
+    id: 'award_ceremony',
+    time: '12:10',
+    title: 'Eredményhirdetés',
+    description: 'Ünnepélyes díjátadó és eredményhirdetés.',
     icon: 'bi-award-fill'
   }
 ]

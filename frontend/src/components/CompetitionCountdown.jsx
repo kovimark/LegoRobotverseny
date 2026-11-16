@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import './CompetitionCountdown.css';
 
-// Verseny időpontja: 2026. november 21. reggel 07:00:00
-const TARGET_TIME = new Date('2026-11-21T07:00:00').getTime();
+// Verseny időpontja: 2026. november 21. 09:30:00
+const TARGET_TIME = new Date('2026-11-21T09:30:00').getTime();
 
 export default function CompetitionCountdown() {
   const [timeLeft, setTimeLeft] = useState(() => calculateTimeLeft());
@@ -39,8 +39,8 @@ export default function CompetitionCountdown() {
           </h2>
           <p className="countdown-hero-subtitle">
             {timeLeft.isPast
-              ? '2026. november 21. 7:00'
-              : '2026. november 21. • Reggel 7:00 óra'}
+              ? '2026. november 21. 9:30'
+              : '2026. november 21. • 9:30'}
           </p>
         </div>
 

@@ -521,8 +521,8 @@ export default function CompetitionRegistration({ user }) {
                   Adatkezelési tájékoztató (PDF)
                 </a>
                 <a
-                  href={`${process.env.PUBLIC_URL}/rulebook/ALÁÍRANDÓ ADATKEZELÉSI TÁJÉKOZTATÓ ÉS NYILATKOZAT.pdf`}
-                  download="ALÁÍRANDÓ ADATKEZELÉSI TÁJÉKOZTATÓ ÉS NYILATKOZAT.pdf"
+                  href={`${process.env.PUBLIC_URL}/rulebook/alairando_adatkezelesi_tajekoztato_es_nyilatkozat.pdf`}
+                  download="alairando_adatkezelesi_tajekoztato_es_nyilatkozat.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn btn-primary btn-sm flex-fill d-inline-flex align-items-center justify-content-center py-2"
