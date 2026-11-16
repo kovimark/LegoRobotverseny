@@ -31,8 +31,8 @@ export default function Navbar({ user, userRole, userPrivilege, userTeamId, auth
     const handleDownloadBoth = (e) => {
         if (e) e.preventDefault()
         const doc1 = {
-            url: `${process.env.PUBLIC_URL}/rulebook/alairando_adatkezelesi_tajekoztato_es_nyilatkozat.pdf`,
-            filename: 'alairando_adatkezelesi_tajekoztato_es_nyilatkozat.pdf'
+            url: `${process.env.PUBLIC_URL}/rulebook/NYILATKOZAT.docx`,
+            filename: 'NYILATKOZAT.docx'
         }
         const doc2 = {
             url: `${process.env.PUBLIC_URL}/rulebook/ADATKEZELÉSI TÁJÉKOZTATÓ ÉS NYILATKOZAT.pdf`,
@@ -162,8 +162,8 @@ export default function Navbar({ user, userRole, userPrivilege, userTeamId, auth
                                     </button>
                                     <hr className="my-1" />
                                     <a
-                                        href={`${process.env.PUBLIC_URL}/rulebook/alairando_adatkezelesi_tajekoztato_es_nyilatkozat.pdf`}
-                                        download="alairando_adatkezelesi_tajekoztato_es_nyilatkozat.pdf"
+                                        href={`${process.env.PUBLIC_URL}/rulebook/NYILATKOZAT.docx`}
+                                        download="NYILATKOZAT.docx"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="btn btn-sm btn-light w-100 text-start mb-1 d-flex align-items-center gap-2"
@@ -173,7 +173,7 @@ export default function Navbar({ user, userRole, userPrivilege, userTeamId, auth
                                         }}
                                     >
                                         <i className="bi bi-file-earmark-check-fill text-success" />
-                                        <span>alairando_adatkezelesi_tajekoztato_es_nyilatkozat.pdf</span>
+                                        <span>NYILATKOZAT.docx</span>
                                     </a>
                                     <a
                                         href={`${process.env.PUBLIC_URL}/rulebook/ADATKEZELÉSI TÁJÉKOZTATÓ ÉS NYILATKOZAT.pdf`}
